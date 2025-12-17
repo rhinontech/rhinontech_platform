@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+include/
+lib/
+bin/
+pip-selfcheck.json
+.git
+.env
+.env.*
+.DS_Store

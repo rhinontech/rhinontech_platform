@@ -1,0 +1,8 @@
+const path = require("path");
+
+module.exports = {
+  config: path.resolve("config/config.js"),
+  "models-path": path.resolve("crm_models"),
+  "migrations-path": path.resolve("migrations/crm_migrations"),
+  env: "crmdb", 
+};

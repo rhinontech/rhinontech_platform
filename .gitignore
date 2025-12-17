@@ -1,0 +1,53 @@
+# Node artifact files
+node_modules/
+dist/
+build/
+.next/
+
+# Compiled Java class files
+*.class
+
+# Compiled Python bytecode
+*.py[cod]
+__pycache__/
+
+# Log files
+*.log
+
+# Package files
+*.jar
+*.war
+
+# IDEs
+.idea/
+.vscode/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Applications
+*.app
+*.exe
+
+# Large media files
+*.mp4
+*.tiff
+*.avi
+*.flv
+*.mov
+*.wmv
+
+# Environment files
+*.env
+*.env.*
+!.env.example
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# GitHub
+.github/

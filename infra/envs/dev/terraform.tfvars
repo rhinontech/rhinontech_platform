@@ -1,0 +1,13 @@
+aws_region          = "ap-south-1"
+environment         = "dev"
+vpc_cidr            = "10.0.0.0/16"
+public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
+availability_zones  = ["ap-south-1a", "ap-south-1b"]
+ssh_allowed_ips     = ["0.0.0.0/0"] # Limit this in real usage
+ami_id              = "ami-0f5ee92e2d63afc18" # Example Amazon Linux 2 AMI for ap-south-1. VALIDATE OR REPLACE.
+instance_type       = "t3.micro"
+key_name            = "rhinon-dev-key"
+db_instance_class   = "db.t3.micro"
+db_name             = "rhinondb"
+db_username         = "rhinonadmin"
+db_password         = "ChangeMe123!" # Should be injected via secrets manager or env var in real usage

@@ -1,0 +1,766 @@
+import { useState, useRef, useEffect } from 'react';
+import { io } from 'socket.io-client';
+import Cookies from 'js-cookie';
+import SpeechRecognition, {
+  useSpeechRecognition,
+} from 'react-speech-recognition';
+import {
+  chatWithAssistant,
+  getChatHistory,
+} from '@tools/services/AiRinoAssisstant/AiRhinoConvoServices';
+import {
+  closeSocketConversation,
+  getSocketConversationsByUserId,
+  submitPostChatForm,
+} from '@tools/services/AiRinoAssisstant/SocketConversationServices';
+import { uploadConversationFile } from '@tools/services/AiRinoAssisstant/fileUploadService';
+import { savePreChatCustomValue } from '@tools/services/formServices';
+
+// ====== Interfaces ======
+export interface Message {
+  id?: number;
+  text: string;
+  role: 'user' | 'bot' | 'separator' | 'support' | 'trigger' | 'timeout' | 'whatsapp_qr' | 'phone_request' | 'whatsapp_trigger';
+  timestamp: string;
+  user_email?: string;
+  user_id?: string;
+  chatbot_id?: string;
+  chatbot_history?: string;
+  isEmailForm?: boolean;
+  sender_name?: string;
+  sender_image?: string;
+}
+
+export interface ChatWithAssistantRequest {
+  user_id: string;
+  user_email: string;
+  chatbot_id: string;
+  conversation_id: string;
+  prompt: string;
+  isFreePlan: boolean;
+  currentPlan: string;
+}
+
+export const useChatLogic = ({
+  userId,
+  userEmail,
+  appId,
+  conversationId,
+  isAdmin,
+  chatAvatar,
+  chatbot_config,
+  timeoutDuration = 15 * 60 * 1000,
+  onConversationTimeout,
+  setUserEmail,
+  setIsEmailAvailable,
+  isSpeakingWithRealPerson,
+  setIsSpeakingWithRealPerson,
+  onBack,
+  setWindowWidth,
+  postChatForm,
+  preChatForm,
+  isEmailAvailable,
+  adminTestingMode
+}: any) => {
+  const [conversation, setConversation] = useState<any>(null);
+  const [message, setMessage] = useState('');
+  const [chatMessages, setChatMessages] = useState<Message[]>(() => {
+    if (conversationId === 'NEW_CHAT') {
+      if (isAdmin && adminTestingMode) {
+        return [
+          {
+            role: 'bot',
+            chatbot_id: appId,
+            timestamp: new Date().toISOString(),
+            user_email: userEmail,
+            user_id: userId,
+            text: 'Hello, how can I help you today?',
+          },
+        ];
+      } else if (isAdmin) {
+        return [
+          {
+            role: 'bot',
+            chatbot_id: appId,
+            timestamp: new Date().toISOString(),
+            user_email: userEmail,
+            user_id: userId,
+            text: 'Hello, how can I help you today?',
+          },
+          {
+            role: 'user',
+            chatbot_id: appId,
+            timestamp: new Date().toISOString(),
+            user_email: userEmail,
+            user_id: userId,
+            text: 'Hi, I just wanted to check if my recent order has been shipped.',
+          },
+          {
+            role: 'bot',
+            chatbot_id: appId,
+            timestamp: new Date().toISOString(),
+            user_email: userEmail,
+            user_id: userId,
+            text: 'Sure! Could you please share your order ID so I can look it up?',
+          },
+        ];
+      } else {
+        return [
+          {
+            role: 'bot',
+            chatbot_id: appId,
+            timestamp: new Date().toISOString(),
+            user_email: userEmail,
+            user_id: userId,
+            text: 'Hello, how can I help you today?',
+          },
+        ];
+      }
+    }
+    return [];
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [convoId, setConvoId] = useState(conversationId);
+  const [isfetching, setIsFetching] = useState(false);
+  const [isConversationActive, setIsConversationActive] =
+    useState<boolean>(true);
+  const [isConversationClosed, setIsConversationClosed] = useState(false);
+  const [reachedLimit, serReachedLimit] = useState(false);
+  const [supportName, setSupportName] = useState<string>(
+    chatbot_config.chatbotName,
+  );
+  const [supportImage, setSupportImage] = useState<string | null>(null);
+  const [showTyping, setShowTyping] = useState<boolean>(false);
+  const [isListening, setIsListening] = useState(false);
+  const [openPostChatForm, setOpenPostChatForm] = useState(false);
+  const [isPostChatSubmitted, setIsPostChatSubmitted] = useState(false);
+
+  // REF to hold instant value for time-sensitive checks (avoid async state race)
+  const isPostChatSubmittedRef = useRef<boolean>(false);
+
+  const lastFetchedConversationIdRef = useRef<string | null>(null);
+  const socketRef = useRef<any>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const hasTimedOutRef = useRef<boolean>(false);
+  const lastMessageTimeRef = useRef<Date>(new Date());
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const typingRef = useRef<HTMLDivElement | null>(null);
+
+  const { transcript, resetTranscript } = useSpeechRecognition();
+
+  // ====== Timeout Management ======
+  const resetInactivityTimeout = () => {
+    if (hasTimedOutRef.current) return;
+
+    lastMessageTimeRef.current = new Date();
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    if (!isConversationActive) return;
+
+    timeoutRef.current = setTimeout(() => {
+      handleConversationTimeout();
+    }, timeoutDuration);
+
+    countdownRef.current = setInterval(() => {
+      if (hasTimedOutRef.current) {
+        clearInterval(countdownRef.current!);
+        return;
+      }
+
+      const now = new Date();
+      const elapsed = now.getTime() - lastMessageTimeRef.current.getTime();
+      const remaining = Math.max(0, timeoutDuration - elapsed);
+
+      if (remaining === 0) {
+        clearInterval(countdownRef.current!);
+        handleConversationTimeout();
+      }
+    }, 1000);
+  };
+
+  const checkConversationActivity = () => {
+    const now = Date.now();
+    const lastMessageTime = lastMessageTimeRef.current.getTime();
+    const timeSinceLastMessage = now - lastMessageTime;
+
+    if (timeSinceLastMessage > timeoutDuration) {
+      handleConversationTimeout();
+      return false;
+    }
+    return true;
+  };
+
+  const handleConversationTimeout = async () => {
+    if (hasTimedOutRef.current) return;
+    hasTimedOutRef.current = true;
+
+    setIsConversationActive(false);
+
+    // Use ref here to avoid async state race
+    if (
+      !isPostChatSubmittedRef.current &&
+      postChatForm &&
+      postChatForm?.enabled &&
+      postChatForm?.elements?.length
+    ) {
+      setOpenPostChatForm(true);
+    }
+
+    const timeoutMessage: Message = {
+      role: 'timeout',
+      text: 'This conversation has been closed due to inactivity or customer closed the conversation. Please start a new conversation if you need further assistance.',
+      timestamp: new Date().toISOString(),
+    };
+
+    setChatMessages((prev) => [...prev, timeoutMessage]);
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+
+    if (socketRef.current) socketRef.current.disconnect();
+
+    try {
+      if (conversation?.id) {
+        await closeSocketConversation(conversation.id);
+      }
+    } catch (error) {
+      console.error('Error closing conversation on server', error);
+    }
+
+    onConversationTimeout?.();
+  };
+
+  // ====== Fetch chat history ======
+  const fetchChats = async () => {
+    setIsFetching(true);
+
+    const requestBody = {
+      user_id: userId,
+      chatbot_id: appId,
+      conversation_id: conversationId,
+    };
+
+    try {
+      let chatHistory: Message[] = [];
+      let socketHistory: Message[] = [];
+
+      try {
+        const resultChat = await getChatHistory(requestBody);
+
+        // IMPORTANT: set this FIRST, before any timeout or resets
+        const submitted = !!resultChat.post_chat_review;
+        setIsPostChatSubmitted(submitted);
+        isPostChatSubmittedRef.current = submitted;
+
+        // Map bot history
+        chatHistory = (resultChat.chat_history || []).map(
+          (msg: any, index: number) => ({
+            id: index,
+            text: msg.text,
+            role: (msg.role as any) || 'bot',
+            timestamp: msg.timestamp,
+          }),
+        );
+      } catch (error) {
+        console.error('Error fetching bot history:', error);
+      }
+
+      try {
+        const resultSocket = await getSocketConversationsByUserId(
+          userId,
+          appId,
+          conversationId,
+        );
+
+        if (resultSocket) {
+          setConversation(resultSocket);
+
+          if (typeof resultSocket.is_closed !== 'undefined') {
+            setIsConversationClosed(resultSocket.is_closed);
+            setIsConversationActive(!resultSocket.is_closed);
+          }
+
+          socketHistory = (resultSocket.messages || []).map(
+            (msg: any, index: number) => ({
+              id: chatHistory.length + index,
+              text: msg.text,
+              role: (msg.role as any) || 'support',
+              timestamp: msg.timestamp,
+            }),
+          );
+
+          if (socketHistory.length > 0) {
+            setIsSpeakingWithRealPerson(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching socket history:', error);
+      }
+
+      const combinedHistory: Message[] =
+        socketHistory.length > 0
+          ? [
+            ...chatHistory,
+            ...(chatHistory.length > 0
+              ? [
+                {
+                  id: chatHistory.length,
+                  text: '<hr>',
+                  role: 'separator' as const,
+                  timestamp: new Date().toISOString(),
+                },
+              ]
+              : []),
+            ...socketHistory,
+          ]
+          : chatHistory;
+
+      setChatMessages((prev) => [...prev, ...combinedHistory]);
+
+      if (combinedHistory.length > 0) {
+        const lastMessage = combinedHistory[combinedHistory.length - 1];
+
+        if (lastMessage.timestamp) {
+          lastMessageTimeRef.current = new Date(lastMessage.timestamp);
+
+          if (checkConversationActivity()) {
+            resetInactivityTimeout();
+          }
+        }
+      } else {
+        // If no history at all, reset inactivity baseline to now
+        lastMessageTimeRef.current = new Date();
+        resetInactivityTimeout();
+      }
+    } catch (error) {
+      console.error('Error fetching chat history or socket chats:', error);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  // ====== Send Message Logic ======
+  const handleSendMessage = (requestBody: ChatWithAssistantRequest) => {
+    setLoading(true);
+    let assistantResponse = '';
+    let firstTokenReceived = false;
+
+    chatWithAssistant(
+      requestBody,
+      (token) => {
+        if (!firstTokenReceived) {
+          setLoading(false); // Stop spinner immediately on first token
+          firstTokenReceived = true;
+        }
+        assistantResponse += token;
+        setChatMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'bot') {
+            return [...prev.slice(0, -1), { ...last, text: assistantResponse }];
+          } else {
+            return [
+              ...prev,
+              {
+                text: assistantResponse,
+                role: 'bot',
+                timestamp: new Date().toISOString(),
+                user_id: requestBody.user_id,
+                user_email: requestBody.user_email,
+              },
+            ];
+          }
+        });
+      },
+      (data) => {
+        resetInactivityTimeout();
+
+        if (data?.event === 'limit_exceeded') {
+          serReachedLimit(true);
+          return;
+        }
+
+        if (data?.conversation_id) setConvoId(data.conversation_id);
+      },
+      (error) => {
+        console.error('Assistant error:', error);
+        setLoading(false);
+      },
+    );
+  };
+
+  const handleSend = (text?: string) => {
+    if (!isConversationActive) {
+      alert('This conversation has expired. Please start a new conversation.');
+      return;
+    }
+
+    if (!isEmailAvailable && !isSpeakingWithRealPerson) {
+      alert('Please enter your details before sending a message.');
+      return;
+    }
+
+    setLoading(true);
+    const messageText = text || message;
+    setMessage('');
+
+    if (messageText.trim() === '') {
+      setLoading(false);
+      return;
+    }
+
+    const newMessage: Message = {
+      user_email:
+        isSpeakingWithRealPerson && !userEmail ? 'New Customer' : userEmail,
+      user_id: userId,
+      chatbot_id: appId,
+      role: 'user',
+      text: messageText,
+      chatbot_history: convoId,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Append the new outgoing message and reset inactivity baseline
+    setChatMessages((prev) => [...prev, newMessage]);
+    resetInactivityTimeout();
+
+    if (isSpeakingWithRealPerson) {
+      let updatedConvoId = convoId;
+      if (updatedConvoId === 'NEW_CHAT') {
+        updatedConvoId = `${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 15)}`;
+        setConvoId(updatedConvoId);
+      }
+
+      if (socketRef.current) {
+        socketRef.current.emit('message', {
+          ...newMessage,
+          chatbot_history: updatedConvoId,
+        });
+      }
+      setLoading(false);
+    } else {
+      const requestBody: ChatWithAssistantRequest = {
+        user_email: userEmail,
+        user_id: userId,
+        chatbot_id: appId,
+        conversation_id: convoId,
+        prompt: messageText,
+        isFreePlan: chatbot_config.isFreePlan,
+        currentPlan: chatbot_config.currentPlan,
+      };
+      handleSendMessage(requestBody);
+    }
+  };
+
+  // ====== File Upload ======
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isConversationActive) {
+      alert('This conversation has expired. Please start a new conversation.');
+      return;
+    }
+
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      const result = await uploadConversationFile(file);
+
+      const newMessage: Message = {
+        user_email: userEmail,
+        chatbot_id: appId,
+        user_id: userId,
+        role: 'user',
+        text: `<a href="${result.url}" target="_blank">${result.fileName}</a>`,
+        chatbot_history: convoId,
+        timestamp: new Date().toISOString(),
+      };
+
+      setChatMessages((prev) => [...prev, newMessage]);
+      resetInactivityTimeout();
+
+      if (isSpeakingWithRealPerson && socketRef.current) {
+        socketRef.current.emit('message', newMessage);
+      }
+    } catch (err) {
+      console.error('File upload error:', err);
+      alert('Failed to upload file');
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // ====== Form Handlers ======
+  const handleSaveEmail = async (values: Record<string, string>) => {
+    const fields = Array.isArray(preChatForm)
+      ? preChatForm
+      : preChatForm.fields || [];
+    const emailField = fields.find((f: any) => f.type === 'email');
+    const emailValue = emailField ? values[emailField.id] : null;
+
+    if (emailValue) {
+      setUserEmail(emailValue);
+      Cookies.set('userEmail', emailValue, { expires: 30 });
+      setIsEmailAvailable(true);
+    }
+
+    const custom_data: Record<string, string> = {};
+    fields.forEach((field: any) => {
+      if (field.type !== 'email' && values[field.id]) {
+        const key = field.label.trim().toLowerCase().replace(/\s+/g, '_');
+        custom_data[key] = values[field.id];
+      }
+    });
+
+    await savePreChatCustomValue({
+      email: emailValue,
+      custom_data,
+      chatbot_id: appId,
+    });
+
+    setChatMessages((prevConversation) =>
+      prevConversation.filter((m) => !m.isEmailForm),
+    );
+
+    resetInactivityTimeout();
+  };
+
+  const handlePostFormSubmit = async (values: Record<string, string>) => {
+    try {
+      // Clean keys: remove "-123456789" from field IDs
+      const cleanedValues: Record<string, string> = {};
+
+      Object.keys(values).forEach((key) => {
+        const cleanKey = key.replace(/-\d+$/, ''); // remove dash + numbers
+        cleanedValues[cleanKey] = values[key];
+      });
+
+      console.log('Cleaned Form Values:', cleanedValues);
+
+      // Mark as submitted
+      setIsPostChatSubmitted(true);
+      isPostChatSubmittedRef.current = true;
+
+      // Save review
+      await submitPostChatForm(convoId, cleanedValues);
+
+      console.log('Conversation ID:', convoId);
+
+      // Close form UI
+      setOpenPostChatForm(false);
+      setWindowWidth('400px');
+      onBack();
+    } catch (error) {
+      console.error('Error submitting post chat form:', error);
+      alert('Failed to submit review. Please try again.');
+    }
+  };
+
+  // ====== Close Chat ======
+  const handleCloseChat = async () => {
+    hasTimedOutRef.current = true;
+    setIsConversationActive(false);
+
+    const timeoutMessage: Message = {
+      role: 'timeout',
+      text: 'This conversation has been closed due to inactivity or customer closed the conversation. Please start a new conversation if you need further assistance.',
+      timestamp: new Date().toISOString(),
+    };
+
+    setChatMessages((prev) => [...prev, timeoutMessage]);
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+
+    try {
+      if (conversation?.id) {
+        await closeSocketConversation(conversation.id);
+      }
+    } catch (error) {
+      console.error('Error closing conversation on server', error);
+    }
+
+    // Use ref-based check to avoid async state races
+    if (
+      !isPostChatSubmittedRef.current &&
+      postChatForm &&
+      postChatForm?.elements?.length !== 0 &&
+      postChatForm?.enabled
+    ) {
+      setOpenPostChatForm(true);
+    } else {
+      setWindowWidth('400px');
+      onBack();
+    }
+
+    if (socketRef.current) socketRef.current.disconnect();
+
+    onConversationTimeout?.();
+  };
+
+  // ====== Voice Recognition ======
+  const startListening = () => {
+    resetTranscript();
+    SpeechRecognition.startListening({ continuous: true, language: 'en-US' });
+  };
+
+  const stopListening = () => {
+    SpeechRecognition.stopListening();
+    // Wait a bit for the final transcript to arrive
+    setTimeout(() => {
+      console.log('Final transcript:', transcript);
+      setMessage((prev) => prev + ' ' + transcript);
+      resetTranscript();
+      setIsListening(false);
+    }, 500); // 0.5s delay usually enough
+  };
+
+  const cancelListening = () => {
+    SpeechRecognition.stopListening();
+    setIsListening(false);
+    resetTranscript();
+  };
+
+  // ====== Switch to Real Person ======
+  const handleSwitchToRealPerson = () => {
+    if (!isConversationActive) {
+      alert('This conversation has expired. Please start a new conversation.');
+      return;
+    }
+
+    if (!isEmailAvailable) {
+      setIsEmailAvailable(true);
+    }
+
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        id: Math.floor(Math.random() * 1000000) + 1,
+        text: '<hr>',
+        role: 'separator',
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+    setIsSpeakingWithRealPerson(true);
+    resetInactivityTimeout();
+  };
+
+  // ====== Start New Conversation ======
+  const startNewConversation = () => {
+    hasTimedOutRef.current = false;
+    setIsConversationActive(true);
+    setIsConversationClosed(false);
+    setIsSpeakingWithRealPerson(false);
+    setConvoId('NEW_CHAT');
+    if (isAdmin && adminTestingMode) {
+      setChatMessages([
+        {
+          role: 'bot',
+          chatbot_id: appId,
+          timestamp: new Date().toISOString(),
+          user_email: userEmail,
+          user_id: userId,
+          text: 'Hello, how can I help you today?',
+        },
+      ]);
+    } else if (isAdmin) {
+      setChatMessages([
+        {
+          role: 'bot',
+          chatbot_id: appId,
+          timestamp: new Date().toISOString(),
+          user_email: userEmail,
+          user_id: userId,
+          text: 'Hello, how can I help you today?',
+        },
+        {
+          role: 'user',
+          chatbot_id: appId,
+          timestamp: new Date().toISOString(),
+          user_email: userEmail,
+          user_id: userId,
+          text: 'Hi, I just wanted to check if my recent order has been shipped.',
+        },
+        {
+          role: 'bot',
+          chatbot_id: appId,
+          timestamp: new Date().toISOString(),
+          user_email: userEmail,
+          user_id: userId,
+          text: 'Sure! Could you please share your order ID so I can look it up?',
+        },
+      ]);
+    } else {
+      setChatMessages([
+        {
+          role: 'bot',
+          chatbot_id: appId,
+          timestamp: new Date().toISOString(),
+          user_id: userId,
+          user_email: userEmail,
+          text: 'Hello, how can I help you today?',
+        },
+      ]);
+    }
+
+    // reset post chat review flags for a fresh session
+    setIsPostChatSubmitted(false);
+    isPostChatSubmittedRef.current = false;
+
+    resetInactivityTimeout();
+  };
+
+  return {
+    // State
+    conversation,
+    message,
+    setMessage,
+    chatMessages,
+    setChatMessages,
+    loading,
+    convoId,
+    setConvoId,
+    isConversationActive,
+    isConversationClosed,
+    reachedLimit,
+    supportName,
+    setSupportName,
+    supportImage,
+    setSupportImage,
+    showTyping,
+    setShowTyping,
+    isListening,
+    setIsListening,
+    openPostChatForm,
+    setOpenPostChatForm,
+    isPostChatSubmitted,
+
+    // Refs
+    lastFetchedConversationIdRef,
+    socketRef,
+    fileInputRef,
+    typingRef,
+    transcript,
+
+    // Functions
+    resetInactivityTimeout,
+    handleSend,
+    handleFileUpload,
+    handleSaveEmail,
+    handlePostFormSubmit,
+    handleCloseChat,
+    startListening,
+    stopListening,
+    cancelListening,
+    handleSwitchToRealPerson,
+    fetchChats,
+    isfetching,
+    startNewConversation,
+    userEmail,
+  };
+};

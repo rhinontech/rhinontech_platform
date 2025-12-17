@@ -1,0 +1,22 @@
+
+OPENAI_API_KEY=your_openai_api_key_here
+GOOGLE_API_KEY=your_google_api_key_here
+
+
+#Logger Configs
+LOGGER_FILE=./logs/app_server.log
+LOGGER_LEVEL=logging.DEBUG
+LOGGER_FORMAT=%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s
+
+
+DB_USERNAME=postgres
+DB_PASSWORD=your_db_password_here
+DB_SCHEMA=public
+DB_NAME=rt-database
+DB_HOST=your_db_host_here
+DB_PORT=5432
+
+
+MONGO_URI = mongodb+srv://username:password@cluster.mongodb.net/database?retryWrites=true&w=majority
+
+S3_BASE_URL=https://your-bucket.s3.region.amazonaws.com/folder

@@ -1,0 +1,59 @@
+PORT=5001
+
+# JWT secret
+JWT_SECRET=your_jwt_secret_here
+
+# meta 
+APP_ID=your_facebook_app_id
+APP_SECRET=your_facebook_app_secret
+REDIRECT_URI=https://your-domain.com/auth/callback
+
+# mongoDB
+MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/seo_db
+MONGO_URI_KB=mongodb+srv://user:pass@cluster.mongodb.net/knowledgebase
+MONGO_URI_CB=mongodb+srv://user:pass@cluster.mongodb.net/chatbot
+
+# aws
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_REGION=ap-south-1
+S3_BUCKET_NAME=your_bucket_name
+S3_FOLDER_NAME=your_folder_name
+
+# razorpay
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+
+
+# postgres 
+DB_HOST=your_db_host
+DB_USERNAME=postgres
+DB_NAME=rt-database
+DB_PASSWORD=your_db_password
+DB_SCHEMA=public 
+DB_PORT=5432
+
+
+# email
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your_email@domain.com
+EMAIL_PASSWORD=your_email_password
+
+EMAIL_DOMAIN=rt.yourdomain.com
+
+# front uri
+FRONT_END_URL=https://your-app.vercel.app
+
+# Google login
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+
+# Outlook Configs
+STATE=12345
+SCOPE= "openid profile offline_access User.Read Mail.Send Directory.Read.All Directory.ReadWrite.All"
+CLIENT_ID=your_outlook_client_id
+CLIENT_SECRET=your_outlook_client_secret
+AUTH_END_POINT=https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+TOKEN_END_POINT=https://login.microsoftonline.com/common/oauth2/v2.0/token

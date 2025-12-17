@@ -1,0 +1,69 @@
+{
+  "session_id": "9309310c-c28a-4b14-9514-dfd45cbc2cd4",
+  "organization_id": "test-org-1",
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "Hi there! \ud83d\udc4b I'm here to help you learn more about our services. What brings you here today?",
+      "timestamp": "2025-12-13T01:47:30.898491",
+      "metadata": {}
+    },
+    {
+      "role": "user",
+      "content": "hey",
+      "timestamp": "2025-12-13T01:48:04.934715",
+      "metadata": {}
+    },
+    {
+      "role": "assistant",
+      "content": "That sounds great! Before we dive in, may I know your name so I can personalize our conversation?",
+      "timestamp": "2025-12-13T01:48:04.936209",
+      "metadata": {
+        "type": "lead_question"
+      }
+    },
+    {
+      "role": "user",
+      "content": "prabhat",
+      "timestamp": "2025-12-13T01:48:27.275802",
+      "metadata": {}
+    },
+    {
+      "role": "assistant",
+      "content": "Nice to meet you, {name}! \ud83d\ude0a To send you more detailed information, could you share your phone number or email?",
+      "timestamp": "2025-12-13T01:48:27.278105",
+      "metadata": {
+        "type": "lead_question"
+      }
+    },
+    {
+      "role": "user",
+      "content": "8249291789",
+      "timestamp": "2025-12-13T01:49:08.622208",
+      "metadata": {}
+    },
+    {
+      "role": "assistant",
+      "content": "Perfect! Thanks for sharing that. Now, how can I help you today?",
+      "timestamp": "2025-12-13T01:49:08.623627",
+      "metadata": {
+        "type": "lead_question"
+      }
+    },
+    {
+      "role": "system",
+      "content": "Summary: <think>\nAlright, let me break this down. The user starts with a greeting and asks \"hey.\" That's the first point about what they wanted\u2014implying a casual greeting.\n\nNext, they mention asking if there's a way to know more about our services. So, the key information collected is wanting personalized service info. I need to make sure that's clear in my summary.\n\nThen, the user responds with their name: \"prabhat.\" That should be included as well since it helps personalize the conversation. \n\nThe assistant then asks for their phone number or email to get more details. This shows they're gathering specific information but keep the door open for further engagement.\n\nFinally, the assistant thanks them and invites them to send more detailed info, asking how we can help today. That wraps up the next steps or outcome by inviting action on their part.\n</think>\n\nThe user greeted me with \"hey\" and asked if I knew about our services. They also mentioned wanting personalized service information. Their name was prabhat, and they requested my phone number or email for further details. I thanked them and invited them to share more information, looking forward to a detailed conversation.",
+      "timestamp": "2025-12-13T01:49:22.209756",
+      "metadata": {
+        "type": "summary"
+      }
+    }
+  ],
+  "lead_data": {
+    "phone": "8249291789"
+  },
+  "current_step": "complete",
+  "created_at": "2025-12-13T01:47:30.898442",
+  "updated_at": "2025-12-13T01:49:22.209814",
+  "status": "completed"
+}

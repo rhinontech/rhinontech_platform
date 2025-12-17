@@ -1,0 +1,6 @@
+const swaggerUi = require("swagger-ui-express");
+const swaggerFile = require("./swagger_output.json");
+
+module.exports = (app) => {
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerFile));
+};

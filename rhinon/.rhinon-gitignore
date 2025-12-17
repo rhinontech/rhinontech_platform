@@ -1,0 +1,4 @@
+# Rhinon Frontend .gitignore additions
+.rhinon.pid
+rhinon.log
+nohup.out

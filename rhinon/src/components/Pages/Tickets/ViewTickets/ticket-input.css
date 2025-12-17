@@ -1,0 +1,237 @@
+/* Add this to your global CSS file (e.g., globals.css or styles.css) */
+
+/* Tiptap Editor Content Styles */
+.ProseMirror {
+  outline: none;
+}
+
+/* Placeholder styling */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: rgb(156, 163, 175);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Headings */
+.ProseMirror h1 {
+  font-size: 2em;
+  font-weight: bold;
+  margin-top: 0.67em;
+  margin-bottom: 0.67em;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+}
+
+.ProseMirror h3 {
+  font-size: 1.17em;
+  font-weight: bold;
+  margin-top: 0.83em;
+  margin-bottom: 0.83em;
+}
+
+.ProseMirror h4 {
+  font-size: 1em;
+  font-weight: bold;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+/* Paragraphs */
+.ProseMirror p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+/* Lists - Critical for proper rendering */
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5rem;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+}
+
+.ProseMirror li {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+  padding-left: 0.25rem;
+}
+
+.ProseMirror li > p {
+  margin: 0;
+}
+
+/* Nested lists */
+.ProseMirror ul ul,
+.ProseMirror ol ul {
+  list-style-type: circle;
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.ProseMirror ul ul ul,
+.ProseMirror ol ul ul,
+.ProseMirror ol ol ul,
+.ProseMirror ul ol ul {
+  list-style-type: square;
+}
+
+/* Links */
+.ProseMirror a {
+  color: rgb(37, 99, 235);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ProseMirror a:hover {
+  opacity: 0.8;
+}
+
+/* Text formatting */
+.ProseMirror strong {
+  font-weight: bold;
+}
+
+.ProseMirror em {
+  font-style: italic;
+}
+
+.ProseMirror u {
+  text-decoration: underline;
+}
+
+.ProseMirror mark {
+  background-color: #fef08a;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.125rem;
+}
+
+/* Code */
+.ProseMirror code {
+  background-color: rgb(229, 231, 235);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+  font-size: 0.875em;
+}
+
+.ProseMirror pre {
+  background-color: rgb(31, 41, 55);
+  color: white;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror pre code {
+  background-color: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: 0.875rem;
+}
+
+/* Blockquotes */
+.ProseMirror blockquote {
+  border-left: 3px solid rgb(209, 213, 219);
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  font-style: italic;
+  color: rgb(107, 114, 128);
+}
+
+/* Text alignment */
+.ProseMirror [style*="text-align: left"] {
+  text-align: left;
+}
+
+.ProseMirror [style*="text-align: center"] {
+  text-align: center;
+}
+
+.ProseMirror [style*="text-align: right"] {
+  text-align: right;
+}
+
+.ProseMirror [style*="text-align: justify"] {
+  text-align: justify;
+}
+
+/* Subscript and Superscript */
+.ProseMirror sub {
+  vertical-align: sub;
+  font-size: smaller;
+}
+
+.ProseMirror sup {
+  vertical-align: super;
+  font-size: smaller;
+}
+
+/* Images */
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+/* Horizontal rule */
+.ProseMirror hr {
+  border: none;
+  border-top: 2px solid rgb(229, 231, 235);
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+/* Dark mode adjustments */
+.dark .ProseMirror code {
+  background-color: rgb(55, 65, 81);
+  color: rgb(229, 231, 235);
+}
+
+.dark .ProseMirror blockquote {
+  border-left-color: rgb(75, 85, 99);
+  color: rgb(156, 163, 175);
+}
+
+.dark .ProseMirror hr {
+  border-top-color: rgb(75, 85, 99);
+}
+
+.dark .ProseMirror mark {
+  background-color: #854d0e;
+  color: #fef08a;
+}
+
+/* Focus styles */
+.ProseMirror:focus {
+  outline: none;
+}
+
+/* Selection */
+.ProseMirror ::selection {
+  background-color: rgb(191, 219, 254);
+}
+
+.dark .ProseMirror ::selection {
+  background-color: rgb(30, 64, 175);
+}

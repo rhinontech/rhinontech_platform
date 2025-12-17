@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "rhinon-botsdk",
+    "rhinontech": "rhinonweb"
+  },
+  "targets": {},
+  "etags": {}
+}

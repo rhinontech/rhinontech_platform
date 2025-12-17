@@ -1,0 +1,34 @@
+# backend
+# NEXT_PUBLIC_API_URL=http://localhost:5001/api
+NEXT_PUBLIC_API_URL=https://beta-api.rhinontech.com/api
+
+
+# websocket
+NEXT_PUBLIC_SOCKET_URL=http://localhost:5001
+# NEXT_PUBLIC_SOCKET_URL=https://beta-api.rhinontech.com
+
+#backendai
+NEXT_PUBLIC_API_AI_URL=http://localhost:5002
+# NEXT_PUBLIC_API_AI_URL=https://beta-api-ai.rhinontech.com
+
+# google oauth
+NEXT_PUBLIC_GOOGLE_LOGIN_CLIENT_ID="1064865088598-hpkkj0nmen74h46fdo9l4kon8si9fjg4.apps.googleusercontent.com"
+NEXT_PUBLIC_GOOGLE_SECRET_KEY="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"
+NEXT_PUBLIC_GOOGLE_SCOPE="https://www.googleapis.com/auth/admin.directory.user.readonly https://www.googleapis.com/auth/gmail.send"
+
+
+
+NEXT_PUBLIC_BASE_URL=https://rhinon.vercel.app
+# NEXT_PUBLIC_BASE_URL=http://localhost:4000
+
+
+#microsoft oauth
+NEXT_PUBLIC_OUTLOOK_CLIENT_ID=858935e4-b0b0-4dfd-bb27-fc544cac9510
+
+
+
+
+# razorpay
+NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_oTjCsE92S4UxKC
+NEXT_PUBLIC_PAYMENT_GATEWAY_URL="https://checkout.razorpay.com/v1/checkout.js"
+

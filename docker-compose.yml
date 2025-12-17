@@ -1,0 +1,41 @@
+services:
+  rtserver:
+    build:
+      context: ./rtserver
+      dockerfile: Dockerfile
+    container_name: rtserver
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.dev
+    depends_on:
+      - backendai
+      - redis
+    networks:
+      - rhinon-network
+
+  backendai:
+    build:
+      context: ./backendai
+      dockerfile: Dockerfile
+    container_name: backendai
+    ports:
+      - "5002:5002"
+    env_file:
+      - .env.dev
+    depends_on:
+      - redis
+    networks:
+      - rhinon-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6380:6379"
+    networks:
+      - rhinon-network
+
+networks:
+  rhinon-network:
+    driver: bridge
