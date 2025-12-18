@@ -2,8 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import EmojiPicker from 'emoji-picker-react/dist';
 import './ChatScreen.scss';
-import RaiseTicket from '../TicketScreen/RaiseTicket';
-import Loader from '../Loader/Loader';
+import RaiseTicket from '@/screens/TicketScreen/RaiseTicket';
+import { Loader } from '@/components/common';
 import { useChatLogic } from './useChatLogic';
 
 // New imports from restructured modules

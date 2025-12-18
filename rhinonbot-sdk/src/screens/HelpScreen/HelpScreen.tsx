@@ -6,7 +6,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import './HelpScreen.scss';
-import Loader from '../Loader/Loader';
+import { Loader } from '@/components/common';
 
 // New imports from restructured modules
 import type { Article, Folder, ChatbotConfig } from '@/types';

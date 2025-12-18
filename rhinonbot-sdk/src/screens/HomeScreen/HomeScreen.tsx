@@ -5,8 +5,8 @@ import {
   X,
 } from 'lucide-react';
 import './HomeScreen.scss';
-import Loader from '../Loader/Loader';
-import RaiseTicket from '../TicketScreen/RaiseTicket';
+import { Loader } from '@/components/common';
+import RaiseTicket from '@/screens/TicketScreen/RaiseTicket';
 import TicketRating from './TicketRating/TicketRating';
 import { motion } from 'motion/react';
 
@@ -15,8 +15,8 @@ import type { TicketField, ChatbotConfig } from '@/types';
 import { getConversationByUserId } from '@/services/chat';
 import { getTicketsStatus, updateTicketRating } from '@/services/ticket';
 
-// Legacy imports (to be migrated)
-import svgIcons from '@tools/assets/svgIcons';
+// Assets
+import svgIcons from '@assets/svgIcons';
 
 interface HomeScreenProps {
   onNavigate: (screen: string) => void;

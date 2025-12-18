@@ -32,3 +32,15 @@ export { StarRating } from './StarRating/StarRating';
 export type { StarRatingProps } from './StarRating/StarRating';
 
 export { ErrorBoundary } from './ErrorBoundary/ErrorBoundary';
+
+// Messenger components
+export { MessengerButton } from './Messenger/MessengerButton';
+export { MessengerHeader } from './Messenger/MessengerHeader';
+export { MessengerFooter } from './Messenger/MessengerFooter';
+export { BottomNav } from './Messenger/BottomNav';
+
+// Common components
+export { Loader } from './common/Loader';
+
+// Icons
+export { HomeIcon, ChatIcon, HelpIcon, NewsIcon, ArticleSaveIcon } from './icons';

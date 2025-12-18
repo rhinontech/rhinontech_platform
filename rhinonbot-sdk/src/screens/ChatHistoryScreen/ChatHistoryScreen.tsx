@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import './ChatHistoryScreen.scss';
-import Loader from '../Loader/Loader';
+import { Loader } from '@/components/common';
 
 // New imports from restructured modules
 import type { ChatbotConfig, ConversationItem } from '@/types';

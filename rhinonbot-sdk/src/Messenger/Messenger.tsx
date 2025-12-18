@@ -10,16 +10,18 @@ import {
   Minus,
 } from 'lucide-react';
 import './Messenger.scss';
-import ChatScreen from './ChatScreen/ChatScreen';
-import ChatHistoryScreen from './ChatHistoryScreen/ChatHistoryScreen';
-import HelpScreen from './HelpScreen/HelpScreen';
-import HomeScreen from './HomeScreen/HomeScreen';
-import Voice from './Voice/Voice';
-import NewsScreen from './NewsScreen/NewsScreen';
-import NewsPage from './NewsPage/NewsPage';
-import HelpAriclePage from './HelpArticlePage/HelpArticlePage';
-import RaiseTicket from './TicketScreen/RaiseTicket';
-import { Campaigns } from './Campaigns/Campaigns';
+
+// Screen imports from new location
+import ChatScreen from '@/screens/ChatScreen/ChatScreen';
+import ChatHistoryScreen from '@/screens/ChatHistoryScreen/ChatHistoryScreen';
+import HelpScreen from '@/screens/HelpScreen/HelpScreen';
+import HomeScreen from '@/screens/HomeScreen/HomeScreen';
+import Voice from '@/screens/VoiceScreen/Voice';
+import NewsScreen from '@/screens/NewsScreen/NewsScreen';
+import NewsPage from '@/screens/NewsPage/NewsPage';
+import HelpAriclePage from '@/screens/HelpArticlePage/HelpArticlePage';
+import RaiseTicket from '@/screens/TicketScreen/RaiseTicket';
+import { Campaigns } from '@/screens/Campaigns/Campaigns';
 import { AnimatePresence, motion } from 'motion/react';
 import Cookies from 'js-cookie';
 
@@ -37,22 +39,22 @@ import { getCampaignsChatbot, trackCampaignImpression } from '@/services/campaig
 import { getEffectiveTheme } from '@/constants/theme';
 import { COOKIE_KEYS } from '@/constants/storage';
 
-// Legacy imports still needed (to be migrated later)
-import { themeVars } from '@tools/utils/theme';
-import useTracking from '@tools/utils/useTracking';
-import svgIcons from '@tools/assets/svgIcons';
-import { evaluateTargeting } from '@tools/utils/campaignTargeting';
+// Utilities
+import { themeVars } from '@/utils/theme';
+import useTracking from '@/utils/useTracking';
+import svgIcons from '@assets/svgIcons';
+import { evaluateTargeting } from '@/utils/campaignTargeting';
 import {
   canShowCampaign,
   recordCampaignView,
-} from '@tools/utils/campaignFrequency';
+} from '@/utils/campaignFrequency';
 import {
   isReturningVisitor,
   getCurrentUrl,
   getReferrerUrl,
   getPageLoadTime,
   initVisitorTracking,
-} from '@tools/utils/visitorTracking';
+} from '@/utils/visitorTracking';
 
 interface MessengerProps {
   config?: RhinontechConfig | null;

@@ -1,17 +1,17 @@
 // Import screen-specific styles
-@use './HomeScreen/HomeScreen.scss';
-@use './ChatScreen/ChatScreen.scss';
-@use './HelpScreen/HelpScreen.scss';
-@use './ChatHistoryScreen/ChatHistoryScreen.scss';
-@use './NewsScreen/NewsScreen.scss';
-@use './NewsPage/NewsPage.scss';
-@use './TicketScreen/RaiseTicket.scss';
-@use './HelpArticlePage/HelpArticlePage.scss';
-@use './Loader/Loader.scss';
-@use './ChatScreen/StarRating/StarRating.scss';
-@use './HomeScreen/TicketRating/TicketRating.scss';
-@use './Voice/Voice.scss';
-@use './Campaigns/Campaigns.scss';
+@use '../screens/HomeScreen/HomeScreen.scss';
+@use '../screens/ChatScreen/ChatScreen.scss';
+@use '../screens/HelpScreen/HelpScreen.scss';
+@use '../screens/ChatHistoryScreen/ChatHistoryScreen.scss';
+@use '../screens/NewsScreen/NewsScreen.scss';
+@use '../screens/NewsPage/NewsPage.scss';
+@use '../screens/TicketScreen/RaiseTicket.scss';
+@use '../screens/HelpArticlePage/HelpArticlePage.scss';
+@use '../screens/Loader/Loader.scss';
+@use '../screens/ChatScreen/StarRating/StarRating.scss';
+@use '../screens/HomeScreen/TicketRating/TicketRating.scss';
+@use '../screens/VoiceScreen/Voice.scss';
+@use '../screens/Campaigns/Campaigns.scss';
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
 
 .chatbot-container {
