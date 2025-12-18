@@ -5,42 +5,8 @@ import {
   trackCampaignImpression,
   trackCampaignClick,
   trackCampaignClose,
-} from '@tools/utils/campaignAnalytics';
-
-interface ButtonElement {
-  id: string;
-  text: string;
-  url: string;
-  style: 'primary' | 'secondary' | 'danger';
-  actionType?: string;
-}
-
-interface TemplateMedia {
-  src: string;
-  alt: string;
-  type: string;
-}
-
-interface CampaignContent {
-  media: TemplateMedia | null;
-  layout: string;
-  buttons: ButtonElement[];
-  heading: string;
-  hasImage: boolean;
-  subheading: string;
-  templateId: string;
-}
-
-interface Campaign {
-  id: number;
-  organization_id: number;
-  type: 'recurring' | 'one-time';
-  status: string;
-  content: CampaignContent;
-  targeting: any;
-  created_at: string;
-  updated_at: string;
-}
+} from '@/services/campaign';
+import type { Campaign, ButtonElement } from '@/types';
 
 interface CampaignsProps {
   setIsOpen: (isOpen: boolean) => void;

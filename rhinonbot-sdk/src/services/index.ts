@@ -17,3 +17,5 @@ export * from './ticket';
 
 // Help services
 export * from './help';
+// Voice services
+export * from './voice';

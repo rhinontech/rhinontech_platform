@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import CloudWave from './CloudWave';
-import { getVoiceSessionToken } from '@tools/services/AiRinoAssisstant/VoiceConversationService';
 import './Voice.scss';
+
+// New imports from restructured modules
+import { getVoiceSessionToken } from '@/services/voice';
 import { Loader2, Mic, MicOff, Volume2, VolumeOff, Wifi, WifiOff, X } from 'lucide-react';
 
 interface VoiceProps {

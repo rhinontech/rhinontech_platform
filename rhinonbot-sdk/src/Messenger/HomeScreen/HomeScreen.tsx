@@ -5,37 +5,32 @@ import {
   X,
 } from 'lucide-react';
 import './HomeScreen.scss';
-import svgIcons from '@tools/assets/svgIcons';
-import { getConversationByUserId } from '@tools/services/AiRinoAssisstant/AiRhinoConvoServices';
 import Loader from '../Loader/Loader';
 import RaiseTicket from '../TicketScreen/RaiseTicket';
-import {
-  getTicketsStatus,
-  updateTicketRating,
-} from '@tools/services/TicketServices';
 import TicketRating from './TicketRating/TicketRating';
 import { motion } from 'motion/react';
 
+// New imports from restructured modules
+import type { TicketField, ChatbotConfig } from '@/types';
+import { getConversationByUserId } from '@/services/chat';
+import { getTicketsStatus, updateTicketRating } from '@/services/ticket';
 
-interface TicketField {
-  id: string;
-  type: string;
-  label: string;
-  required: boolean;
-  placeholder: string;
-}
+// Legacy imports (to be migrated)
+import svgIcons from '@tools/assets/svgIcons';
+
 interface HomeScreenProps {
   onNavigate: (screen: string) => void;
   isAdmin?: boolean;
   isFreePlan?: boolean;
   userId: string;
   appId: string;
-  chatbot_config?: any;
+  chatbot_config?: ChatbotConfig;
   setIsTicketRaised: React.Dispatch<React.SetStateAction<boolean>>;
   ticketForm: TicketField[];
   userEmail: string;
   onChatSelect: (chatId: string) => void;
 }
+
 interface IConversationIds {
   conversation_id: string;
   title: string;
@@ -46,8 +41,6 @@ interface IConversationIds {
   unreadCount?: number;
   lastMessage?: string;
 }
-
-
 
 interface ticket {
   ticket_id: string;

@@ -4,42 +4,19 @@ import Cookies from 'js-cookie';
 import SpeechRecognition, {
   useSpeechRecognition,
 } from 'react-speech-recognition';
-import {
-  chatWithAssistant,
-  getChatHistory,
-} from '@tools/services/AiRinoAssisstant/AiRhinoConvoServices';
-import {
-  closeSocketConversation,
-  getSocketConversationsByUserId,
-  submitPostChatForm,
-} from '@tools/services/AiRinoAssisstant/SocketConversationServices';
-import { uploadConversationFile } from '@tools/services/AiRinoAssisstant/fileUploadService';
-import { savePreChatCustomValue } from '@tools/services/formServices';
 
-// ====== Interfaces ======
-export interface Message {
-  id?: number;
-  text: string;
-  role: 'user' | 'bot' | 'separator' | 'support' | 'trigger' | 'timeout' | 'whatsapp_qr' | 'phone_request' | 'whatsapp_trigger';
-  timestamp: string;
-  user_email?: string;
-  user_id?: string;
-  chatbot_id?: string;
-  chatbot_history?: string;
-  isEmailForm?: boolean;
-  sender_name?: string;
-  sender_image?: string;
-}
+// New imports from restructured modules
+import type { Message, ChatWithAssistantRequest } from '@/types';
+import { chatWithAssistant, getChatHistory } from '@/services/chat';
+import { 
+  closeSocketConversation, 
+  getSocketConversationsByUserId, 
+  submitPostChatForm 
+} from '@/services/chat/socketService';
+import { uploadConversationFile } from '@/services/chat/fileService';
+import { savePreChatCustomValue } from '@/services/config/formService';
 
-export interface ChatWithAssistantRequest {
-  user_id: string;
-  user_email: string;
-  chatbot_id: string;
-  conversation_id: string;
-  prompt: string;
-  isFreePlan: boolean;
-  currentPlan: string;
-}
+export type { Message, ChatWithAssistantRequest };
 
 export const useChatLogic = ({
   userId,

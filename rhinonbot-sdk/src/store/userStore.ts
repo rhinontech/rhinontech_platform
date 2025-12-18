@@ -26,9 +26,9 @@ const generateId = (): string =>
 export const useUserStore = create<UserState>()(
   persist(
     (set, get) => ({
-      userId: null,
-      userEmail: null,
-      sessionId: null,
+      userId: null as string | null,
+      userEmail: null as string | null,
+      sessionId: null as string | null,
       isEmailAvailable: false,
 
       initUser: () => {

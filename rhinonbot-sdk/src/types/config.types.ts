@@ -3,23 +3,24 @@
 export type Theme = 'dark' | 'light' | 'system';
 
 export interface ChatbotConfig {
-  theme: Theme;
-  isFreePlan: boolean;
-  currentPlan: string;
-  isBackgroundImage: boolean;
-  backgroundImage: string;
-  isBgFade: boolean;
-  primaryColor: string;
-  secondaryColor: string;
-  chatbotName: string;
-  navigationOptions: string[];
-  popupMessage: string;
-  greetings: string[];
-  primaryLogo: string;
-  secondaryLogo: string;
-  preChatForm: FormField[];
-  postChatForm: PostChatFormConfig;
-  ticketForm: FormField[];
+  theme?: Theme;
+  isFreePlan?: boolean;
+  currentPlan?: string;
+  isBackgroundImage?: boolean;
+  backgroundImage?: string;
+  isBgFade?: boolean;
+  primaryColor?: string;
+  secondaryColor?: string;
+  chatbotName?: string;
+  navigationOptions?: string[];
+  popupMessage?: string;
+  greetings?: string[];
+  primaryLogo?: string;
+  secondaryLogo?: string;
+  preChatForm?: FormField[];
+  postChatForm?: PostChatFormConfig;
+  ticketForm?: FormField[];
+  selectedPage?: string; // For admin preview mode
 }
 
 export interface FormField {

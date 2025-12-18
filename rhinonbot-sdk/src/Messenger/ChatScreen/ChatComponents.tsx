@@ -14,33 +14,14 @@ import {
   Maximize2,
   MessageCircle,
 } from 'lucide-react';
-import { saveCustomerPhone } from '@tools/services/chatbotConfigService';
-import StarRating from './StarRating/StarRating';
 import { motion } from 'motion/react';
+import StarRating from './StarRating/StarRating';
 
-// ====== Interfaces ======
-export interface Message {
-  id?: number;
-  text: string;
-  role:
-  | 'user'
-  | 'bot'
-  | 'separator'
-  | 'support'
-  | 'trigger'
-  | 'timeout'
-  | 'whatsapp_qr'
-  | 'phone_request'
-  | 'whatsapp_trigger';
-  timestamp: string;
-  user_email?: string;
-  user_id?: string;
-  chatbot_id?: string;
-  chatbot_history?: string;
-  isEmailForm?: boolean;
-  sender_name?: string;
-  sender_image?: string;
-}
+// New imports from restructured modules
+import type { Message } from '@/types';
+import { saveCustomerPhone } from '@/services/config';
+
+export type { Message };
 
 // ====== Chat Header Component ======
 export const ChatHeader: React.FC<{

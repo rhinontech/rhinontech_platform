@@ -6,32 +6,15 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import './HelpScreen.scss';
-import { fetchFoldersWithArticles } from '@tools/services/helpService';
 import Loader from '../Loader/Loader';
 
-interface Article {
-  articleId: string;
-  title: string;
-  content: string;
-  status: string;
-  views: number;
-  likes: number;
-  dislikes: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Folder {
-  folderId: string;
-  name: string;
-  articles: Article[];
-  description?: string;
-  createdAt?: string;
-}
+// New imports from restructured modules
+import type { Article, Folder, ChatbotConfig } from '@/types';
+import { fetchFoldersWithArticles } from '@/services/help';
 
 interface HelpScreenProps {
   onNavigate: (screen: string) => void;
-  chatbot_config?: any;
+  chatbot_config?: ChatbotConfig;
   setSelectedHelpArticle: React.Dispatch<React.SetStateAction<Article | null>>;
   setSelectedHelp: React.Dispatch<React.SetStateAction<Folder | null>>;
   selectedHelp: Folder | null;
@@ -54,8 +37,8 @@ const HelpScreen: React.FC<HelpScreenProps> = ({
   useEffect(() => {
     const fetchFolders = async () => {
       try {
-        const response = await fetchFoldersWithArticles(appId);
-        setFolders(response.folders || []);
+        const folders = await fetchFoldersWithArticles(appId);
+        setFolders(folders || []);
       } catch (error) {
         console.log('error fetching folders', error);
       } finally {

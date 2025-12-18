@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import './ChatHistoryScreen.scss';
-import { getConversationByUserId } from '@tools/services/AiRinoAssisstant/AiRhinoConvoServices';
 import Loader from '../Loader/Loader';
+
+// New imports from restructured modules
+import type { ChatbotConfig, ConversationItem } from '@/types';
+import { getConversationByUserId } from '@/services/chat';
 
 interface ChatHistoryScreenProps {
   isFreePlan: boolean;
@@ -9,19 +12,8 @@ interface ChatHistoryScreenProps {
   setIsSpeakingWithRealPerson: React.Dispatch<React.SetStateAction<boolean>>;
   userId: string;
   appId: string;
-  chatbot_config?: any;
+  chatbot_config?: ChatbotConfig;
   isAdmin?: boolean;
-}
-
-interface IConversationIds {
-  conversation_id: string;
-  title: string;
-  last_chat_time: string;
-  avatar?: string;
-  name?: string;
-  isOnline?: boolean;
-  unreadCount?: number;
-  lastMessage?: string;
 }
 
 const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
@@ -33,7 +25,7 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
   chatbot_config,
   isAdmin,
 }) => {
-  const [conversationIds, setConversationIds] = useState<IConversationIds[]>(
+  const [conversationIds, setConversationIds] = useState<ConversationItem[]>(
     [],
   );
   const [loading, setLoading] = useState<boolean>(true);
@@ -42,7 +34,7 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
     try {
       const response = await getConversationByUserId(userId, appId);
       const sortedConversations = response.conversation.sort(
-        (a: IConversationIds, b: IConversationIds) =>
+        (a: ConversationItem, b: ConversationItem) =>
           new Date(b.last_chat_time).getTime() -
           new Date(a.last_chat_time).getTime(),
       );

@@ -4,7 +4,8 @@ export interface ButtonElement {
   id: string;
   text: string;
   url: string;
-  style: 'primary' | 'secondary';
+  style: 'primary' | 'secondary' | 'danger';
+  actionType?: 'open-url' | 'open-chat' | 'dismiss' | 'phone-call' | 'send-message' | 'copy-coupon' | 'open-moment';
 }
 
 export interface TemplateMedia {

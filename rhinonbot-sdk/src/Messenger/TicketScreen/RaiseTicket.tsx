@@ -1,22 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import './RaiseTicket.scss';
-import { submitTickets } from '@tools/services/TicketServices';
 import { ChevronLeft } from 'lucide-react';
-import { useRef } from 'react';
 
-interface TicketField {
-  id: string;
-  type: string;
-  label: string;
-  required: boolean;
-  placeholder: string;
-}
+// New imports from restructured modules
+import type { TicketField, ChatbotConfig } from '@/types';
+import { submitTicket } from '@/services/ticket';
 
 interface TicketProps {
   appId: string;
   setIsTicketRaised: React.Dispatch<React.SetStateAction<boolean>>;
   setOpenTicket: React.Dispatch<React.SetStateAction<boolean>>;
-  chatbot_config: any;
+  chatbot_config: ChatbotConfig;
   ticketForm: TicketField[];
 }
 
@@ -107,7 +101,7 @@ const RaiseTicket: React.FC<TicketProps> = ({
     console.log('Ticket submitted:', payload);
 
     try {
-      await submitTickets(payload);
+      await submitTicket(payload);
       setIsTicketRaised(true);
       setOpenTicket(false);
     } catch (error) {

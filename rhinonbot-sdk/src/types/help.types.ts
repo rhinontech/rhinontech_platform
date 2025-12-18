@@ -17,6 +17,8 @@ export interface Folder {
   name: string;
   description: string;
   articles: Article[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface NewsItem {

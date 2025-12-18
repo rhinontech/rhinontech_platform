@@ -37,6 +37,7 @@ export {
 export {
   type Conversation,
   type ConversationSummary,
+  type ConversationItem,
   type ChatScreenProps,
   type ChatLogicProps,
   type ChatLogicReturn,

@@ -5,10 +5,10 @@ import './ChatScreen.scss';
 import RaiseTicket from '../TicketScreen/RaiseTicket';
 import Loader from '../Loader/Loader';
 import { useChatLogic } from './useChatLogic';
-import {
-  getWhatsAppConfig,
-  checkCustomerPhone,
-} from '@tools/services/chatbotConfigService';
+
+// New imports from restructured modules
+import type { Message, TicketField, ChatbotConfig, WhatsAppConfig } from '@/types';
+import { getWhatsAppConfig, checkCustomerPhone } from '@/services/config';
 import {
   ChatHeader,
   MessageItem,
@@ -18,38 +18,6 @@ import {
   PreChatForm,
   PostChatForm,
 } from './ChatComponents';
-
-// ====== Interfaces ======
-interface Message {
-  id?: number;
-  text: string;
-  role:
-  | 'user'
-  | 'bot'
-  | 'separator'
-  | 'support'
-  | 'trigger'
-  | 'timeout'
-  | 'whatsapp_qr'
-  | 'phone_request'
-  | 'whatsapp_trigger';
-  timestamp: string;
-  user_email?: string;
-  user_id?: string;
-  chatbot_id?: string;
-  chatbot_history?: string;
-  isEmailForm?: boolean;
-  sender_name?: string;
-  sender_image?: string;
-}
-
-interface TicketField {
-  id: string;
-  type: string;
-  label: string;
-  required: boolean;
-  placeholder: string;
-}
 
 interface ChatScreenProps {
   isAdmin: boolean;
@@ -72,7 +40,7 @@ interface ChatScreenProps {
   setIsSpeakingWithRealPerson: React.Dispatch<React.SetStateAction<boolean>>;
   timeoutDuration?: number;
   onConversationTimeout?: () => void;
-  chatbot_config: any;
+  chatbot_config: ChatbotConfig;
   setIsTicketRaised: React.Dispatch<React.SetStateAction<boolean>>;
   ticketForm: TicketField[];
   setWindowWidth: React.Dispatch<React.SetStateAction<string>>;

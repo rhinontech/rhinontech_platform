@@ -7,20 +7,11 @@ import {
 } from 'lucide-react';
 import './HelpArticlePage.scss';
 
-interface Article {
-  articleId: string;
-  title: string;
-  content: string; // HTML string
-  status: string;
-  views: number;
-  likes: number;
-  dislikes: number;
-  createdAt: string;
-  updatedAt: string;
-}
+// New imports from restructured modules
+import type { Article, ChatbotConfig } from '@/types';
 
 interface HelpArticlePageProps {
-  chatbot_config?: any;
+  chatbot_config?: ChatbotConfig;
   setWindowWidth: React.Dispatch<React.SetStateAction<string>>;
   setSelectedHelpArticle: React.Dispatch<React.SetStateAction<Article | null>>;
   selectedHelpArticle: Article;

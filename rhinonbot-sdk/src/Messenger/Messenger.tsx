@@ -15,20 +15,32 @@ import ChatHistoryScreen from './ChatHistoryScreen/ChatHistoryScreen';
 import HelpScreen from './HelpScreen/HelpScreen';
 import HomeScreen from './HomeScreen/HomeScreen';
 import Voice from './Voice/Voice';
-import { themeVars } from '@tools/utils/theme';
-import useTracking from '@tools/utils/useTracking';
-import Cookies from 'js-cookie';
-import { useConfigStore } from '@tools/utils/chatbotConfigStore';
 import NewsScreen from './NewsScreen/NewsScreen';
 import NewsPage from './NewsPage/NewsPage';
 import HelpAriclePage from './HelpArticlePage/HelpArticlePage';
-import { getForms } from '@tools/services/formServices';
 import RaiseTicket from './TicketScreen/RaiseTicket';
-import { AnimatePresence, motion } from 'motion/react';
-import { getChatbotConfig } from '@tools/services/chatbotConfigService';
-import svgIcons from '@tools/assets/svgIcons';
-import { getCampaignsChatbot } from '@tools/services/Campaigns/chatbotService';
 import { Campaigns } from './Campaigns/Campaigns';
+import { AnimatePresence, motion } from 'motion/react';
+import Cookies from 'js-cookie';
+
+// New imports from restructured modules
+import type { 
+  Campaign, 
+  Folder, 
+  Article, 
+  PostChatFormConfig,
+  RhinontechConfig 
+} from '@/types';
+import { useConfigStore } from '@/store';
+import { getChatbotConfig, getForms } from '@/services/config';
+import { getCampaignsChatbot, trackCampaignImpression } from '@/services/campaign';
+import { getEffectiveTheme } from '@/constants/theme';
+import { COOKIE_KEYS } from '@/constants/storage';
+
+// Legacy imports still needed (to be migrated later)
+import { themeVars } from '@tools/utils/theme';
+import useTracking from '@tools/utils/useTracking';
+import svgIcons from '@tools/assets/svgIcons';
 import { evaluateTargeting } from '@tools/utils/campaignTargeting';
 import {
   canShowCampaign,
@@ -41,20 +53,9 @@ import {
   getPageLoadTime,
   initVisitorTracking,
 } from '@tools/utils/visitorTracking';
-import { trackCampaignImpression } from '@tools/utils/campaignAnalytics';
 
 interface MessengerProps {
-  config?: {
-    app_id: string;
-    admin?: boolean;
-    adminTestingMode?: boolean;
-    chatbot_config?: any;
-  } | null;
-}
-
-export interface PostChatFormConfig {
-  enabled: boolean;
-  elements: any[]; // or FormField[]
+  config?: RhinontechConfig | null;
 }
 
 interface selectedNewsProps {
@@ -66,6 +67,7 @@ interface selectedNewsProps {
   authorName: string;
   updatedAt: string;
 }
+
 interface selectedHelpArticleProps {
   articleId: string;
   title: string;
@@ -76,58 +78,6 @@ interface selectedHelpArticleProps {
   dislikes: number;
   createdAt: string;
   updatedAt: string;
-}
-interface Article {
-  articleId: string;
-  title: string;
-  content: string;
-  status: string;
-  views: number;
-  likes: number;
-  dislikes: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Folder {
-  folderId: string;
-  name: string;
-  description: string;
-  articles: Article[];
-}
-
-interface ButtonElement {
-  id: string;
-  text: string;
-  url: string;
-  style: 'primary' | 'secondary';
-}
-
-interface TemplateMedia {
-  src: string;
-  alt: string;
-  type: string;
-}
-
-interface CampaignContent {
-  media: TemplateMedia | null;
-  layout: string;
-  buttons: ButtonElement[];
-  heading: string;
-  hasImage: boolean;
-  subheading: string;
-  templateId: string;
-}
-
-interface Campaign {
-  id: number;
-  organization_id: number;
-  type: 'recurring' | 'one-time';
-  status: string;
-  content: CampaignContent;
-  targeting: any;
-  created_at: string;
-  updated_at: string;
 }
 
 const Messenger: React.FC<MessengerProps> = ({ config }) => {

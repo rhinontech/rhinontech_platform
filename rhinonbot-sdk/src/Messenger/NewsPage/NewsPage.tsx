@@ -8,24 +8,17 @@ import {
 } from 'lucide-react';
 import './NewsPage.scss';
 
-interface selectedNewsProps {
-  title: string;
-  content: string;
-  img: string;
-  tags: string[];
-  authorImg: string;
-  authorName: string;
-  updatedAt: string;
-}
+// New imports from restructured modules
+import type { NewsItem, ChatbotConfig } from '@/types';
 
-interface NewsScreenProps {
-  chatbot_config?: any;
+interface NewsPageProps {
+  chatbot_config?: ChatbotConfig;
   setWindowWidth: React.Dispatch<React.SetStateAction<string>>;
-  setSelectedNews: React.Dispatch<React.SetStateAction<selectedNewsProps>>;
-  selectedNews: selectedNewsProps;
+  setSelectedNews: React.Dispatch<React.SetStateAction<NewsItem | null>>;
+  selectedNews: NewsItem;
 }
 
-const NewsScreen: React.FC<NewsScreenProps> = ({
+const NewsPage: React.FC<NewsPageProps> = ({
   chatbot_config,
   setWindowWidth,
   setSelectedNews,
@@ -191,4 +184,4 @@ const NewsScreen: React.FC<NewsScreenProps> = ({
   );
 };
 
-export default NewsScreen;
+export default NewsPage;

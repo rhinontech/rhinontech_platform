@@ -8,7 +8,10 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 import './NewsScreen.scss';
 
-const news = [
+// New imports from restructured modules
+import type { NewsItem, ChatbotConfig } from '@/types';
+
+const news: NewsItem[] = [
   {
     title: 'Interview Update Request',
     content:
@@ -43,19 +46,9 @@ const news = [
     updatedAt: '2 month ago',
   },
 ];
-interface selectedNewsProps {
-  title: string;
-  content: string;
-  img: string;
-  tags: string[];
-  authorImg: string;
-  authorName: string;
-  updatedAt: string;
-}
-
 interface NewsScreenProps {
-  chatbot_config?: any;
-  setSelectedNews: React.Dispatch<React.SetStateAction<selectedNewsProps>>;
+  chatbot_config?: ChatbotConfig;
+  setSelectedNews: React.Dispatch<React.SetStateAction<NewsItem | null>>;
 }
 
 const NewsScreen: React.FC<NewsScreenProps> = ({

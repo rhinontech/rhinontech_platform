@@ -57,7 +57,8 @@ export const trackCampaignClick = (
   campaignId: number,
   appId: string,
   buttonId: string,
-  url: string
+  url: string,
+  actionType?: string
 ): void => {
   sendAnalytics('campaign_click', {
     campaignId,
@@ -65,6 +66,7 @@ export const trackCampaignClick = (
     timestamp: Date.now(),
     buttonId,
     url,
+    actionType,
   });
 };
 
@@ -74,12 +76,12 @@ export const trackCampaignClick = (
 export const trackCampaignClose = (
   campaignId: number,
   appId: string,
-  actionType: 'dismiss' | 'click_outside' | 'close_button'
+  actionType?: 'dismiss' | 'click_outside' | 'close_button'
 ): void => {
   sendAnalytics('campaign_close', {
     campaignId,
     appId,
     timestamp: Date.now(),
-    actionType,
+    actionType: actionType || 'close_button',
   });
 };

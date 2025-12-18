@@ -21,6 +21,9 @@ export interface ConversationSummary {
   lastMessage?: string;
 }
 
+// Alias for ConversationSummary - used in ChatHistoryScreen
+export type ConversationItem = ConversationSummary;
+
 export interface ChatScreenProps {
   isAdmin: boolean;
   isFreePlan?: boolean;
