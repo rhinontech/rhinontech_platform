@@ -1,0 +1,42 @@
+// Message type definitions
+
+export type MessageRole =
+  | 'user'
+  | 'bot'
+  | 'separator'
+  | 'support'
+  | 'trigger'
+  | 'timeout'
+  | 'whatsapp_qr'
+  | 'phone_request'
+  | 'whatsapp_trigger';
+
+export interface Message {
+  id?: number;
+  text: string;
+  role: MessageRole;
+  timestamp: string;
+  user_email?: string;
+  user_id?: string;
+  chatbot_id?: string;
+  chatbot_history?: string;
+  isEmailForm?: boolean;
+  sender_name?: string;
+  sender_image?: string;
+}
+
+export interface ChatWithAssistantRequest {
+  user_id: string;
+  user_email: string;
+  chatbot_id: string;
+  conversation_id: string;
+  prompt: string;
+  isFreePlan: boolean;
+  currentPlan: string;
+}
+
+export interface GetChatHistoryRequest {
+  user_id: string;
+  chatbot_id: string;
+  conversation_id: string;
+}

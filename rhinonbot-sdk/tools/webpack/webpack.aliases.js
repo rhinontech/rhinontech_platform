@@ -11,4 +11,12 @@ module.exports = createWebpackAliases({
   '@assets': 'assets',
   '@src': 'src',
   '@tools': 'tools',
+  // New organized structure
+  '@': 'src',
+  '@/types': 'src/types',
+  '@/constants': 'src/constants',
+  '@/services': 'src/services',
+  '@/store': 'src/store',
+  '@/hooks': 'src/hooks',
+  '@/components': 'src/components',
 });

@@ -16,7 +16,14 @@
       "*": ["node_modules/*"],
       "@assets/*": ["./assets/*"],
       "@tools/*": ["./tools/*"],
-      "@src/*": ["./src/*"]
+      "@src/*": ["./src/*"],
+      "@/*": ["./src/*"],
+      "@/types/*": ["./src/types/*"],
+      "@/constants/*": ["./src/constants/*"],
+      "@/services/*": ["./src/services/*"],
+      "@/store/*": ["./src/store/*"],
+      "@/hooks/*": ["./src/hooks/*"],
+      "@/components/*": ["./src/components/*"]
     },
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
