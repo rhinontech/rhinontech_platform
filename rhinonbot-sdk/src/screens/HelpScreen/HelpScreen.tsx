@@ -53,7 +53,7 @@ const HelpScreen: React.FC<HelpScreenProps> = ({
   const filteredFolders = folders
     .map((folder) => ({
       ...folder,
-      articles: folder.articles.filter((article) =>
+      articles: (folder.articles || []).filter((article) =>
         article.title.toLowerCase().includes(searchQuery.toLowerCase()),
       ),
     }))

@@ -1,5 +1,6 @@
 // Default configuration values
 import type { ChatbotConfig, FormField, PostChatFormConfig } from '@/types';
+import { LOGOS, BACKGROUNDS } from './urls';
 
 export const DEFAULT_PRIMARY_COLOR = '#1403ac';
 export const DEFAULT_SECONDARY_COLOR = '#f3f6ff';
@@ -76,7 +77,7 @@ export const DEFAULT_CONFIG: ChatbotConfig = {
   isFreePlan: false,
   currentPlan: 'Trial',
   isBackgroundImage: false,
-  backgroundImage: '',
+  backgroundImage: BACKGROUNDS.default,
   isBgFade: true,
   primaryColor: DEFAULT_PRIMARY_COLOR,
   secondaryColor: DEFAULT_SECONDARY_COLOR,
@@ -84,8 +85,8 @@ export const DEFAULT_CONFIG: ChatbotConfig = {
   navigationOptions: DEFAULT_NAVIGATION_OPTIONS,
   popupMessage: DEFAULT_POPUP_MESSAGE,
   greetings: DEFAULT_GREETINGS,
-  primaryLogo: '',
-  secondaryLogo: '',
+  primaryLogo: LOGOS.primaryLight,
+  secondaryLogo: LOGOS.primaryDark,
   preChatForm: DEFAULT_PRE_CHAT_FORM,
   postChatForm: DEFAULT_POST_CHAT_FORM,
   ticketForm: DEFAULT_TICKET_FORM,

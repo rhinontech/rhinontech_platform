@@ -5,12 +5,6 @@ const webpack = require('webpack');
 // Load environment variables at build time (not bundled)
 require('dotenv').config();
 
-console.log("Alias check:", {
-  root: process.cwd(),
-  assets: path.resolve(__dirname, "../assets"),
-  tools: path.resolve(__dirname, "../tools"),
-});
-
 module.exports = {
   mode: 'development',
   entry: ['./src/main.tsx'],

@@ -7,10 +7,16 @@ import type { Folder, Article } from '@/types';
  * Fetch folders with articles for help center
  */
 export const fetchFoldersWithArticles = async (chatbotId: string): Promise<Folder[]> => {
-  const response = await serverApi.get(ENDPOINTS.FOLDERS_STRUCTURE, {
-    params: { chatbot_id: chatbotId },
-  });
-  return response.data;
+  try {
+    const response = await serverApi.get(ENDPOINTS.FOLDERS_STRUCTURE, {
+      params: { chatbot_id: chatbotId },
+    });
+    // Ensure we return an array
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error('Error fetching folders:', error);
+    return [];
+  }
 };
 
 /**

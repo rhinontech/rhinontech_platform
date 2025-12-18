@@ -11,8 +11,8 @@ export { default as useTracking } from './useTracking';
 
 // Campaign utilities
 export { evaluateTargeting } from './campaignTargeting';
-export { canShowCampaign, recordCampaignView, CampaignFrequencyManager } from './campaignFrequency';
-export { trackCampaignAnalytics, CampaignAnalyticsManager } from './campaignAnalytics';
+export { canShowCampaign, recordCampaignView, getCampaignViewCount, getLastViewTime, resetCampaignViews, clearAllCampaignViews } from './campaignFrequency';
+export { trackCampaignImpression, trackCampaignClick, trackCampaignClose } from './campaignAnalytics';
 
 // Visitor tracking
 export {
@@ -24,10 +24,10 @@ export {
 } from './visitorTracking';
 
 // Exit intent
-export { ExitIntentManager } from './exitIntent';
+export { initExitIntent, cleanupExitIntent, hasExitIntentTriggered, resetExitIntent } from './exitIntent';
 
 // Time utilities
-export { convertTimestamp } from './timeConvertion';
+export { timeConvertion } from './timeConvertion';
 
 // Config store
-export { getChatbotConfigFromStore, setChatbotConfigInStore } from './chatbotConfigStore';
+export { useConfigStore } from './chatbotConfigStore';

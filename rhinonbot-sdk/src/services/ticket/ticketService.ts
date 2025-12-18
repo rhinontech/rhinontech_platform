@@ -18,11 +18,17 @@ export const getTicketsStatus = async (
   chatbotId: string,
   userEmail: string
 ): Promise<Ticket[]> => {
-  const response = await serverApi.post(ENDPOINTS.GET_TICKETS, {
-    chatbot_id: chatbotId,
-    user_email: userEmail,
-  });
-  return response.data;
+  try {
+    const response = await serverApi.post(ENDPOINTS.GET_TICKETS, {
+      chatbot_id: chatbotId,
+      user_email: userEmail,
+    });
+    // Ensure we return an array
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error('Error fetching tickets:', error);
+    return [];
+  }
 };
 
 /**
