@@ -34,6 +34,7 @@ export interface FormField {
 export interface PostChatFormConfig {
   enabled: boolean;
   elements: FormField[];
+  fields?: FormField[]; // For backwards compatibility
 }
 
 export interface RhinontechConfig {

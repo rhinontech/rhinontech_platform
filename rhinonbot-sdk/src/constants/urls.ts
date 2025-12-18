@@ -7,9 +7,9 @@ export const LOGOS = {
 } as const;
 
 export const AVATARS = {
-  support: 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png',
-  bot: 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png',
-  defaultUser: 'https://img.freepik.com/premium-photo/beautiful-woman-with-natural-makeup-women-with-clean-fresh-skin-dark-hear-blue-eyes_150254-452.jpg?semt=ais_hybrid&w=740',
+  SUPPORT: 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png',
+  BOT: 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png',
+  DEFAULT_USER: 'https://img.freepik.com/premium-photo/beautiful-woman-with-natural-makeup-women-with-clean-fresh-skin-dark-hear-blue-eyes_150254-452.jpg?semt=ais_hybrid&w=740',
 } as const;
 
 export const BACKGROUNDS = {

@@ -25,11 +25,11 @@ interface ChatState {
   reset: () => void;
 }
 
-const initialState = {
-  selectedChatId: null,
+const initialState: Omit<ChatState, 'setSelectedChatId' | 'setIsSpeakingWithRealPerson' | 'setIsTicketRaised' | 'setActiveCampaign' | 'setIsApiKeyProvided' | 'setIsFreePlan' | 'reset'> = {
+  selectedChatId: null as string | null,
   isSpeakingWithRealPerson: false,
   isTicketRaised: false,
-  activeCampaign: undefined,
+  activeCampaign: undefined as Campaign | undefined,
   isApiKeyProvided: false,
   isFreePlan: false,
 };
