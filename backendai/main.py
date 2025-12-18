@@ -73,6 +73,12 @@ app.include_router(image_generation_route, tags=["Image Generation"])
 app.include_router(ollama_route, tags=["Ollama Lead Generation"])
 # app.include_router(gemini_support_route, tags=["Gemini"])
 
+# New Routes for RAG Migration
+from routes.standard_rag_routes import router as standard_rag_route
+from routes.realtime_rag_routes import router as realtime_rag_route
+app.include_router(standard_rag_route, tags=["Standard RAG (OpenAI)"])
+app.include_router(realtime_rag_route, tags=["Realtime API"])
+
 
 # Run with: python main.py
 if __name__ == "__main__":

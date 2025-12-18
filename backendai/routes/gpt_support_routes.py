@@ -129,33 +129,34 @@ async def chat_assistant(request: ChatRequest):
 
         # PAID PLAN CHATBOT HANDLING
         else:
-            conn = postgres_connection()
+            from DB.postgresDB import get_db_connection
+            
+            with get_db_connection() as conn:
+                # Fetch chat_count and token_count from bot_assistants
+                select_query = """
+                    SELECT chat_count, token_count
+                    FROM bot_assistants
+                    WHERE chatbot_id = %s;
+                """
+                result = run_query(conn, select_query, (chatbot_id,))
+                if result:
+                    chat_count, token_count = result[0]
+                else:
+                    chat_count, token_count = 0, 0
 
-            # Fetch chat_count and token_count from bot_assistants
-            select_query = """
-                SELECT chat_count, token_count
-                FROM bot_assistants
-                WHERE chatbot_id = %s;
-            """
-            result = run_query(conn, select_query, (chatbot_id,))
-            if result:
-                chat_count, token_count = result[0]
-            else:
-                chat_count, token_count = 0, 0
+                # Define limits based on plan
+                current_plan = getattr(request, "currentPlan", "Trial")
+                if current_plan in ["Starter", "Trial", "Free"]:
+                    token_limit = 500_000
+                elif current_plan == "Growth":
+                    token_limit = 1_000_000
+                elif current_plan == "Scale":
+                    token_limit = 2_000_000
+                else:
+                    token_limit = 500_000
 
-            # Define limits based on plan
-            current_plan = getattr(request, "currentPlan", "Trial")
-            if current_plan in ["Starter", "Trial", "Free"]:
-                token_limit = 500_000
-            elif current_plan == "Growth":
-                token_limit = 1_000_000
-            elif current_plan == "Scale":
-                token_limit = 2_000_000
-            else:
-                token_limit = 500_000
-
-            chat_limit = token_limit // 125
-            limit_exceed = chat_count >= chat_limit or token_count >= token_limit
+                chat_limit = token_limit // 125
+                limit_exceed = chat_count >= chat_limit or token_count >= token_limit
 
             async def event_generator():
                 async for chunk in chat_support(
@@ -202,8 +203,13 @@ async def chat_assistant(request: ChatRequest):
                     WHERE chatbot_id = %s;
                 """
 
-                run_write_query(conn, update_query, (total_tokens, chatbot_id))
-                conn.close()
+                # Note: finalize_counts runs in background long after original request scope.
+                # We should get a NEW connection from the pool.
+                try:
+                    with get_db_connection() as conn_update:
+                        run_write_query(conn_update, update_query, (total_tokens, chatbot_id))
+                except Exception as e:
+                    logging.error(f"Error updating token counts: {e}")
 
             asyncio.create_task(finalize_counts())
 

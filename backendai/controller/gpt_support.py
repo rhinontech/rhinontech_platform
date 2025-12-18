@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # from openai import OpenAI
 import redis
 from services.openai_services import client
-from DB.postgresDB import postgres_connection, run_query, run_write_query
+from DB.postgresDB import postgres_connection, run_query, run_write_query, get_db_connection
 
 
 
@@ -57,10 +57,10 @@ def extract_instruction_from_data(org_data):
 
 
 def get_assistant(chatbot_id):
-    conn = postgres_connection()
-    query = "SELECT assistant_id FROM bot_assistants WHERE chatbot_id = %s;"
-    result = run_query(conn, query, (chatbot_id,))
-    conn.close()
+    with get_db_connection() as conn:
+        query = "SELECT assistant_id FROM bot_assistants WHERE chatbot_id = %s;"
+        result = run_query(conn, query, (chatbot_id,))
+    
     if result:
         return result[0][0]
     return None
@@ -100,18 +100,17 @@ def get_assistant(chatbot_id):
 
 
 def start_new_chat(user_id, chatbot_id, user_email,user_plan="Free"):
-    conn = postgres_connection()
-    current_time = datetime.now(timezone.utc)
-    thread = client.beta.threads.create()
-    thread_id = thread.id
+    with get_db_connection() as conn:
+        current_time = datetime.now(timezone.utc)
+        thread = client.beta.threads.create()
+        thread_id = thread.id
 
-    query = """
-        INSERT INTO bot_conversations (user_id, user_email, chatbot_id, user_plan, conversation_id, title, history, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
-    """
-    params = (user_id, user_email, chatbot_id, user_plan, thread_id, "Untitled Conversation", '[]', current_time, current_time)
-    run_write_query(conn, query, params)
-    conn.close()
+        query = """
+            INSERT INTO bot_conversations (user_id, user_email, chatbot_id, user_plan, conversation_id, title, history, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s, %s)
+        """
+        params = (user_id, user_email, chatbot_id, user_plan, thread_id, "Untitled Conversation", '[]', current_time, current_time)
+        run_write_query(conn, query, params)
     return thread_id
 
 
@@ -150,15 +149,18 @@ async def chat_support(
 ):
     try:
         # Check if conversation exists; if not, create a new one
-        conn = postgres_connection()
-        if not conversation_id or conversation_id == "NEW_CHAT":
-            conversation_id = start_new_chat(user_id, chatbot_id, user_email,user_plan)
-        else:
-            check_query = "SELECT 1 FROM bot_conversations WHERE conversation_id = %s;"
-            exists = run_query(conn, check_query, (conversation_id,))
-            if not exists:
-                conversation_id = start_new_chat(user_id, chatbot_id, user_email,user_plan)
-        conn.close()
+        conversation_created = False
+        with get_db_connection() as conn:
+            if not conversation_id or conversation_id == "NEW_CHAT":
+                conversation_created = True
+            else:
+                check_query = "SELECT 1 FROM bot_conversations WHERE conversation_id = %s;"
+                exists = run_query(conn, check_query, (conversation_id,))
+                if not exists:
+                     conversation_created = True
+        
+        if conversation_created:
+             conversation_id = start_new_chat(user_id, chatbot_id, user_email,user_plan)
 
         assistant_id = get_assistant(chatbot_id)
         if not assistant_id:
@@ -225,19 +227,27 @@ async def chat_support(
             {"role": "bot", "text": assistant_response, "timestamp": current_time.isoformat()},
         ]
 
-        conn = postgres_connection()
-        update_query = """
-            UPDATE bot_conversations
-            SET history = COALESCE(history, '[]'::jsonb) || %s::jsonb,
-                updated_at = %s
-            WHERE conversation_id = %s;
-        """
-        run_write_query(conn, update_query, (json.dumps(messages), current_time, conversation_id))
+        with get_db_connection() as conn:
+            update_query = """
+                UPDATE bot_conversations
+                SET history = COALESCE(history, '[]'::jsonb) || %s::jsonb,
+                    updated_at = %s
+                WHERE conversation_id = %s;
+            """
+            run_write_query(conn, update_query, (json.dumps(messages), current_time, conversation_id))
 
-        # Check if title is still "Untitled Conversation"
-        title_query = "SELECT title FROM bot_conversations WHERE conversation_id = %s;"
-        result = run_query(conn, title_query, (conversation_id,))
-        conn.close()
+            # Check if title is still "Untitled Conversation"
+            title_query = "SELECT title FROM bot_conversations WHERE conversation_id = %s;"
+            result = run_query(conn, title_query, (conversation_id,))
+             
+            if result and result[0][0] == "Untitled Conversation":
+                # We can do title generation outside the lock, or keep it short. 
+                # Better to release lock, generate title, then update. 
+                pass # Logic continues below
+        
+        # NOTE: Original code had conn.close() after query but before title gen logic used 'result'.
+        # I will preserve the logic flow but use safer DB access.
+        
         if result and result[0][0] == "Untitled Conversation":
             try:
                 title_prompt = (
@@ -257,10 +267,9 @@ async def chat_support(
 
                 ai_generated_title = title_response.choices[0].message.content.strip().replace('"', '')
 
-                conn = postgres_connection()
-                update_title_query = "UPDATE bot_conversations SET title = %s WHERE conversation_id = %s;"
-                run_write_query(conn, update_title_query, (ai_generated_title, conversation_id))
-                conn.close()
+                with get_db_connection() as conn_title:
+                    update_title_query = "UPDATE bot_conversations SET title = %s WHERE conversation_id = %s;"
+                    run_write_query(conn_title, update_title_query, (ai_generated_title, conversation_id))
             except Exception as e:
                 logging.error(f"Title generation failed: {e}")
 
@@ -272,14 +281,13 @@ async def chat_support(
 
 
 def get_chat_history(user_id, chatbot_id, conversation_id):
-    conn = postgres_connection()
-    query = """
-        SELECT history, post_chat_review
-        FROM bot_conversations
-        WHERE user_id = %s AND chatbot_id = %s AND conversation_id = %s;
-    """
-    result = run_query(conn, query, (user_id, chatbot_id, conversation_id))
-    conn.close()
+    with get_db_connection() as conn:
+        query = """
+            SELECT history, post_chat_review
+            FROM bot_conversations
+            WHERE user_id = %s AND chatbot_id = %s AND conversation_id = %s;
+        """
+        result = run_query(conn, query, (user_id, chatbot_id, conversation_id))
 
     if result:
         # result[0] = (history_json, post_chat_review_json)
@@ -293,15 +301,14 @@ def get_chat_history(user_id, chatbot_id, conversation_id):
 
 
 def get_conversation_by_user_id(user_id, chatbot_id):
-    conn = postgres_connection()
-    query = """
-        SELECT conversation_id, title, history, updated_at
-        FROM bot_conversations
-        WHERE user_id = %s AND chatbot_id = %s
-        ORDER BY updated_at DESC;
-    """
-    results = run_query(conn, query, (user_id, chatbot_id))
-    conn.close()
+    with get_db_connection() as conn:
+        query = """
+            SELECT conversation_id, title, history, updated_at
+            FROM bot_conversations
+            WHERE user_id = %s AND chatbot_id = %s
+            ORDER BY updated_at DESC;
+        """
+        results = run_query(conn, query, (user_id, chatbot_id))
 
     conversation_list = []
     for row in results:
