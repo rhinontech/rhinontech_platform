@@ -5,9 +5,13 @@
   position: relative;
   padding: 0;
   height: calc(100% - 10px);
+  min-height: 0; // Critical for flex children to respect height
+  flex: 1;
   margin: 10px 10px 0px 10px;
   border: 1px solid var(--border-color);
   border-radius: 16px;
+  // Prevent content overflow
+  overflow: hidden;
 }
 
 .chat-header {
@@ -72,9 +76,13 @@
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  height: 0; // Forces flex: 1 to work properly
   position: relative;
   -ms-overflow-style: none;
   scrollbar-width: none;
+  // Better mobile scrolling
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 
   #{'&::-webkit-scrollbar'} {
     display: none;

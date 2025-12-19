@@ -119,6 +119,9 @@
   overflow: hidden;
   transition: width 0.5s ease, background 0.3s ease, color 0.3s ease;
   border: 1px solid var(--border-color);
+  
+  // Prevent iOS rubber-banding on the container
+  overscroll-behavior: contain;
 
   .admin-align & {
     position: relative;
@@ -164,6 +167,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  // Critical: ensure it can shrink and fill available space
+  height: 0; // This forces flex: 1 to work properly
 }
 
 // Loading state for lazy-loaded screens
@@ -181,7 +186,10 @@
   overflow-y: auto;
   padding: 0;
   min-height: 0;
-  /* Important for proper flex behavior */
+  height: 0; // Forces flex: 1 to work properly
+  // Better mobile scrolling
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 /* Bottom Navigation */
@@ -297,28 +305,43 @@
 /* Mobile Responsive */
 @media (max-width: 480px) {
   .chat-window {
+    // Use dvh (dynamic viewport height) with vh fallback for older browsers
+    // dvh accounts for mobile browser chrome (address bar, etc.)
     width: 100vw;
-    height: 100vh;
+    height: 100vh; // Fallback for older browsers
+    height: 100dvh; // Dynamic viewport - excludes browser chrome
+    height: calc(100vh - env(safe-area-inset-bottom, 0px)); // Safe area fallback
     max-width: none;
     max-height: none;
     bottom: 0;
+    right: 0;
     border-radius: 0;
-    z-index: 100;
-
+    z-index: 9999;
+    position: fixed;
+    
+    // Prevent iOS rubber-banding
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    
+    // Safe area for notched devices (iPhone X+)
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 
     .admin-align & {
-      width: 380px; // Keep original width in admin mode
-      height: 650px; // Keep original height in admin mode
+      width: 380px;
+      height: 650px;
+      position: relative;
     }
   }
 
   .chat-button {
     margin: 10px;
+    // Account for safe area on bottom
+    margin-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   }
 
   .chat-bot-header {
     position: absolute;
-    top: 23px;
+    top: env(safe-area-inset-top, 23px);
     right: 20px;
     z-index: 5;
     display: flex;
@@ -341,7 +364,6 @@
     margin-bottom: 5px;
     color: var(--text-primary);
 
-
     &:hover {
       background: var(--bg-tertiary);
       cursor: pointer;
@@ -355,5 +377,36 @@
 
   .header-btn-extend {
     display: none;
+  }
+  
+  // Ensure bottom nav respects safe area
+  .bottom-nav {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  
+  // Ensure footer respects safe area
+  .footer {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Tablet breakpoint - slightly smaller widget */
+@media (min-width: 481px) and (max-width: 768px) {
+  .chat-window {
+    width: 380px;
+    height: 600px;
+    max-height: 80vh;
+  }
+}
+
+/* Landscape mobile - adjust height */
+@media (max-width: 480px) and (orientation: landscape) {
+  .chat-window {
+    height: 100dvh;
+    height: 100vh; // Fallback
+  }
+  
+  .bottom-nav {
+    height: 55px; // Slightly smaller in landscape
   }
 }
