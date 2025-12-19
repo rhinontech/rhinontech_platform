@@ -9,13 +9,12 @@ from fastapi import HTTPException
 from services.openai_services import client
 from services.embedding_service import embedding_service
 from DB.postgresDB import postgres_connection, run_query, run_write_query, search_vectors
-from controller.chatbot_config import get_url_data, pdf_data, doc_data, txt_data, ppt_data, image_data
+from controller.chatbot_config import get_sitemap_urls, get_url_data, pdf_data, doc_data, txt_data, ppt_data, image_data
 
 # Use the environment variable for S3 Base URL
 S3_BASE_URL = os.getenv("S3_BASE_URL", "")
 
 class StandardRAGController:
-    
     @staticmethod
     async def fetch_and_prepare_data(chatbot_id: str) -> str:
         """
@@ -43,8 +42,31 @@ class StandardRAGController:
             if url_data:
                 for url_item in url_data:
                     try:
-                        content = get_url_data(url_item['url'])
-                        combined_text += f"\n\n--- Source: {url_item['url']} ---\n{content}"
+                        if url_item.get("sitemap"):
+                        # Sitemap-based scraping
+                            sitemap_urls = get_sitemap_urls(url_item["url"])
+
+                            for page_url in sitemap_urls:
+                                try:
+                                    content = get_url_data(page_url)
+                                    if content:
+                                        combined_text += (
+                                            f"\n\n--- Source: {page_url} ---\n{content}"
+                                        )
+                                except Exception as e:
+                                    logging.error(f"Error scraping {page_url}: {e}")
+
+                            else:
+                                # Single-page scraping
+                                try:
+                                    content = get_url_data(url_item["url"])
+                                    if content:
+                                        combined_text += (
+                                            f"\n\n--- Source: {url_item['url']} ---\n{content}"
+                                        )
+                                except Exception as e:
+                                    logging.error(f"Error fetching URL {url_item['url']}: {e}")
+
                     except Exception as e:
                         logging.error(f"Error fetching URL {url_item.get('url')}: {e}")
 

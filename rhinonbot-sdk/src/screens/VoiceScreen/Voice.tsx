@@ -5,12 +5,20 @@ import './Voice.scss';
 // New imports from restructured modules
 import type { VoiceScreenProps } from '@/types';
 import { getVoiceSessionToken } from '@/services/voice';
-import { Loader2, Mic, MicOff, Volume2, VolumeOff, Wifi, WifiOff, X } from 'lucide-react';
+import {
+  Loader2,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeOff,
+  Wifi,
+  WifiOff,
+  X,
+} from 'lucide-react';
 
 const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) => {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [loading, setLoading] = useState(false);
-
 
   const [isMuted, setIsMuted] = useState(false);
 
@@ -20,50 +28,46 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null); // 🔥 Added
   const initializedRef = useRef(false);
 
-
-
-
   const baseStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    margin: "8px 0",
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '8px 0',
   };
 
   const badgeBase: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "6px 12px",
-    borderRadius: "20px",
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '6px 12px',
+    borderRadius: '20px',
     fontWeight: 500,
-    fontSize: "14px",
+    fontSize: '14px',
   };
-
 
   const statusConfig: Record<
     string,
     { icon: JSX.Element; text: string; style: React.CSSProperties }
   > = {
     Connected: {
-      icon: <Wifi size={16} color="#4CAF50" />,
-      text: "Connected",
-      style: { backgroundColor: "#E8F5E9", color: "#2E7D32" },
+      icon: <Wifi size={16} color='#4CAF50' />,
+      text: 'Connected',
+      style: { backgroundColor: '#E8F5E9', color: '#2E7D32' },
     },
-    "Connection failed": {
-      icon: <WifiOff size={16} color="#F44336" />,
-      text: "Connection Failed",
-      style: { backgroundColor: "#FFEBEE", color: "#C62828" },
+    'Connection failed': {
+      icon: <WifiOff size={16} color='#F44336' />,
+      text: 'Connection Failed',
+      style: { backgroundColor: '#FFEBEE', color: '#C62828' },
     },
     Connecting: {
-      icon: <Loader2 size={16} color="#FFC107" className="spin" />,
-      text: "Connecting...",
-      style: { backgroundColor: "#FFF8E1", color: "#FF8F00" },
+      icon: <Loader2 size={16} color='#FFC107' className='spin' />,
+      text: 'Connecting...',
+      style: { backgroundColor: '#FFF8E1', color: '#FF8F00' },
     },
     default: {
-      icon: <Loader2 size={16} color="#FFC107" className="spin" />,
-      text: "Connecting...",
-      style: { backgroundColor: "#FFF8E1", color: "#FF8F00" },
+      icon: <Loader2 size={16} color='#FFC107' className='spin' />,
+      text: 'Connecting...',
+      style: { backgroundColor: '#FFF8E1', color: '#FF8F00' },
     },
   };
 
@@ -81,6 +85,14 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
         localStreamRef.current = null;
+      }
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.pause();
+        remoteAudioRef.current.srcObject = null;
+        if (remoteAudioRef.current.parentNode) {
+          remoteAudioRef.current.parentNode.removeChild(remoteAudioRef.current);
+        }
+        remoteAudioRef.current = null;
       }
       setConnectionStatus('Disconnected');
       setLoading(false);
@@ -161,9 +173,11 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
       // Remote audio
       const audioEl = document.createElement('audio');
       audioEl.autoplay = true;
-      remoteAudioRef.current = audioEl; // 🔥 store reference
+      document.body.appendChild(audioEl); // 🔥 Attach to maximize compatibility
+      remoteAudioRef.current = audioEl;
       pc.ontrack = (e) => {
         audioEl.srcObject = e.streams[0];
+        audioEl.play().catch((e) => console.error('Autoplay failed:', e));
         setLoading(false);
       };
 
@@ -196,7 +210,7 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
       await pc.setLocalDescription(offer);
 
       const response = await fetch(
-        `https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01`,
+        `https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview`,
         {
           method: 'POST',
           body: offer.sdp,
@@ -232,7 +246,8 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
       });
     }
   };
-  const { icon, text, style } = statusConfig[connectionStatus] || statusConfig.default;
+  const { icon, text, style } =
+    statusConfig[connectionStatus] || statusConfig.default;
 
   return (
     <div className='voice-container'>
@@ -273,10 +288,15 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
           <span>{text}</span>
         </div>
       </div>
-      <CloudWave
-        isListening={loading}
-      />
-      <div style={{ display: 'flex', marginTop: "70px", justifyContent: 'center', gap: '100px' }}>
+      <CloudWave isListening={loading} />
+      <div
+        style={{
+          display: 'flex',
+          marginTop: '70px',
+          justifyContent: 'center',
+          gap: '100px',
+        }}
+      >
         <button className='voice-btn' onClick={handleToggleMute}>
           <div
             style={{
@@ -311,8 +331,11 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: (connectionStatus !== 'Connected' &&
-            connectionStatus !== 'Connection failed') ? "#ae2525":'#e02f2f',
+              background:
+                connectionStatus !== 'Connected' &&
+                connectionStatus !== 'Connection failed'
+                  ? '#ae2525'
+                  : '#e02f2f',
               color: 'white',
               border: 'none',
               padding: '12px',

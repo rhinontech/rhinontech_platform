@@ -52,7 +52,7 @@ async def generate_openai_ephemeral_session(chatbot_id) -> dict:
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "gpt-4o-realtime-preview-2024-10-01",
+        "model": "gpt-4o-realtime-preview",
         "voice": "verse",
         "instructions": instructions,
     }
