@@ -39,4 +39,5 @@ export const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   );
 };
 
-export default TypingIndicator;
+// Memoize TypingIndicator to prevent re-renders when props haven't changed
+export default React.memo(TypingIndicator);

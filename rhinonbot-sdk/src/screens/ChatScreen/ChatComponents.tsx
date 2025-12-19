@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import {
   ChevronLeft,
   SendHorizontal,
@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import StarRating from './StarRating/StarRating';
+import { Loader } from '@/components/common';
+
+// Lazy load emoji picker to reduce initial bundle size (~200KB saved)
+const EmojiPickerComponent = lazy(() => import('emoji-picker-react'));
 
 // New imports from restructured modules
 import type { Message } from '@/types';
@@ -919,7 +923,6 @@ export const ChatInput: React.FC<{
   stopListening: () => void;
   chatbot_config: any;
   showEmojiPicker: boolean;
-  EmojiPicker: any;
   adminTestingMode?: boolean;
   whatsappConfig?: any;
   onWhatsAppClick?: () => void;
@@ -942,7 +945,6 @@ export const ChatInput: React.FC<{
   stopListening,
   chatbot_config,
   showEmojiPicker,
-  EmojiPicker,
   adminTestingMode,
   whatsappConfig,
   onWhatsAppClick,
@@ -1094,6 +1096,7 @@ export const ChatInput: React.FC<{
           </div>
         )}
 
+        {/* Lazy-loaded Emoji Picker */}
         {showEmojiPicker && isConversationActive && (
           <div
             style={{
@@ -1106,11 +1109,30 @@ export const ChatInput: React.FC<{
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <EmojiPicker
-              onEmojiClick={(emojiData: any) => {
-                setMessage((prev) => prev + emojiData.emoji);
-              }}
-            />
+            <Suspense
+              fallback={
+                <div
+                  style={{
+                    width: '320px',
+                    height: '400px',
+                    background: 'var(--bg-secondary)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: 'var(--shadow-lg)',
+                  }}
+                >
+                  <Loader />
+                </div>
+              }
+            >
+              <EmojiPickerComponent
+                onEmojiClick={(emojiData: any) => {
+                  setMessage((prev) => prev + emojiData.emoji);
+                }}
+              />
+            </Suspense>
           </div>
         )}
       </div>

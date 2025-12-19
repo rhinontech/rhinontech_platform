@@ -436,4 +436,5 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   );
 };
 
-export default MessageItem;
+// Memoize MessageItem to prevent re-renders when props haven't changed
+export default React.memo(MessageItem);

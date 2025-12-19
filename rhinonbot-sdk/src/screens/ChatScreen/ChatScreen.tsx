@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
-import EmojiPicker from 'emoji-picker-react/dist';
 import './ChatScreen.scss';
 import RaiseTicket from '@/screens/TicketScreen/RaiseTicket';
 import { Loader } from '@/components/common';
@@ -993,7 +992,6 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
         stopListening={stopListening}
         chatbot_config={chatbot_config}
         showEmojiPicker={showEmojiPicker}
-        EmojiPicker={EmojiPicker}
       />
     </div>
   );

@@ -190,4 +190,5 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   );
 };
 
-export default ChatHeader;
+// Memoize ChatHeader to prevent re-renders when props haven't changed
+export default React.memo(ChatHeader);

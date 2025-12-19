@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, Suspense, lazy } from 'react';
 import {
   MessageCircle,
   X,
@@ -11,19 +11,25 @@ import {
 } from 'lucide-react';
 import './Messenger.scss';
 
-// Screen imports from new location
-import ChatScreen from '@/screens/ChatScreen/ChatScreen';
-import ChatHistoryScreen from '@/screens/ChatHistoryScreen/ChatHistoryScreen';
-import HelpScreen from '@/screens/HelpScreen/HelpScreen';
-import HomeScreen from '@/screens/HomeScreen/HomeScreen';
-import Voice from '@/screens/VoiceScreen/Voice';
-import NewsScreen from '@/screens/NewsScreen/NewsScreen';
-import NewsPage from '@/screens/NewsPage/NewsPage';
-import HelpAriclePage from '@/screens/HelpArticlePage/HelpArticlePage';
-import RaiseTicket from '@/screens/TicketScreen/RaiseTicket';
-import { Campaigns } from '@/screens/Campaigns/Campaigns';
+// Lazy load screens for better initial bundle size
+const ChatScreen = lazy(() => import('@/screens/ChatScreen/ChatScreen'));
+const ChatHistoryScreen = lazy(() => import('@/screens/ChatHistoryScreen/ChatHistoryScreen'));
+const HelpScreen = lazy(() => import('@/screens/HelpScreen/HelpScreen'));
+const HomeScreen = lazy(() => import('@/screens/HomeScreen/HomeScreen'));
+const Voice = lazy(() => import('@/screens/VoiceScreen/Voice'));
+const NewsScreen = lazy(() => import('@/screens/NewsScreen/NewsScreen'));
+const NewsPage = lazy(() => import('@/screens/NewsPage/NewsPage'));
+const HelpAriclePage = lazy(() => import('@/screens/HelpArticlePage/HelpArticlePage'));
+const RaiseTicket = lazy(() => import('@/screens/TicketScreen/RaiseTicket'));
+const Campaigns = lazy(() => 
+  import('@/screens/Campaigns/Campaigns').then(module => ({ default: module.Campaigns }))
+);
+
 import { AnimatePresence, motion } from 'motion/react';
 import Cookies from 'js-cookie';
+
+// Common components
+import { Loader } from '@/components/common';
 
 // New imports from restructured modules
 import type { 
@@ -635,7 +641,11 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
               style={{ ['--set-width' as any]: windowWidth }}
             >
 
-              <div className='screen-wrapper'>{renderActiveScreen()}</div>
+              <div className='screen-wrapper'>
+                <Suspense fallback={<div className="screen-loading"><Loader /></div>}>
+                  {renderActiveScreen()}
+                </Suspense>
+              </div>
 
               {/* Dynamic Bottom Navigation */}
               {!(
@@ -677,7 +687,11 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
               <div className='chat-bot-header'>
                 <button className='chat-bot-header-button' onClick={handleClose}><Minus /> </button>
               </div>
-              <div className='screen-wrapper'>{renderActiveScreen()}</div>
+              <div className='screen-wrapper'>
+                <Suspense fallback={<div className="screen-loading"><Loader /></div>}>
+                  {renderActiveScreen()}
+                </Suspense>
+              </div>
 
               {/* Dynamic Bottom Navigation */}
               {!(

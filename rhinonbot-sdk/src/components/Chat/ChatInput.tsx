@@ -10,6 +10,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import type { ChatbotConfig, WhatsAppConfig } from '@/types';
+import { LazyEmojiPicker } from './LazyEmojiPicker';
 
 export interface ChatInputProps {
   isAdmin: boolean;
@@ -30,7 +31,6 @@ export interface ChatInputProps {
   stopListening: () => void;
   chatbot_config: ChatbotConfig;
   showEmojiPicker: boolean;
-  EmojiPicker: any;
   adminTestingMode?: boolean;
   whatsappConfig?: WhatsAppConfig;
   onWhatsAppClick?: () => void;
@@ -55,7 +55,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   stopListening,
   chatbot_config,
   showEmojiPicker,
-  EmojiPicker,
   adminTestingMode,
   whatsappConfig,
   onWhatsAppClick,
@@ -208,26 +207,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       )}
 
-      {/* Emoji picker */}
-      {showEmojiPicker && isConversationActive && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '60px',
-            right: '20px',
-            zIndex: 1000,
-            transform: 'scale(0.8)',
-            transformOrigin: 'bottom right',
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <EmojiPicker
-            onEmojiClick={(emojiData: any) => {
-              setMessage((prev) => prev + emojiData.emoji);
-            }}
-          />
-        </div>
-      )}
+      {/* Lazy-loaded Emoji picker */}
+      <LazyEmojiPicker
+        show={showEmojiPicker && isConversationActive}
+        onEmojiClick={(emojiData) => {
+          setMessage((prev) => prev + emojiData.emoji);
+        }}
+      />
     </div>
   );
 };
