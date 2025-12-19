@@ -11,25 +11,12 @@ import TicketRating from './TicketRating/TicketRating';
 import { motion } from 'motion/react';
 
 // New imports from restructured modules
-import type { TicketField, ChatbotConfig } from '@/types';
+import type { TicketField, ChatbotConfig, HomeScreenProps } from '@/types';
 import { getConversationByUserId } from '@/services/chat';
 import { getTicketsStatus, updateTicketRating } from '@/services/ticket';
 
 // Assets
 import svgIcons from '@assets/svgIcons';
-
-interface HomeScreenProps {
-  onNavigate: (screen: string) => void;
-  isAdmin?: boolean;
-  isFreePlan?: boolean;
-  userId: string;
-  appId: string;
-  chatbot_config?: ChatbotConfig;
-  setIsTicketRaised: React.Dispatch<React.SetStateAction<boolean>>;
-  ticketForm: TicketField[];
-  userEmail: string;
-  onChatSelect: (chatId: string) => void;
-}
 
 interface IConversationIds {
   conversation_id: string;

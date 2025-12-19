@@ -9,17 +9,8 @@ import './HelpScreen.scss';
 import { Loader } from '@/components/common';
 
 // New imports from restructured modules
-import type { Article, Folder, ChatbotConfig } from '@/types';
+import type { Article, Folder, ChatbotConfig, HelpScreenProps } from '@/types';
 import { fetchFoldersWithArticles } from '@/services/help';
-
-interface HelpScreenProps {
-  onNavigate: (screen: string) => void;
-  chatbot_config?: ChatbotConfig;
-  setSelectedHelpArticle: React.Dispatch<React.SetStateAction<Article | null>>;
-  setSelectedHelp: React.Dispatch<React.SetStateAction<Folder | null>>;
-  selectedHelp: Folder | null;
-  appId: string;
-}
 
 const HelpScreen: React.FC<HelpScreenProps> = ({
   onNavigate,

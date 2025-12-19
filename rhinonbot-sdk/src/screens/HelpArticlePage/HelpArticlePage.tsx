@@ -8,14 +8,7 @@ import {
 import './HelpArticlePage.scss';
 
 // New imports from restructured modules
-import type { Article, ChatbotConfig } from '@/types';
-
-interface HelpArticlePageProps {
-  chatbot_config?: ChatbotConfig;
-  setWindowWidth: React.Dispatch<React.SetStateAction<string>>;
-  setSelectedHelpArticle: React.Dispatch<React.SetStateAction<Article | null>>;
-  selectedHelpArticle: Article;
-}
+import type { Article, ChatbotConfig, HelpArticlePageProps } from '@/types';
 
 const HelpArticlePage: React.FC<HelpArticlePageProps> = ({
   chatbot_config,

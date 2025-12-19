@@ -9,14 +9,7 @@ import {
 import './NewsPage.scss';
 
 // New imports from restructured modules
-import type { NewsItem, ChatbotConfig } from '@/types';
-
-interface NewsPageProps {
-  chatbot_config?: ChatbotConfig;
-  setWindowWidth: React.Dispatch<React.SetStateAction<string>>;
-  setSelectedNews: React.Dispatch<React.SetStateAction<NewsItem | null>>;
-  selectedNews: NewsItem;
-}
+import type { NewsItem, ChatbotConfig, NewsPageProps } from '@/types';
 
 const NewsPage: React.FC<NewsPageProps> = ({
   chatbot_config,

@@ -6,7 +6,7 @@ import { Loader } from '@/components/common';
 import { useChatLogic } from './useChatLogic';
 
 // New imports from restructured modules
-import type { Message, TicketField, ChatbotConfig, WhatsAppConfig } from '@/types';
+import type { Message, ChatScreenProps } from '@/types';
 import { getWhatsAppConfig, checkCustomerPhone } from '@/services/config';
 import {
   ChatHeader,
@@ -17,34 +17,6 @@ import {
   PreChatForm,
   PostChatForm,
 } from './ChatComponents';
-
-interface ChatScreenProps {
-  isAdmin: boolean;
-  isFreePlan?: boolean;
-  onNavigate: (screen: string) => void;
-  chatName?: string;
-  chatAvatar?: string;
-  userId: string;
-  userEmail: string;
-  setUserEmail: React.Dispatch<React.SetStateAction<string>>;
-  appId: string;
-  preChatForm: any;
-  postChatForm: any;
-  raiseTicket: () => void;
-  conversationId: string;
-  onBack?: () => void;
-  isEmailAvailable: boolean;
-  setIsEmailAvailable: React.Dispatch<React.SetStateAction<boolean>>;
-  isSpeakingWithRealPerson: boolean;
-  setIsSpeakingWithRealPerson: React.Dispatch<React.SetStateAction<boolean>>;
-  timeoutDuration?: number;
-  onConversationTimeout?: () => void;
-  chatbot_config: ChatbotConfig;
-  setIsTicketRaised: React.Dispatch<React.SetStateAction<boolean>>;
-  ticketForm: TicketField[];
-  setWindowWidth: React.Dispatch<React.SetStateAction<string>>;
-  adminTestingMode?: boolean;
-}
 
 // ====== Main ChatScreen Component ======
 const ChatScreen: React.FC<ChatScreenProps> = (props) => {

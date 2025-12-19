@@ -3,18 +3,10 @@ import './RaiseTicket.scss';
 import { ChevronLeft } from 'lucide-react';
 
 // New imports from restructured modules
-import type { TicketField, ChatbotConfig } from '@/types';
+import type { TicketField, ChatbotConfig, TicketScreenProps } from '@/types';
 import { submitTicket } from '@/services/ticket';
 
-interface TicketProps {
-  appId: string;
-  setIsTicketRaised: React.Dispatch<React.SetStateAction<boolean>>;
-  setOpenTicket: React.Dispatch<React.SetStateAction<boolean>>;
-  chatbot_config: ChatbotConfig;
-  ticketForm: TicketField[];
-}
-
-const RaiseTicket: React.FC<TicketProps> = ({
+const RaiseTicket: React.FC<TicketScreenProps> = ({
   appId,
   setIsTicketRaised,
   chatbot_config,

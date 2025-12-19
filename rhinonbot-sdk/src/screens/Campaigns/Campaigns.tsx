@@ -6,15 +6,9 @@ import {
   trackCampaignClick,
   trackCampaignClose,
 } from '@/services/campaign';
-import type { Campaign, ButtonElement } from '@/types';
+import type { Campaign, ButtonElement, CampaignsProps } from '@/types';
 
-interface CampaignsProps {
-  setIsOpen: (isOpen: boolean) => void;
-  activeCampaign: Campaign;
-  appId?: string;
-}
-
-export const Campaigns: React.FC<CampaignsProps> = ({
+export const Campaigns: React.FC<CampaignsProps & { appId?: string }> = ({
   setIsOpen,
   activeCampaign,
   appId = '',

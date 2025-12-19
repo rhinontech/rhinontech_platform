@@ -88,6 +88,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         position: 'relative',
         ['--primary-color' as any]: chatbot_config.primaryColor,
       }}
+      role="form"
+      aria-label="Message input"
     >
       {!isListening ? (
         <>
@@ -98,6 +100,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             disabled={!isConversationActive}
+            aria-label="Type your message"
+            aria-disabled={!isConversationActive}
             style={{
               opacity: isConversationActive ? 1 : 0.6,
             }}
@@ -111,13 +115,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 ref={fileInputRef}
                 style={{ display: 'none' }}
                 onChange={handleFileUpload}
+                aria-label="Upload file"
               />
               <button
                 className='input-btn'
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!isConversationActive}
+                aria-label="Attach file"
               >
-                <Paperclip color='var(--text-primary)' size={20} />
+                <Paperclip color='var(--text-primary)' size={20} aria-hidden="true" />
               </button>
             </>
           )}
@@ -132,8 +138,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   setShowEmojiPicker((prev) => !prev);
                 }}
                 disabled={!isConversationActive}
+                aria-label="Open emoji picker"
+                aria-expanded={showEmojiPicker}
               >
-                <Smile size={20} color='var(--text-primary)' />
+                <Smile size={20} color='var(--text-primary)' aria-hidden="true" />
               </button>
 
               {/* WhatsApp button */}
@@ -144,14 +152,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     onClick={onWhatsAppClick}
                     className='input-btn'
                     title='Connect on WhatsApp'
+                    aria-label="Connect on WhatsApp"
                   >
-                    <MessageCircle color='#25D366' size={20} />
+                    <MessageCircle color='#25D366' size={20} aria-hidden="true" />
                   </button>
                 )}
 
               {/* Voice input button */}
-              <button onClick={startListening} className='input-btn'>
-                <Mic color='var(--text-primary)' size={20} />
+              <button 
+                onClick={startListening} 
+                className='input-btn'
+                aria-label="Start voice recording"
+              >
+                <Mic color='var(--text-primary)' size={20} aria-hidden="true" />
               </button>
 
               {/* Send button */}
@@ -162,8 +175,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                   'disabled'
                 }`}
                 disabled={!isConversationActive || loading}
+                aria-label="Send message"
+                aria-disabled={!isConversationActive || loading || message.length === 0}
               >
-                <SendHorizontal size={20} />
+                <SendHorizontal size={20} aria-hidden="true" />
               </button>
             </>
           )}
@@ -173,16 +188,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <div
           className='voice-mode'
           style={{ display: 'flex', alignItems: 'center', width: '100%' }}
+          role="status"
+          aria-label="Voice recording in progress"
         >
           <button
             className='voice-btn cancel'
             onClick={cancelListening}
             style={{ marginRight: '10px' }}
+            aria-label="Cancel recording"
           >
-            <X size={22} color='white' />
+            <X size={22} color='white' aria-hidden="true" />
           </button>
 
-          <div className='waveform'>
+          <div className='waveform' aria-hidden="true">
             <span></span>
             <span></span>
             <span></span>
@@ -197,10 +215,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             className='voice-btn stop'
             onClick={stopListening}
             style={{ marginLeft: '10px' }}
+            aria-label="Stop recording and send"
           >
             <Square
               fill={chatbot_config.primaryColor}
               size={22}
+              aria-hidden="true"
               color={chatbot_config.primaryColor}
             />
           </button>

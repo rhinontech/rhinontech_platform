@@ -9,7 +9,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import './NewsScreen.scss';
 
 // New imports from restructured modules
-import type { NewsItem, ChatbotConfig } from '@/types';
+import type { NewsItem, ChatbotConfig, NewsScreenProps } from '@/types';
 
 const news: NewsItem[] = [
   {
@@ -46,10 +46,6 @@ const news: NewsItem[] = [
     updatedAt: '2 month ago',
   },
 ];
-interface NewsScreenProps {
-  chatbot_config?: ChatbotConfig;
-  setSelectedNews: React.Dispatch<React.SetStateAction<NewsItem | null>>;
-}
 
 const NewsScreen: React.FC<NewsScreenProps> = ({
   chatbot_config,

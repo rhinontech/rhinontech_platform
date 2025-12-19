@@ -3,18 +3,8 @@ import './ChatHistoryScreen.scss';
 import { Loader } from '@/components/common';
 
 // New imports from restructured modules
-import type { ChatbotConfig, ConversationItem } from '@/types';
+import type { ChatbotConfig, ConversationItem, ChatHistoryScreenProps } from '@/types';
 import { getConversationByUserId } from '@/services/chat';
-
-interface ChatHistoryScreenProps {
-  isFreePlan: boolean;
-  onChatSelect: (chatId: string) => void;
-  setIsSpeakingWithRealPerson: React.Dispatch<React.SetStateAction<boolean>>;
-  userId: string;
-  appId: string;
-  chatbot_config?: ChatbotConfig;
-  isAdmin?: boolean;
-}
 
 const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
   isFreePlan,

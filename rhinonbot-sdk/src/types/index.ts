@@ -58,3 +58,18 @@ export {
   type Folder,
   type NewsItem,
 } from './help.types';
+
+// Screen prop types
+export {
+  type SelectedNewsProps,
+  type SelectedHelpArticleProps,
+  type HomeScreenProps,
+  type ChatHistoryScreenProps,
+  type HelpScreenProps,
+  type HelpArticlePageProps,
+  type NewsScreenProps,
+  type NewsPageProps,
+  type VoiceScreenProps,
+  type TicketScreenProps,
+  type CampaignsProps,
+} from './screen.types';

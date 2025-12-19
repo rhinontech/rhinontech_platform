@@ -3,16 +3,11 @@ import CloudWave from './CloudWave';
 import './Voice.scss';
 
 // New imports from restructured modules
+import type { VoiceScreenProps } from '@/types';
 import { getVoiceSessionToken } from '@/services/voice';
 import { Loader2, Mic, MicOff, Volume2, VolumeOff, Wifi, WifiOff, X } from 'lucide-react';
 
-interface VoiceProps {
-  appId: string;
-  onButtonClick: () => void;
-  isAdmin: boolean;
-}
-
-const Voice: React.FC<VoiceProps> = ({ appId, onButtonClick, isAdmin }) => {
+const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) => {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [loading, setLoading] = useState(false);
 
