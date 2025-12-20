@@ -31,11 +31,14 @@ async def lifespan(app: FastAPI):
         print(f"MongoDB connection error: {e}")
 
     # Connect to PostgreSQL
-    pg_conn = postgres_connection()
-    if pg_conn:
-        print("PostgreSQL connection successful")
-    else:
-        print("Failed to connect to PostgreSQL")
+    try:
+        pg_conn = postgres_connection()
+        if pg_conn:
+            print("PostgreSQL connection successful")
+        else:
+            print("Failed to connect to PostgreSQL - will retry on demand")
+    except Exception as e:
+        print(f"PostgreSQL connection error: {e} - will retry on demand")
 
     yield 
 

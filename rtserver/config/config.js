@@ -1,5 +1,10 @@
 require("dotenv").config();
 
+// Helper function to check if SSL should be disabled (for local dev)
+const isLocalDB = (host) => {
+  return host === 'localhost' || host === '127.0.0.1' || host === 'host.docker.internal';
+};
+
 module.exports = {
   development: {
     username: process.env.DB_USERNAME,
@@ -8,14 +13,14 @@ module.exports = {
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     dialect: "postgres",
-    dialectOptions: {
+    dialectOptions: isLocalDB(process.env.DB_HOST) ? {} : {
       ssl: {
         require: true,
         rejectUnauthorized: false,
       },
     },
     define: {
-      schema: process.env.DB_SCHEMA,
+      schema: process.env.DB_SCHEMA || 'public',
     },
   },
   test: {
@@ -60,7 +65,7 @@ module.exports = {
     host: process.env.CRM_DB_HOST,
     port: process.env.CRM_DB_PORT,
     dialect: "postgres",
-    dialectOptions: {
+    dialectOptions: isLocalDB(process.env.CRM_DB_HOST) ? {} : {
       ssl: {
         require: true,
         rejectUnauthorized: false,

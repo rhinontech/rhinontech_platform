@@ -7,7 +7,9 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - .env.dev
+      - .env.docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backendai
       - redis
@@ -22,7 +24,9 @@ services:
     ports:
       - "5002:5002"
     env_file:
-      - .env.dev
+      - .env.docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - redis
     networks:

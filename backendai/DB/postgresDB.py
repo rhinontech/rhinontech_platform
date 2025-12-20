@@ -6,13 +6,13 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Construct the PostgresDB
-DB_USERNAME = os.getenv("DB_USERNAME")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_SCHEMA = os.getenv("DB_SCHEMA")
-DB_NAME = os.getenv("DB_NAME")
-DB_HOST = os.getenv("DB_HOST")
-DB_PORT = os.getenv("DB_PORT")
+# Construct the PostgresDB - Use POSTGRES_* variables first, fallback to DB_*
+DB_USERNAME = os.getenv("POSTGRES_USER") or os.getenv("DB_USERNAME")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD") or os.getenv("DB_PASSWORD")
+DB_SCHEMA = os.getenv("DB_SCHEMA", "public")
+DB_NAME = os.getenv("POSTGRES_DB") or os.getenv("DB_NAME")
+DB_HOST = os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("POSTGRES_PORT") or os.getenv("DB_PORT", "5432")
 
 # DB_USERNAME=postgres
 # DB_PASSWORD=Rhinonserver
@@ -29,6 +29,9 @@ DB_CONFIG = {
     "host": DB_HOST,
     "port": DB_PORT,
 }
+
+# Debug logging
+print(f"PostgreSQL Config: host={DB_HOST}, port={DB_PORT}, dbname={DB_NAME}, user={DB_USERNAME}")
 
 from psycopg2 import pool
 
@@ -51,6 +54,12 @@ def postgres_connection():
     global pg_pool
     if not pg_pool:
         init_db_pool()
+    
+    # Check again after init attempt
+    if not pg_pool:
+        print("WARNING: PostgreSQL pool not initialized. Skipping connection.")
+        return None
+    
     return pg_pool.getconn()
 
 from contextlib import contextmanager
