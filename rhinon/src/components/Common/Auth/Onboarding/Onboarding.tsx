@@ -13,6 +13,7 @@ import { completeOnboarding } from "@/services/authServices"
 
 type OnboardingData = {
   organization_name: string
+  organization_type: string
   first_name: string
   last_name: string
   company_size: string
@@ -20,6 +21,10 @@ type OnboardingData = {
 
 const orgSchema = z.object({
   organization_name: z.string().trim().min(2, "Organization name must be at least 2 characters"),
+})
+
+const orgTypeSchema = z.object({
+  organization_type: z.string().min(1, "Please select your organization type"),
 })
 
 const firstNameSchema = z.object({
@@ -34,7 +39,7 @@ const companySizeSchema = z.object({
   company_size: z.string().min(1, "Please select your company size"),
 })
 
-const totalSteps = 4
+const totalSteps = 5
 
 export default function Onboarding() {
   const router = useRouter()
@@ -44,6 +49,7 @@ export default function Onboarding() {
 
   const [data, setData] = useState<OnboardingData>({
     organization_name: "",
+    organization_type: "",
     first_name: "",
     last_name: "",
     company_size: "",
@@ -82,24 +88,31 @@ export default function Onboarding() {
         }
       case 2:
         return {
+          name: "organization_type" as const,
+          label: "Organization type",
+          placeholder: "",
+          type: "select-type" as const,
+        }
+      case 3:
+        return {
           name: "first_name" as const,
           label: "First name",
           placeholder: "John",
           type: "text" as const,
         }
-      case 3:
+      case 4:
         return {
           name: "last_name" as const,
           label: "Last name",
           placeholder: "Doe",
           type: "text" as const,
         }
-      case 4:
+      case 5:
         return {
           name: "company_size" as const,
           label: "Company size",
           placeholder: "",
-          type: "select" as const,
+          type: "select-size" as const,
         }
       default:
         return null
@@ -115,18 +128,24 @@ export default function Onboarding() {
         return false
       }
     } else if (step === 2) {
+      const res = orgTypeSchema.safeParse({ organization_type: data.organization_type })
+      if (!res.success) {
+        setError(res.error.issues[0]?.message || "Invalid organization type")
+        return false
+      }
+    } else if (step === 3) {
       const res = firstNameSchema.safeParse({ first_name: data.first_name })
       if (!res.success) {
         setError(res.error.issues[0]?.message || "Invalid first name")
         return false
       }
-    } else if (step === 3) {
+    } else if (step === 4) {
       const res = lastNameSchema.safeParse({ last_name: data.last_name })
       if (!res.success) {
         setError(res.error.issues[0]?.message || "Invalid last name")
         return false
       }
-    } else if (step === 4) {
+    } else if (step === 5) {
       const res = companySizeSchema.safeParse({ company_size: data.company_size })
       if (!res.success) {
         setError(res.error.issues[0]?.message || "Invalid company size")
@@ -134,7 +153,7 @@ export default function Onboarding() {
       }
     }
     return true
-  }, [step, data.organization_name, data.first_name, data.last_name, data.company_size])
+  }, [step, data.organization_name, data.organization_type, data.first_name, data.last_name, data.company_size])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setError(null)
@@ -255,7 +274,45 @@ export default function Onboarding() {
               </>
             )}
 
-            {currentField?.type === "select" && (
+            {currentField?.type === "select-type" && (
+              <>
+                <label htmlFor={currentField.name} className="text-sm font-medium">
+                  {currentField.label}
+                </label>
+                <select
+                  ref={(el) => { inputRef.current = el; }}
+                  id={currentField.name}
+                  name={currentField.name}
+                  value={data.organization_type}
+                  onChange={handleChange}
+                  onKeyDown={handleKeyDown}
+                  className="w-full rounded-md border border-input bg-background px-3 py-3 outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "field-error" : undefined}
+                >
+                  <option value="" disabled>
+                    Select organization type
+                  </option>
+                  <option value="Medical">Medical</option>
+                  <option value="Automation">Automation</option>
+                  <option value="Education">Education</option>
+                  <option value="Software">Software</option>
+                  <option value="Retail">Retail</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Real Estate">Real Estate</option>
+                  <option value="Manufacturing">Manufacturing</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Legal">Legal</option>
+                  <option value="Entertainment">Entertainment</option>
+                  <option value="Non-profit">Non-profit</option>
+                  <option value="Travel">Travel</option>
+                  <option value="Construction">Construction</option>
+                  <option value="Other">Other</option>
+                </select>
+              </>
+            )}
+
+            {currentField?.type === "select-size" && (
               <>
                 <label htmlFor={currentField.name} className="text-sm font-medium">
                   {currentField.label}

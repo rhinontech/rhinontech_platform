@@ -38,7 +38,9 @@ import { X, Info, MessageCircle } from "lucide-react";
 export default function Chats() {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
-  const [rightPanelTab, setRightPanelTab] = useState<"details" | "whatsapp">("details");
+  const [rightPanelTab, setRightPanelTab] = useState<"details" | "whatsapp">(
+    "details"
+  );
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -291,7 +293,8 @@ export default function Chats() {
         ),
       ]);
 
-      const userConversationData = userMsgs.status === "fulfilled" ? userMsgs.value : null;
+      const userConversationData =
+        userMsgs.status === "fulfilled" ? userMsgs.value : null;
       const userHistory = userConversationData?.messages || [];
       const botHistory =
         chatbotMsgs.status === "fulfilled"
@@ -300,10 +303,13 @@ export default function Chats() {
 
       // Update selected conversation with phone number if available from backend
       if (userConversationData?.phone_number) {
-        console.log("Enriching conversation with Phone:", userConversationData.phone_number);
+        console.log(
+          "Enriching conversation with Phone:",
+          userConversationData.phone_number
+        );
         setSelectedConversation((prev: any) => ({
           ...prev,
-          phone_number: userConversationData.phone_number
+          phone_number: userConversationData.phone_number,
         }));
       }
 
@@ -474,7 +480,8 @@ export default function Chats() {
     if (!input.trim() || !selectedConversation) return;
 
     // Check if this is a WhatsApp trigger
-    const isWhatsAppTrigger = input === 'whatsapp_trigger' && provider === 'system';
+    const isWhatsAppTrigger =
+      input === "whatsapp_trigger" && provider === "system";
 
     const newMessage = {
       user_email: selectedConversation.user_email,
@@ -567,7 +574,7 @@ export default function Chats() {
       // We need to map this message to a conversation.
       // The conversation is identified by 'phone_number_id' of the account and user 'from_number' (or 'to_number' if outbound)
       // But wait, our conversations list in Chats.tsx is chatbot conversations.
-      // Is there a unified conversation model? 
+      // Is there a unified conversation model?
       // In 'fetchConversations', we fetch conversations for 'chatbot_id'.
       // WhatsApp messages might need to be linked to these conversations or create new ones?
       // Looking at 'processIncomingMessage', it creates a 'whatsapp_messages' record, NOT a 'messages' record linked to chatbot_history.
@@ -584,7 +591,10 @@ export default function Chats() {
       const { userData, setUserData } = useUserStore.getState();
 
       // Find conversation with this user's phone number
-      const fromNumber = whatsappMsg.direction === 'inbound' ? whatsappMsg.from_number : whatsappMsg.to_number; // The user's phone
+      const fromNumber =
+        whatsappMsg.direction === "inbound"
+          ? whatsappMsg.from_number
+          : whatsappMsg.to_number; // The user's phone
 
       setConversations((prev) => {
         // Check if conversation exists (by checking user_id usually, which might be phone for WA?)
@@ -592,10 +602,11 @@ export default function Chats() {
         // Let's try to match by phone_number if available, or fallback to user_id.
 
         let found = false;
-        const updated = prev.map(c => {
+        const updated = prev.map((c) => {
           // Check match. 'user_id' for WA might be the phone number?
           // Or 'phone_number' field?
-          const isMatch = c.phone_number === fromNumber || c.user_id === fromNumber; // heuristic
+          const isMatch =
+            c.phone_number === fromNumber || c.user_id === fromNumber; // heuristic
 
           if (isMatch) {
             found = true;
@@ -611,12 +622,17 @@ export default function Chats() {
               ...c,
               is_new: !isCurrent,
               has_whatsapp_unread: !isCurrent,
-              messages: [...(c.messages || []), {
-                text: whatsappMsg.content || (whatsappMsg.media_url ? "📷 Media" : "Message"),
-                timestamp: whatsappMsg.created_at,
-                role: 'user', // UI expects role for styling
-                id: whatsappMsg.id
-              }]
+              messages: [
+                ...(c.messages || []),
+                {
+                  text:
+                    whatsappMsg.content ||
+                    (whatsappMsg.media_url ? "📷 Media" : "Message"),
+                  timestamp: whatsappMsg.created_at,
+                  role: "user", // UI expects role for styling
+                  id: whatsappMsg.id,
+                },
+              ],
             };
           }
           return c;
@@ -630,8 +646,12 @@ export default function Chats() {
       });
 
       // If currently selected
-      if (selectedConversation && (selectedConversation.phone_number === fromNumber || selectedConversation.user_id === fromNumber)) {
-        // Add to messages list? 
+      if (
+        selectedConversation &&
+        (selectedConversation.phone_number === fromNumber ||
+          selectedConversation.user_id === fromNumber)
+      ) {
+        // Add to messages list?
         // 'messages' state in Chats.tsx seems to be mixed?
         // The 'WhatsAppPanel' fetches its own messages via 'getWhatsAppMessages'.
         // 'Chats.tsx' renders 'WhatsAppPanel' if 'rightPanelTab === "whatsapp"'.
@@ -703,8 +723,7 @@ export default function Chats() {
           className={cn(
             "flex flex-col border-l bg-muted/30 transition-all duration-300 ease-in-out",
             rightSidebarOpen ? "w-96" : "w-0 overflow-hidden"
-          )}
-        >
+          )}>
           {selectedConversation && (
             <>
               {/* Panel Header */}
@@ -717,11 +736,10 @@ export default function Chats() {
                       rightPanelTab === "details"
                         ? "bg-background shadow-sm text-foreground"
                         : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
+                    )}>
                     <Info className="h-4 w-4" />
                   </button>
-                  {/* {selectedConversation?.phone_number && (
+                  {selectedConversation?.phone_number && (
                     <button
                       onClick={() => setRightPanelTab("whatsapp")}
                       className={cn(
@@ -729,13 +747,15 @@ export default function Chats() {
                         rightPanelTab === "whatsapp"
                           ? "bg-background shadow-sm text-foreground"
                           : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
+                      )}>
                       <MessageCircle className="h-4 w-4" />
                     </button>
-                  )} */}
+                  )}
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setRightSidebarOpen(false)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setRightSidebarOpen(false)}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
@@ -753,7 +773,8 @@ export default function Chats() {
                     availableUsers={availableUsers}
                     messages={messages}
                     chatHistoryCount={
-                      (chatHistoryByUser[selectedConversation?.user_id]?.length || 1) - 1
+                      (chatHistoryByUser[selectedConversation?.user_id]
+                        ?.length || 1) - 1
                     }
                     onPinChat={updatePinChat}
                     onDeleteChat={deleteChat}
@@ -810,16 +831,14 @@ export default function Chats() {
                             className={cn(
                               "flex",
                               isUser ? "justify-start" : "justify-end"
-                            )}
-                          >
+                            )}>
                             <div
                               className={cn(
                                 "max-w-[70%] rounded-lg px-3 py-2",
                                 isUser
                                   ? "bg-muted text-foreground"
                                   : "bg-primary text-primary-foreground"
-                              )}
-                            >
+                              )}>
                               <div className="text-sm">
                                 {/<a\s+href=.*<\/a>/i.test(msg.text) ? (
                                   (() => {
@@ -849,8 +868,7 @@ export default function Chats() {
                                           setIsHistoryOpen(false);
                                           setIsModalOpen(true);
                                         }}
-                                        className="cursor-pointer block max-w-xs rounded-lg overflow-hidden border shadow-sm hover:opacity-90"
-                                      >
+                                        className="cursor-pointer block max-w-xs rounded-lg overflow-hidden border shadow-sm hover:opacity-90">
                                         <img
                                           src={fileUrl}
                                           alt={fileName}
@@ -874,8 +892,7 @@ export default function Chats() {
                                           setIsHistoryOpen(false);
                                           setIsModalOpen(true);
                                         }}
-                                        className="cursor-pointer flex items-center gap-2 p-2 border rounded-lg bg-white shadow-sm hover:bg-gray-50"
-                                      >
+                                        className="cursor-pointer flex items-center gap-2 p-2 border rounded-lg bg-white shadow-sm hover:bg-gray-50">
                                         📎
                                         <div className="flex-1 truncate">
                                           <p className="text-sm font-medium text-gray-900 truncate">
@@ -895,8 +912,7 @@ export default function Chats() {
                                   isUser
                                     ? "text-muted-foreground"
                                     : "text-primary-foreground/70"
-                                )}
-                              >
+                                )}>
                                 {new Date(msg.timestamp).toLocaleTimeString()}
                               </p>
                             </div>
@@ -913,8 +929,7 @@ export default function Chats() {
                     <Button
                       variant="outline"
                       onClick={() => setViewConv(null)}
-                      className="mr-2"
-                    >
+                      className="mr-2">
                       Back
                     </Button>
                   </DialogFooter>
@@ -935,8 +950,7 @@ export default function Chats() {
                       <div
                         key={conv.id}
                         className="p-3 rounded-md border cursor-pointer hover:bg-accent"
-                        onClick={() => setViewConv(conv)}
-                      >
+                        onClick={() => setViewConv(conv)}>
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <p className="font-medium">
@@ -973,8 +987,7 @@ export default function Chats() {
                     <Button
                       variant="outline"
                       onClick={() => setIsHistoryOpen(false)}
-                      className="mr-2 mt-2"
-                    >
+                      className="mr-2 mt-2">
                       Back
                     </Button>
                   </DialogFooter>
@@ -996,8 +1009,7 @@ export default function Chats() {
                     <Button
                       variant="outline"
                       onClick={() => setIsHistoryOpen(false)}
-                      className="mr-2"
-                    >
+                      className="mr-2">
                       Back
                     </Button>
                   </DialogFooter>

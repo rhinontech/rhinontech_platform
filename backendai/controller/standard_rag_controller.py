@@ -11,6 +11,8 @@ from services.openai_services import client
 from services.embedding_service import embedding_service
 from DB.postgresDB import postgres_connection, run_query, run_write_query, search_vectors
 from controller.chatbot_config import get_sitemap_urls, get_url_data, pdf_data, doc_data, txt_data, ppt_data, image_data
+from DB.postgresDB import postgres_connection, run_query, run_write_query, search_vectors, get_db_connection
+from resources.industry_prompts import INDUSTRY_PROMPTS
 
 # Use the environment variable for S3 Base URL
 S3_BASE_URL = os.getenv("S3_BASE_URL", "")
@@ -216,6 +218,29 @@ class StandardRAGController:
         return True
 
     @staticmethod
+    def get_organization_type(chatbot_id: str) -> str:
+        """
+        Fetches the organization type for a given chatbot.
+        """
+        try:
+            with get_db_connection() as conn:
+                query = """
+                    SELECT o.organization_type 
+                    FROM organizations o
+                    JOIN chatbots c ON o.id = c.organization_id
+                    WHERE c.chatbot_id = %s
+                """
+                with conn.cursor() as cur:
+                   cur.execute(query, (chatbot_id,))
+                   result = cur.fetchone()
+                   if result:
+                       return result[0] or "Default"
+            return "Default"
+        except Exception as e:
+            logging.error(f"Error fetching organization type: {e}")
+            return "Default"
+
+    @staticmethod
     async def chat_stream(chatbot_id: str, user_id: str, prompt: str, conversation_id: str = None, user_email: str = None, user_plan: str = None):
         """
         Manages the chat using Custom RAG (Direct Context + History -> Chat Completion).
@@ -246,10 +271,17 @@ class StandardRAGController:
         print(f"RAG Context (Vector Search): {context_text[:100]}...")
 
         # 2. Construct System Instruction (Base)
+        
+        # Determine Organization Type and get Industry Instruction
+        org_type = StandardRAGController.get_organization_type(chatbot_id)
+        # Determine Organization Type and get Industry Instruction
+        org_type = StandardRAGController.get_organization_type(chatbot_id)
+        industry_instruction = INDUSTRY_PROMPTS.get(org_type, INDUSTRY_PROMPTS["Default"])
+        
         system_instruction = (
-            "You are a helpful assistant for this organization.\n"
+            f"{industry_instruction}\n\n"
             "Use the following pieces of retrieved context to answer the user's question.\n"
-            "If the answer is not in the context, say you don't know, but answer politely.\n"
+            "If the answer is not in the context, say you don't know, but answer politely based on your persona.\n"
             "Keep answers concise and relevant."
             "\n"
             f"Context:\n{context_text}"

@@ -587,7 +587,7 @@ const microsoftSignUp = async (req, res) => {
 };
 
 const completeOnboarding = async (req, res) => {
-  const { organization_name, company_size, first_name, last_name } = req.body;
+  const { organization_name, company_size, organization_type, first_name, last_name } = req.body;
   const { user_id } = req.user;
   const t = await sequelize.transaction();
 
@@ -644,6 +644,7 @@ const completeOnboarding = async (req, res) => {
           {
             organization_name,
             company_size,
+            organization_type,
             company_email: newCompanyEmail,
           },
           { transaction: t }
@@ -652,7 +653,7 @@ const completeOnboarding = async (req, res) => {
         // edge case: ID exists but record not found → create new one
         const uniqueEmail = await generateUniqueOrgEmail(organization_name);
         organization = await organizations.create(
-          { organization_name, company_size, company_email: uniqueEmail },
+          { organization_name, company_size, organization_type, company_email: uniqueEmail },
           { transaction: t }
         );
         user.organization_id = organization.id;
@@ -664,6 +665,7 @@ const completeOnboarding = async (req, res) => {
         {
           organization_name,
           company_size,
+          organization_type,
           company_email: uniqueEmail,
         },
         { transaction: t }
@@ -792,6 +794,7 @@ const completeOnboarding = async (req, res) => {
       "Organization created/updated",
       {
         organization_name,
+        organization_type,
       }
     );
 
