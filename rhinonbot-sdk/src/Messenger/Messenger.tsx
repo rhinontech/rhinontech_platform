@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { Minus } from 'lucide-react';
 import './Messenger.scss';
 
@@ -11,7 +11,7 @@ const Voice = lazy(() => import('@/screens/VoiceScreen/Voice'));
 const NewsScreen = lazy(() => import('@/screens/NewsScreen/NewsScreen'));
 const NewsPage = lazy(() => import('@/screens/NewsPage/NewsPage'));
 const HelpAriclePage = lazy(() => import('@/screens/HelpArticlePage/HelpArticlePage'));
-const Campaigns = lazy(() => 
+const Campaigns = lazy(() =>
   import('@/screens/Campaigns/Campaigns').then(module => ({ default: module.Campaigns }))
 );
 
@@ -24,10 +24,10 @@ import { Loader } from '@/components/common';
 import type { RhinontechConfig } from '@/types';
 
 // Hooks - centralized state and logic
-import { 
-  useMessengerState, 
-  useCampaignLogic, 
-  useScreenNavigation 
+import {
+  useMessengerState,
+  useCampaignLogic,
+  useScreenNavigation
 } from './hooks';
 
 // Components - extracted UI pieces
@@ -44,7 +44,7 @@ interface MessengerProps {
 const Messenger: React.FC<MessengerProps> = ({ config }) => {
   // Use centralized state management hook
   const state = useMessengerState(config);
-  
+
   const {
     isOpen,
     setIsOpen,
@@ -117,7 +117,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
 
   // Check if bottom nav should be hidden
   const shouldHideBottomNav = (
-    (activeScreen === 'chats' && selectedChatId) ||
+    (activeScreen === 'chats') ||
     (activeScreen === 'news' && selectedNews) ||
     activeScreen === 'raiseTicket' ||
     (activeScreen === 'help' && selectedHelpArticle) ||
@@ -135,6 +135,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
             appId={config?.app_id || ''}
             userId={userId}
             userEmail={userEmail}
+            setSelectedChatId={setSelectedChatId}
             chatbot_config={chatbot_config}
             setIsTicketRaised={setIsTicketRaised}
             ticketForm={chatbot_config?.ticketForm}
@@ -159,6 +160,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
             setUserEmail={setUserEmail}
             userEmail={userEmail}
             conversationId={selectedChatId || 'NEW_CHAT'}
+            setSelectedChatId={setSelectedChatId}
             chatbot_config={chatbot_config}
             preChatForm={chatbot_config?.preChatForm}
             raiseTicket={raiseTicket}
@@ -232,6 +234,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
             setUserEmail={setUserEmail}
             userEmail={userEmail}
             conversationId={selectedChatId || 'NEW_CHAT'}
+            setSelectedChatId={setSelectedChatId}
             chatbot_config={chatbot_config}
             preChatForm={chatbot_config?.preChatForm}
             raiseTicket={raiseTicket}
@@ -314,8 +317,8 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
               aria-label="Chat window"
             >
               <div className='chat-bot-header'>
-                <button 
-                  className='chat-bot-header-button' 
+                <button
+                  className='chat-bot-header-button'
                   onClick={handleClose}
                   aria-label="Minimize chat"
                 >

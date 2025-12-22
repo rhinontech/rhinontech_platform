@@ -60,6 +60,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   userId,
   appId,
   setIsTicketRaised,
+  setSelectedChatId,
   ticketForm,
   userEmail,
   onChatSelect,
@@ -79,7 +80,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
           new Date(b.last_chat_time).getTime() -
           new Date(a.last_chat_time).getTime(),
       );
-      console.log(sortedConversations[0]);
       setConversationIds(sortedConversations[0]);
     } catch (error) {
       console.error('Error fetching messages:', error);

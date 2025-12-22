@@ -39,6 +39,7 @@ export interface HomeScreenProps {
   appId: string;
   chatbot_config?: ChatbotConfig;
   setIsTicketRaised: React.Dispatch<React.SetStateAction<boolean>>;
+  setSelectedChatId: React.Dispatch<React.SetStateAction<string>>;
   ticketForm: TicketField[];
   userEmail: string;
   onChatSelect: (chatId: string) => void;

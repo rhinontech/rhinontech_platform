@@ -1,17 +1,19 @@
 // useMessengerState - Main state management hook for Messenger
 import { useState, useEffect, useRef } from 'react';
 import Cookies from 'js-cookie';
-import type { 
-  Campaign, 
-  Folder, 
-  RhinontechConfig, 
+import type {
+  Campaign,
+  Folder,
+  RhinontechConfig,
   ChatbotConfig,
   SelectedNewsProps,
   SelectedHelpArticleProps,
+  ConversationItem,
 } from '@/types';
 import { useConfigStore } from '@/store';
 import { getChatbotConfig, getForms } from '@/services/config';
 import { getEffectiveTheme } from '@/constants/theme';
+import { getChatHistory, getConversationByUserId, getSocketConversationsByUserId } from '@/services/chat';
 
 export interface UseMessengerStateReturn {
   // UI State
@@ -212,6 +214,42 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
       campaignFoundRef.current = true;
     }
   }, [activeCampaign]);
+
+
+  const fetchConversation = async () => {
+    try {
+      const response = await getConversationByUserId(userId, config.app_id);
+      const sortedConversations = response.conversation.sort(
+        (a: ConversationItem, b: ConversationItem) =>
+          new Date(b.last_chat_time).getTime() -
+          new Date(a.last_chat_time).getTime(),
+      );
+
+
+      setSelectedChatId(sortedConversations.length > 0 ? sortedConversations[0].conversation_id : 'NEW_CHAT');
+
+      if (sortedConversations.length > 0) {
+        const resultSocket = await getSocketConversationsByUserId(
+          userId,
+          config.app_id,
+          sortedConversations[0].conversation_id,
+        );
+        if (resultSocket.is_closed) {
+          setSelectedChatId("NEW_CHAT")
+        }
+
+      }
+
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchConversation();
+  }, [userId, config.app_id]);
+
+
 
   return {
     // UI State

@@ -26,6 +26,7 @@ export const useChatLogic = ({
   isAdmin,
   chatAvatar,
   chatbot_config,
+  setSelectedChatId,
   timeoutDuration = 15 * 60 * 1000,
   onConversationTimeout,
   setUserEmail,
