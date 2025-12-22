@@ -41,6 +41,7 @@ export interface ChatScreenProps {
   onBack?: () => void;
   isEmailAvailable: boolean;
   setIsEmailAvailable: React.Dispatch<React.SetStateAction<boolean>>;
+  setSelectedChatId: React.Dispatch<React.SetStateAction<string>>;
   isSpeakingWithRealPerson: boolean;
   setIsSpeakingWithRealPerson: React.Dispatch<React.SetStateAction<boolean>>;
   timeoutDuration?: number;

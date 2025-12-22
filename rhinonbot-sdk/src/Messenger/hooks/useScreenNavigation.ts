@@ -24,9 +24,9 @@ export function useScreenNavigation({ state }: UseScreenNavigationProps) {
   const handleNavigate = useCallback(
     (screen: string) => {
       setActiveScreen(screen);
-      if (screen === 'chats') {
-        setSelectedChatId(null);
-      }
+      // if (screen === 'chats') {
+      //   setSelectedChatId(null);
+      // }
     },
     [setActiveScreen, setSelectedChatId]
   );
@@ -41,8 +41,9 @@ export function useScreenNavigation({ state }: UseScreenNavigationProps) {
 
   // Go back to chat list
   const handleBackToChats = useCallback(() => {
-    setSelectedChatId(null);
+    // setSelectedChatId(null);
     setIsSpeakingWithRealPerson(false);
+    setActiveScreen('home');
   }, [setSelectedChatId, setIsSpeakingWithRealPerson]);
 
   // Navigate to raise ticket screen

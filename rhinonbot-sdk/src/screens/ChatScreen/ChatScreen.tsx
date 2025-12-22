@@ -34,6 +34,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     conversationId,
     isEmailAvailable,
     setIsEmailAvailable,
+    setSelectedChatId,
     preChatForm,
     postChatForm,
     chatAvatar = 'https://img.freepik.com/premium-photo/beautiful-woman-with-natural-makeup-women-with-clean-fresh-skin-dark-hear-blue-eyes_150254-452.jpg?semt=ais_hybrid&w=740',
@@ -55,6 +56,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     isAdmin,
     chatAvatar,
     chatbot_config,
+    setSelectedChatId,
     timeoutDuration,
     onConversationTimeout,
     setUserEmail,
@@ -108,6 +110,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     startNewConversation,
     setOpenPostChatForm,
   } = chatLogic;
+
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [openTicket, setOpenTicket] = useState(false);
@@ -596,7 +599,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     if (loading && !isSpeakingWithRealPerson) {
       timer = setTimeout(() => {
         setShowTyping(true);
-      }, 2000);
+      }, 500);
     } else {
       setShowTyping(false);
     }
