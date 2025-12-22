@@ -4,7 +4,7 @@ import './Voice.scss';
 
 // New imports from restructured modules
 import type { VoiceScreenProps } from '@/types';
-import { getVoiceSessionToken, submitVoiceLead } from '@/services/voice';
+import { getVoiceSessionToken, submitVoiceLead, searchVoiceKnowledge } from '@/services/voice';
 import {
   Loader2,
   Mic,
@@ -246,6 +246,40 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
 
               } catch (e) {
                 console.error("Error processing tool call:", e);
+              }
+            } else if (functionName === 'search_knowledge_base') {
+              console.log("🔍 Tool Triggered: search_knowledge_base", argsString);
+
+              try {
+                const args = JSON.parse(argsString);
+
+                // 1. Call Backend to Search
+                const result = await searchVoiceKnowledge({
+                  chatbot_id: appId,
+                  query: args.query
+                });
+
+                console.log("✅ Knowledge Found:", result);
+
+                // 2. Send Tool Output back
+                const toolOutput = {
+                  type: "conversation.item.create",
+                  item: {
+                    type: "function_call_output",
+                    call_id: callId,
+                    output: JSON.stringify(result) // Return chunks
+                  }
+                };
+                dataChannel.send(JSON.stringify(toolOutput));
+
+                // 3. Trigger Bot Response
+                const responseCreate = {
+                  type: "response.create"
+                };
+                dataChannel.send(JSON.stringify(responseCreate));
+
+              } catch (e) {
+                console.error("Error processing search tool:", e);
               }
             }
           }

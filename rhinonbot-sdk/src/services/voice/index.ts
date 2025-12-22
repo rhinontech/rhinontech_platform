@@ -25,6 +25,11 @@ export interface RealtimeLeadRequest {
   phone?: string;
 }
 
+export interface RealtimeSearchRequest {
+  chatbot_id: string;
+  query: string;
+}
+
 /**
  * Get a voice session token for real-time voice communication
  */
@@ -46,6 +51,31 @@ export const getVoiceSessionToken = async (chatbot_id: string): Promise<VoiceSes
   } catch (error) {
     console.error('Failed to start voice session', error);
     throw error;
+  }
+};
+
+/**
+ * Search Knowledge Base for Realtime Voice
+ */
+export const searchVoiceKnowledge = async (data: RealtimeSearchRequest): Promise<any> => {
+  try {
+    const response = await fetch(`${getAiApiUrl()}/realtime/search_knowledge`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Failed to search knowledge base', error);
+    // Return empty result on error so conversation continues
+    return { result: "Error searching knowledge base." };
   }
 };
 

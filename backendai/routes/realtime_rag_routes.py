@@ -81,17 +81,17 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
                          text = msg.get("text", "")
                          history_text += f"{role.title()}: {text}\n"
 
-        # C. Get Knowledge Base Content
-        stored_knowledge = await standard_rag_controller.get_stored_knowledge(chatbot_id)
+        # C. Get Knowledge Base Content - REMOVED for Optimization
+        # stored_knowledge = await standard_rag_controller.get_stored_knowledge(chatbot_id) 
         
-        if not stored_knowledge:
-             system_instruction = "You are a helpful assistant."
-        else:
-             truncated_text = stored_knowledge[:20000]
-             system_instruction = (
-                 "You are a helpful assistant. Use the following knowledge base to answer questions:\n"
-                 f"{truncated_text}"
-             )
+        # Base System Instruction
+        system_instruction = (
+            "You are the AI Assistant for this organization. "
+            "Do NOT mention 'OpenAI' or being an AI model from another company. "
+            "If asked about your identity, say you are the AI Assistant for the organization. "
+            "Use the 'search_knowledge_base' tool to find specific answers. "
+            "Always verify your answer with the retrieved context."
+        )
         
         # D. Combine Instructions
         final_instructions = f"{system_instruction}{history_text}"
@@ -99,7 +99,23 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
         # D.1 Check for Pre-Chat Form (Function Calling) & Inject Instructions
         from DB.postgresDB import get_pre_chat_form
         form_config = get_pre_chat_form(chatbot_id)
-        tools = []
+        
+        # Defines tools list with the Search Tool by default
+        tools = [{
+            "type": "function",
+            "name": "search_knowledge_base",
+            "description": "Search for specific facts, prices, policies, or details. Use specific, keyword-rich queries (e.g., 'price of plan A' instead of 'price').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query to find relevant information."
+                    }
+                },
+                "required": ["query"]
+            }
+        }]
         
         print(f"🔍 DEBUG: chatbot_id={chatbot_id}, form_config={form_config}")
         logging.info(f"🔍 DEBUG: chatbot_id={chatbot_id}, form_config={form_config}")
@@ -125,7 +141,7 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
             logging.info(f"🔍 DEBUG: properties={properties}, required_fields={required_fields}")
             
             if properties:
-                tools = [{
+                tools.append({
                     "type": "function",
                     "name": "submit_pre_chat_form",
                     "description": "Submit user form data when they provide it.",
@@ -134,7 +150,7 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
                         "properties": properties,
                         "required": required_fields
                     }
-                }]
+                })
                 
                 print(f"✅ DEBUG: Tools generated: {len(tools)} tool(s)")
                 logging.info(f"✅ DEBUG: Tools generated: {len(tools)} tool(s)")
@@ -319,3 +335,45 @@ async def submit_realtime_lead(request: RealtimeLeadRequest):
     except Exception as e:
         logging.error(f"Error submitting lead: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+class RealtimeSearchRequest(BaseModel):
+    chatbot_id: str
+    query: str
+
+@router.post("/realtime/search_knowledge")
+async def search_knowledge_base_endpoint(request: RealtimeSearchRequest):
+    """
+    Endpoint for the Frontend SDK to call when the Realtime AI triggers 'search_knowledge_base'.
+    Performs a vector search and returns relevant chunks.
+    """
+    try:
+        from services.embedding_service import embedding_service
+        from controller.standard_rag_controller import standard_rag_controller # Ensure import
+        
+        # Reuse standard RAG logic: Embed -> Search
+        # But wait, standard_rag_controller.chat_stream does it all. 
+        # We just want the vector search part.
+        # standard_rag_controller has search_vectors imported from DB.postgresDB
+        from DB.postgresDB import search_vectors
+        
+        # Embed query
+        query_vector = embedding_service.embed_text(request.query)
+        if not query_vector:
+             return {"result": "Could not process query."}
+             
+        # Search
+        # Run in thread since DB ops are blocking if not async specific
+        import asyncio
+        results = await asyncio.to_thread(search_vectors, request.chatbot_id, query_vector, limit=5)
+        
+        if results:
+            # Format for the AI
+            content = "\n\n".join([f"[CHUNK]: {r['content']}" for r in results])
+            return {"result": content}
+        
+        return {"result": "No relevant information found in the knowledge base."}
+
+    except Exception as e:
+        logging.error(f"Error searching knowledge base: {e}")
+        # Don't fail the client call entirely, just return error text
+        return {"result": "Error searching knowledge base."}

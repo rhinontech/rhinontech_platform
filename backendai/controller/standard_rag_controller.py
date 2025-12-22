@@ -136,7 +136,7 @@ class StandardRAGController:
             conn.close()
 
     @staticmethod
-    def chunk_text(text: str, chunk_size: int = 800, overlap: int = 100) -> list[str]:
+    def chunk_text(text: str, chunk_size: int = 600, overlap: int = 100) -> list[str]:
         """
         Splits text into chunks of roughly chunk_size characters with overlap.
         """
