@@ -2,7 +2,7 @@ require("dotenv").config();
 
 // Helper function to check if SSL should be disabled (for local dev)
 const isLocalDB = (host) => {
-  return host === 'localhost' || host === '127.0.0.1' || host === 'host.docker.internal';
+  return host === 'localhost' || host === '127.0.0.1' || host === 'host.docker.internal' || host === 'postgres';
 };
 
 module.exports = {

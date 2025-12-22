@@ -8,10 +8,10 @@ export const ENDPOINTS = {
   CUSTOMER_PHONE: '/chatbot/customer-phone',
 
   // Chat & Conversations
-  CHAT: '/chat',
+  CHAT: '/standard/chat', // Updated to use RAG endpoint
   CHAT_HISTORY: '/chat_history',
   CONVERSATION_BY_USER_ID: '/conversation_by_user_id',
-  SET_USER_ASSISTANT: '/set_user_assistant',
+  SET_USER_ASSISTANT: '/standard/set_user_assistant', // Updated to use RAG endpoint
 
   // Socket Conversations
   SOCKET_CONVERSATION: '/conversations/socketConversation',

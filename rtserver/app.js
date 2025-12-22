@@ -77,6 +77,44 @@ app.get("/", (req, res) => {
   res.send("Hello, Rhinon Tech Server is LIVE!");
 });
 
+// Health check endpoint
+app.get("/health", async (req, res) => {
+  const healthStatus = {
+    service: "rtserver",
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    checks: {}
+  };
+
+  // Check PostgreSQL
+  try {
+    await sequelize.authenticate();
+    healthStatus.checks.postgresql = { status: "healthy" };
+  } catch (error) {
+    healthStatus.checks.postgresql = { status: "unhealthy", error: error.message };
+    healthStatus.status = "degraded";
+  }
+
+  // Check Redis (if available)
+  const io = req.app.get('io');
+  if (io) {
+    healthStatus.checks.socketio = { status: "healthy", connections: io.engine.clientsCount };
+  }
+
+  // Check AI Backend
+  try {
+    const axios = require('axios');
+    const aiUrl = process.env.AI_API_URL || 'http://localhost:5002';
+    await axios.get(`${aiUrl}/health`, { timeout: 3000 });
+    healthStatus.checks.backendai = { status: "healthy" };
+  } catch (error) {
+    healthStatus.checks.backendai = { status: "unhealthy", error: error.message };
+  }
+
+  const statusCode = healthStatus.status === "healthy" ? 200 : 503;
+  res.status(statusCode).json(healthStatus);
+});
+
 // Route setup
 app.use("/api/auth", /** #swagger.tags = ['AUTH'] */ authRouter);
 app.use("/api/onboarding", /** #swagger.tags = ['AUTH'] */ onboardingRouter);

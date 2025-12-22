@@ -69,24 +69,31 @@ def generate_chatbot_training_instruction(content: str, image_bytes: Optional[by
         return "Error generating summary."
 
 def get_sitemap_urls(base_url: str) -> list[str]:
-    try:
-        sitemap_url = urljoin(base_url, "/sitemap.xml")
-        res = requests.get(sitemap_url, timeout=10)
-        res.raise_for_status()
+    sitemaps = ["/sitemap.xml", "/sitemap_index.xml"]
+    
+    for relative_path in sitemaps:
+        try:
+            sitemap_url = urljoin(base_url, relative_path)
+            res = requests.get(sitemap_url, timeout=10)
+            res.raise_for_status()
 
-        soup = BeautifulSoup(res.text, "xml")
+            soup = BeautifulSoup(res.text, "xml")
+            urls = []
 
-        urls = []
+            # Normal sitemap
+            for loc in soup.find_all("loc"):
+                urls.append(loc.text.strip())
+            
+            if urls:
+                print(f"Found sitemap at {sitemap_url} with {len(urls)} URLs")
+                return urls
 
-        # Normal sitemap
-        for loc in soup.find_all("loc"):
-            urls.append(loc.text.strip())
+        except Exception as e:
+            logging.warning(f"Could not read sitemap at {sitemap_url}: {e}")
+            continue
 
-        print(urls)
-        return urls
-    except Exception as e:
-        logging.error(f"Failed to read sitemap for {base_url}: {e}")
-        return []
+    logging.error(f"Failed to find any sitemap for {base_url}")
+    return []
 
 
 def get_url_data(url):
@@ -95,8 +102,19 @@ def get_url_data(url):
         response = requests.get(url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        paragraphs = soup.find_all('p')
-        url_data = "\n".join([p.get_text() for p in paragraphs])
+        # Remove script and style elements
+        for script_or_style in soup(['script', 'style', 'nav', 'footer']):
+            script_or_style.decompose()
+
+        # Get text
+        text = soup.get_text(separator='\n')
+
+        # Break into lines and remove leading and trailing space on each
+        lines = (line.strip() for line in text.splitlines())
+        # Break multi-headlines into a line each
+        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+        # Drop blank lines
+        url_data = '\n'.join(chunk for chunk in chunks if chunk)
 
         summary = generate_chatbot_training_instruction(url_data)
         print(summary)

@@ -255,6 +255,83 @@ def search_vectors(chatbot_id: str, query_vector: list, limit: int = 3):
         print(f"Search Error: {e}")
         return []
 
+def save_bot_message(conversation_id: str, chatbot_id: str, role: str, content: str, user_id: str = None, user_email: str = None):
+    """
+    Saves a chat message to bot_conversations table.
+    Args:
+        conversation_id: Unique conversation identifier
+        chatbot_id: Chatbot identifier
+        role: 'user' or 'assistant'
+        content: Message content
+        user_id: Optional user identifier
+        user_email: Optional user email
+    """
+    try:
+        with get_db_connection() as conn:
+            query = """
+                INSERT INTO bot_conversations (conversation_id, chatbot_id, user_id, user_email, role, content)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            run_write_query(conn, query, (conversation_id, chatbot_id, user_id, user_email, role, content))
+            return True
+    except Exception as e:
+        print(f"Save Message Error: {e}")
+        return False
+
+def get_conversation_history(conversation_id: str, limit: int = 50):
+    """
+    Retrieves conversation history for a given conversation_id.
+    Returns: [{'role': str, 'content': str, 'created_at': str}]
+    Args:
+        conversation_id: Unique conversation identifier
+        limit: Maximum number of messages to retrieve (default 50)
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT role, content, created_at
+                    FROM bot_conversations
+                    WHERE conversation_id = %s
+                    ORDER BY created_at ASC
+                    LIMIT %s;
+                    """,
+                    (conversation_id, limit)
+                )
+                results = cur.fetchall()
+                return [
+                    {
+                        "role": r[0],
+                        "content": r[1],
+                        "created_at": r[2].isoformat() if r[2] else None
+                    }
+                    for r in results
+                ]
+    except Exception as e:
+        print(f"Get History Error: {e}")
+        return []
+
+def check_db_health():
+    """
+    Checks if PostgreSQL connection is healthy.
+    Returns: dict with status and details
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                result = cur.fetchone()
+                if result and result[0] == 1:
+                    return {
+                        "status": "healthy",
+                        "database": DB_NAME,
+                        "host": DB_HOST
+                    }
+        return {"status": "unhealthy", "error": "No response from database"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
+
 # Run init on module load
 try:
     init_vector_db()

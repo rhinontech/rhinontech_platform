@@ -4,7 +4,7 @@ import './Voice.scss';
 
 // New imports from restructured modules
 import type { VoiceScreenProps } from '@/types';
-import { getVoiceSessionToken } from '@/services/voice';
+import { getVoiceSessionToken, submitVoiceLead } from '@/services/voice';
 import {
   Loader2,
   Mic,
@@ -189,9 +189,13 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
       dataChannel.onclose = () => setConnectionStatus('Disconnected');
       dataChannel.onerror = (err) => console.error('DataChannel Error:', err);
 
-      dataChannel.onmessage = (event) => {
+      dataChannel.onmessage = async (event) => {
         try {
           const payload = JSON.parse(event.data);
+
+          // Debugging
+          console.log("Realtime Event:", payload.type, payload);
+
           if (
             payload.type.includes('input_audio_buffer') ||
             payload.type.includes('output_audio_buffer.stopped')
@@ -200,6 +204,52 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
           } else if (payload.type.includes('output_audio_buffer.started')) {
             setLoading(false);
           }
+
+          // Handle Function Calls (Tools)
+          if (payload.type === 'response.function_call_arguments.done') {
+            const functionName = payload.name;
+            const callId = payload.call_id;
+            const argsString = payload.arguments;
+
+            if (functionName === 'submit_pre_chat_form') {
+              console.log("📝 Tool Triggered: submit_pre_chat_form", argsString);
+
+              try {
+                const args = JSON.parse(argsString);
+
+                // 1. Call Backend to Save Lead
+                const result = await submitVoiceLead({
+                  chatbot_id: appId,
+                  email: args.email,
+                  name: args.name,
+                  phone: args.phone
+                });
+
+                console.log("✅ Lead Saved:", result);
+
+                // 2. Send Tool Output back to OpenAI (Required to continue flow)
+                const toolOutput = {
+                  type: "conversation.item.create",
+                  item: {
+                    type: "function_call_output",
+                    call_id: callId,
+                    output: JSON.stringify(result) // Return success message
+                  }
+                };
+                dataChannel.send(JSON.stringify(toolOutput));
+
+                // 3. Trigger Bot Response (to say "Thanks!")
+                const responseCreate = {
+                  type: "response.create"
+                };
+                dataChannel.send(JSON.stringify(responseCreate));
+
+              } catch (e) {
+                console.error("Error processing tool call:", e);
+              }
+            }
+          }
+
         } catch (err) {
           console.error('Message parsing error:', err);
         }
@@ -209,8 +259,11 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
+      // Connect to OpenAI Realtime API using the session token from backend
+      // IMPORTANT: No model parameter - this tells OpenAI to use the existing session
+      // that was created by the backend (which has tools and instructions configured)
       const response = await fetch(
-        `https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview`,
+        `https://api.openai.com/v1/realtime`,
         {
           method: 'POST',
           body: offer.sdp,
@@ -333,7 +386,7 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
               justifyContent: 'center',
               background:
                 connectionStatus !== 'Connected' &&
-                connectionStatus !== 'Connection failed'
+                  connectionStatus !== 'Connection failed'
                   ? '#ae2525'
                   : '#e02f2f',
               color: 'white',

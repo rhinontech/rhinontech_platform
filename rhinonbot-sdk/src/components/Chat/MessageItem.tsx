@@ -278,6 +278,177 @@ const RegularMessage: React.FC<{
   supportImage: string | null;
   chatbot_config: ChatbotConfig;
 }> = ({ msg, index, supportImage, chatbot_config }) => {
+  
+  // Helper to parse and render text with clickable links
+  const parseTextWithLinks = (text: string) => {
+    const parts: (string | JSX.Element)[] = [];
+    let currentText = text;
+    let keyCounter = 0;
+
+    // Define all patterns
+    const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/;
+    const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/;
+    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/;
+    const phoneRegex = /(\+?\d{1,4}[-.\s]?\(?\d{1,3}\)?[-.\s]?\d{1,4}[-.\s]?\d{4,})/;
+
+    while (currentText.length > 0) {
+      let earliestMatch: { index: number; length: number; type: string; match: RegExpMatchArray } | null = null;
+
+      // Find markdown link
+      const mdMatch = currentText.match(markdownLinkRegex);
+      if (mdMatch && mdMatch.index !== undefined) {
+        earliestMatch = { index: mdMatch.index, length: mdMatch[0].length, type: 'markdown', match: mdMatch };
+      }
+
+      // Find URL (but not if it's part of a markdown link we already found)
+      const urlMatch = currentText.match(urlRegex);
+      if (urlMatch && urlMatch.index !== undefined) {
+        if (!earliestMatch || urlMatch.index < earliestMatch.index) {
+          earliestMatch = { index: urlMatch.index, length: urlMatch[0].length, type: 'url', match: urlMatch };
+        }
+      }
+
+      // Find email
+      const emailMatch = currentText.match(emailRegex);
+      if (emailMatch && emailMatch.index !== undefined) {
+        if (!earliestMatch || emailMatch.index < earliestMatch.index) {
+          earliestMatch = { index: emailMatch.index, length: emailMatch[0].length, type: 'email', match: emailMatch };
+        }
+      }
+
+      // Find phone
+      const phoneMatch = currentText.match(phoneRegex);
+      if (phoneMatch && phoneMatch.index !== undefined) {
+        if (!earliestMatch || phoneMatch.index < earliestMatch.index) {
+          earliestMatch = { index: phoneMatch.index, length: phoneMatch[0].length, type: 'phone', match: phoneMatch };
+        }
+      }
+
+      // If no matches found, add remaining text and break
+      if (!earliestMatch) {
+        if (currentText) {
+          parts.push(currentText);
+        }
+        break;
+      }
+
+      // Add text before the match
+      if (earliestMatch.index > 0) {
+        parts.push(currentText.substring(0, earliestMatch.index));
+      }
+
+      // Add the matched element
+      if (earliestMatch.type === 'markdown') {
+        const linkText = earliestMatch.match[1];
+        const url = earliestMatch.match[2];
+        parts.push(
+          <a
+            key={`md-link-${keyCounter++}`}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: chatbot_config.primaryColor || '#3b82f6',
+              textDecoration: 'underline',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {linkText}
+          </a>
+        );
+      } else if (earliestMatch.type === 'url') {
+        const url = earliestMatch.match[0];
+        parts.push(
+          <a
+            key={`url-${keyCounter++}`}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: chatbot_config.primaryColor || '#3b82f6',
+              textDecoration: 'underline',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {url}
+          </a>
+        );
+      } else if (earliestMatch.type === 'email') {
+        const email = earliestMatch.match[0];
+        parts.push(
+          <a
+            key={`email-${keyCounter++}`}
+            href={`mailto:${email}`}
+            style={{
+              color: chatbot_config.primaryColor || '#3b82f6',
+              textDecoration: 'underline',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {email}
+          </a>
+        );
+      } else if (earliestMatch.type === 'phone') {
+        const phone = earliestMatch.match[0];
+        const cleanPhone = phone.replace(/[^\d+]/g, '');
+        parts.push(
+          <a
+            key={`phone-${keyCounter++}`}
+            href={`tel:${cleanPhone}`}
+            style={{
+              color: chatbot_config.primaryColor || '#3b82f6',
+              textDecoration: 'underline',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {phone}
+          </a>
+        );
+      }
+
+      // Move past the match
+      currentText = currentText.substring(earliestMatch.index + earliestMatch.length);
+    }
+
+    // Process text parts for bold, italic, line breaks
+    const processedParts: (string | JSX.Element)[] = [];
+    parts.forEach((part, partIdx) => {
+      if (typeof part === 'string') {
+        // Split by line breaks
+        const lines = part.split('\n');
+        lines.forEach((line, lineIdx) => {
+          // Process bold and italic
+          const segments = line.split(/(\*\*[^\*]+\*\*|__[^_]+__|_[^_]+_|\*[^\*]+\*)/);
+          segments.forEach((seg, segIdx) => {
+            if (!seg) return;
+            if (/^\*\*(.+)\*\*$/.test(seg) || /^__(.+)__$/.test(seg)) {
+              processedParts.push(<strong key={`bold-${partIdx}-${lineIdx}-${segIdx}`}>{seg.replace(/^\*\*|__|\*\*$|__$/g, '')}</strong>);
+            } else if (/^\*(.+)\*$/.test(seg) || /^_(.+)_$/.test(seg)) {
+              processedParts.push(<em key={`italic-${partIdx}-${lineIdx}-${segIdx}`}>{seg.replace(/^\*|_|\*$|_$/g, '')}</em>);
+            } else {
+              processedParts.push(seg);
+            }
+          });
+          if (lineIdx < lines.length - 1) {
+            processedParts.push(<br key={`br-${partIdx}-${lineIdx}`} />);
+          }
+        });
+      } else {
+        processedParts.push(part);
+      }
+    });
+
+    return processedParts;
+  };
+
   const renderMessageContent = () => {
     if (typeof msg.text === 'string' && /<a\s+href=.*<\/a>/i.test(msg.text)) {
       const match = msg.text.match(/href="([^"]+)".*>(.*?)<\/a>/i);
@@ -348,7 +519,14 @@ const RegularMessage: React.FC<{
     }
 
     if (typeof msg.text === 'string') {
-      return <span dangerouslySetInnerHTML={{ __html: msg.text }} />;
+      // For bot messages, only parse markdown if streaming is complete
+      // For user messages, always parse immediately
+      if (msg.role === 'bot' && !msg.streamComplete) {
+        // Show raw text while streaming
+        return <span>{msg.text}</span>;
+      }
+      // Parse and render with clickable links
+      return <span>{parseTextWithLinks(msg.text)}</span>;
     }
 
     return msg.text;

@@ -4,7 +4,7 @@ import './Messenger.scss';
 
 // Lazy load screens for better initial bundle size
 const ChatScreen = lazy(() => import('@/screens/ChatScreen/ChatScreen'));
-const ChatHistoryScreen = lazy(() => import('@/screens/ChatHistoryScreen/ChatHistoryScreen'));
+// ChatHistoryScreen removed - using unified chat screen instead
 const HelpScreen = lazy(() => import('@/screens/HelpScreen/HelpScreen'));
 const HomeScreen = lazy(() => import('@/screens/HomeScreen/HomeScreen'));
 const Voice = lazy(() => import('@/screens/VoiceScreen/Voice'));
@@ -142,42 +142,31 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
           />
         );
       case 'chats':
-        if (selectedChatId) {
-          return (
-            <ChatScreen
-              isAdmin={config?.admin}
-              isFreePlan={freePlan}
-              onNavigate={handleNavigate}
-              isEmailAvailable={isEmailAvailable}
-              setIsEmailAvailable={setIsEmailAvailable}
-              isSpeakingWithRealPerson={isSpeakingWithRealPerson}
-              setIsSpeakingWithRealPerson={setIsSpeakingWithRealPerson}
-              onBack={handleBackToChats}
-              appId={config?.app_id || ''}
-              userId={userId}
-              setUserEmail={setUserEmail}
-              userEmail={userEmail}
-              conversationId={selectedChatId}
-              chatbot_config={chatbot_config}
-              preChatForm={chatbot_config?.preChatForm}
-              raiseTicket={raiseTicket}
-              postChatForm={chatbot_config?.postChatForm}
-              setIsTicketRaised={setIsTicketRaised}
-              ticketForm={chatbot_config?.ticketForm}
-              setWindowWidth={setWindowWidth}
-              adminTestingMode={config?.adminTestingMode}
-            />
-          );
-        }
+        // Always show unified ChatScreen directly (like WhatsApp)
+        // Use 'NEW_CHAT' if no conversation selected
         return (
-          <ChatHistoryScreen
+          <ChatScreen
+            isAdmin={config?.admin}
             isFreePlan={freePlan}
+            onNavigate={handleNavigate}
+            isEmailAvailable={isEmailAvailable}
+            setIsEmailAvailable={setIsEmailAvailable}
+            isSpeakingWithRealPerson={isSpeakingWithRealPerson}
             setIsSpeakingWithRealPerson={setIsSpeakingWithRealPerson}
-            onChatSelect={handleChatSelect}
+            onBack={handleBackToChats}
             appId={config?.app_id || ''}
             userId={userId}
+            setUserEmail={setUserEmail}
+            userEmail={userEmail}
+            conversationId={selectedChatId || 'NEW_CHAT'}
             chatbot_config={chatbot_config}
-            isAdmin={config?.admin}
+            preChatForm={chatbot_config?.preChatForm}
+            raiseTicket={raiseTicket}
+            postChatForm={chatbot_config?.postChatForm}
+            setIsTicketRaised={setIsTicketRaised}
+            ticketForm={chatbot_config?.ticketForm}
+            setWindowWidth={setWindowWidth}
+            adminTestingMode={config?.adminTestingMode}
           />
         );
       case 'voice':
@@ -227,15 +216,30 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
           />
         );
       default:
+        // Default to unified chat screen instead of history
         return (
-          <ChatHistoryScreen
+          <ChatScreen
+            isAdmin={config?.admin}
             isFreePlan={freePlan}
+            onNavigate={handleNavigate}
+            isEmailAvailable={isEmailAvailable}
+            setIsEmailAvailable={setIsEmailAvailable}
+            isSpeakingWithRealPerson={isSpeakingWithRealPerson}
             setIsSpeakingWithRealPerson={setIsSpeakingWithRealPerson}
-            onChatSelect={handleChatSelect}
+            onBack={handleBackToChats}
             appId={config?.app_id || ''}
             userId={userId}
+            setUserEmail={setUserEmail}
+            userEmail={userEmail}
+            conversationId={selectedChatId || 'NEW_CHAT'}
             chatbot_config={chatbot_config}
-            isAdmin={config?.admin}
+            preChatForm={chatbot_config?.preChatForm}
+            raiseTicket={raiseTicket}
+            postChatForm={chatbot_config?.postChatForm}
+            setIsTicketRaised={setIsTicketRaised}
+            ticketForm={chatbot_config?.ticketForm}
+            setWindowWidth={setWindowWidth}
+            adminTestingMode={config?.adminTestingMode}
           />
         );
     }

@@ -354,12 +354,30 @@ export const useChatLogic = ({
       (data) => {
         resetInactivityTimeout();
 
+        // Handle new conversation ID from RAG backend
+        if (data?.conversation_id) {
+          setConvoId(data.conversation_id);
+        }
+
+        // Handle limit exceeded (legacy support)
         if (data?.event === 'limit_exceeded') {
           serReachedLimit(true);
           return;
         }
 
-        if (data?.conversation_id) setConvoId(data.conversation_id);
+        // Mark loading complete on end event
+        if (data?.event === 'end') {
+          setLoading(false);
+          
+          // Force re-render with flag to trigger markdown parsing
+          setChatMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === 'bot') {
+              return [...prev.slice(0, -1), { ...last, streamComplete: true }];
+            }
+            return prev;
+          });
+        }
       },
       (error) => {
         console.error('Assistant error:', error);

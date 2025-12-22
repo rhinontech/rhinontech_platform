@@ -23,6 +23,7 @@ export interface Message {
   isEmailForm?: boolean;
   sender_name?: string;
   sender_image?: string;
+  streamComplete?: boolean; // Flag to indicate streaming is done
 }
 
 export interface ChatWithAssistantRequest {

@@ -88,36 +88,67 @@ const createOrUpdateAutomation = async (req, res) => {
       }
     }
 
-    // STEP 3: Sync to AI Engine (RAG)
+    // STEP 3: Sync to AI Engine (RAG) - WAIT for completion
     // We send the automation data to Python service for ingestion
-    // try {
-    //   const pythonBackendUrl1 =
-    //     "http://localhost:5002/standard/set_user_assistant";
-    //   // We need to fetch the chatbot_id for this organization to send to Python
-    //   // Assuming 1-to-1 mapping or just taking one.
-    //   // Based on old query: JOIN chatbots c ON a.organization_id = c.organization_id
-    //   const { chatbots } = require("../models");
-    //   const chatbot = await chatbots.findOne({ where: { organization_id } });
+    try {
+      const axios = require("axios");
+      const pythonBackendUrl = process.env.AI_API_URL || "http://localhost:5002";
+      const pythonBackendUrl1 = `${pythonBackendUrl}/api/ingest`;
+      // We need to fetch the chatbot_id for this organization to send to Python
+      // Assuming 1-to-1 mapping or just taking one.
+      // Based on old query: JOIN chatbots c ON a.organization_id = c.organization_id
+      const { chatbots } = require("../models");
+      const chatbot = await chatbots.findOne({ where: { organization_id } });
 
-    //   if (chatbot) {
-    //     const payload = {
-    //       chatbot_id: chatbot.chatbot_id,
-    //       // training_url: automation.training_url,
-    //       // training_pdf: automation.training_pdf,
-    //       // training_article: automation.training_article,
-    //     };
+      if (chatbot) {
+        const payload = {
+          chatbot_id: chatbot.chatbot_id,
+        };
 
-    //     // Non-blocking call or awaited? User said "send datas", presumably fire-and-forget or await but verify processing.
-    //     // Let's await it to log success/failure
-    //     await axios.post(pythonBackendUrl1, payload);
-    //     console.log("Automatically synced data to AI Brain");
-    //   } else {
-    //     console.warn("No chatbot found for this org, skipped AI sync");
-    //   }
-    // } catch (aiError) {
-    //   console.error("Failed to sync with AI Backend:", aiError.message);
-    //   // We do NOT fail the request, just log it.
-    // }
+        // WAIT for ingestion to complete (blocking)
+        // Increased timeout to 10 minutes for large websites/documents
+        console.log(`🔄 Starting AI ingestion for chatbot ${chatbot.chatbot_id}...`);
+        const response = await axios.post(pythonBackendUrl1, payload, { 
+          timeout: 600000, // 10 minutes
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        });
+        console.log(`✅ AI ingestion completed successfully for chatbot ${chatbot.chatbot_id}`);
+        console.log(`Response:`, response.data);
+        
+        // Emit success event to frontend via WebSocket
+        io.emit("training:completed", { 
+          organization_id,
+          chatbot_id: chatbot.chatbot_id,
+          status: "success",
+          message: "Chatbot training completed successfully"
+        });
+      } else {
+        console.warn("⚠️  No chatbot found for this org, skipped AI sync");
+      }
+    } catch (aiError) {
+      console.error("❌ Failed to sync with AI Backend:", aiError.message);
+      
+      // Emit failure event to frontend via WebSocket
+      const { chatbots } = require("../models");
+      const chatbot = await chatbots.findOne({ where: { organization_id } });
+      if (chatbot) {
+        io.emit("training:failed", { 
+          organization_id,
+          chatbot_id: chatbot.chatbot_id,
+          status: "failed",
+          message: "Chatbot training failed",
+          error: aiError.message
+        });
+      }
+      
+      // Fail the request if AI sync fails
+      return res.status(500).json({
+        message: "Failed to sync knowledge base with AI",
+        error: aiError.message,
+        details: aiError.response?.data || "Training process exceeded timeout or encountered an error"
+      });
+    }
 
     return res
       .status(200)

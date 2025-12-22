@@ -2,6 +2,7 @@ import logging
 import asyncio
 import json
 import os
+import time
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
@@ -162,17 +163,22 @@ class StandardRAGController:
         """
         from DB.postgresDB import delete_chunks, insert_chunk_batch
         
+        logging.info(f"🔄 Step 1/4: Fetching training data for chatbot {chatbot_id}")
         text_data = await StandardRAGController.fetch_and_prepare_data(chatbot_id)
         if not text_data:
             raise Exception("No training data found for this chatbot.")
         
+        logging.info(f"✅ Fetched {len(text_data)} characters of training data")
+        
         # 1. Chunking
+        logging.info(f"🔄 Step 2/4: Chunking text data...")
         chunks_text = StandardRAGController.chunk_text(text_data)
-        logging.info(f"Generated {len(chunks_text)} chunks for chatbot {chatbot_id}")
+        logging.info(f"✅ Generated {len(chunks_text)} chunks for chatbot {chatbot_id}")
         
         # 2. Embedding (Batch)
         # We process in small batches of 20 to avoid rate limits if needed, 
         # but OpenAI handles list inputs well.
+        logging.info(f"🔄 Step 3/4: Generating embeddings for {len(chunks_text)} chunks...")
         chunks_data = []
         
         # We need a robust embed function. Since embedding_service.embed_text currently takes str, 
@@ -185,6 +191,8 @@ class StandardRAGController:
         # I must fix that first. I will do loop here for specific reliability now.
         
         for i, chunk in enumerate(chunks_text):
+            if (i + 1) % 10 == 0:  # Log progress every 10 chunks
+                logging.info(f"   Embedded {i + 1}/{len(chunks_text)} chunks...")
             vector = embedding_service.embed_text(chunk) 
             if vector:
                 chunks_data.append({
@@ -193,12 +201,17 @@ class StandardRAGController:
                     "embedding": vector
                 })
         
+        logging.info(f"✅ Generated embeddings for {len(chunks_data)} chunks")
+        
         # 3. Replace Data
+        logging.info(f"🔄 Step 4/4: Saving embeddings to database...")
         # Use Thread for DB Ops
         await asyncio.to_thread(delete_chunks, chatbot_id)
         
         if chunks_data:
             await asyncio.to_thread(insert_chunk_batch, chatbot_id, chunks_data)
+        
+        logging.info(f"✅ Successfully saved {len(chunks_data)} chunks to database for chatbot {chatbot_id}")
         
         return True
 
@@ -290,13 +303,17 @@ class StandardRAGController:
                 
                 fields_str = "\n".join(field_descriptions)
                 
+                # Updated system instruction - wait 4-6 messages before asking for details
                 system_instruction += (
-                    f"\n\n[MANDATORY FORM COLLECTION]\n"
-                    f"Before providing ANY assistance or answering ANY questions, you MUST collect the following user details: {fields_str}\n"
-                    f"If the user provides only SOME of these details, you must acknowledge them and IMMEDIATELY ask for the remaining missing details.\n"
-                    f"However, collect ONLY the details listed above. Do NOT ask for 'Name' or 'Phone' unless they are explicitly listed in the requirements.\n"
-                    f"Do NOT generate a tool call until you have received ALL the required values.\n"
-                    f"Once you have ALL the values, call the 'submit_pre_chat_form' function immediately."
+                    f"\n\n[PROGRESSIVE FORM COLLECTION]\n"
+                    f"First, engage naturally with the user. Answer their questions helpfully for 4-6 conversation turns.\n"
+                    f"After 4-6 turns, you must collect: Name, Email, and Phone Number.\n"
+                    f"CRITICAL: Ask for these details ONE BY ONE. Do NOT ask for all three at once.\n"
+                    f"1. Ask for the Name. Wait for answer.\n"
+                    f"2. Ask for the Email. Wait for answer.\n"
+                    f"3. Ask for the Phone Number. Wait for answer.\n"
+                    f"Once you have all three values (name, email, phone), call the 'submit_pre_chat_form' function immediately.\n"
+                    f"After calling the function, do NOT tell the user 'I have saved your details'. Just say 'Thanks!' or 'Got it!' and continue the conversation naturally."
                 )
 
         # 3. Manage Thread/Conversation
@@ -345,17 +362,33 @@ class StandardRAGController:
 
                 # Separate Form Instruction to inject it closer to User Prompt for stronger adherence
                 form_system_instruction = ""
+                conversation_turn_count = len(history_messages) // 2  # Count user-bot exchanges
+                
                 if form_config and fields_str:
-                     form_system_instruction = (
-                        f"\n\n[SYSTEM INTERVENTION - MANDATORY FORM]"
-                        f"\nREQUIRED DETAILS: {fields_str}"
-                        f"\nLOGIC FLOW:"
-                        f"\n1. ANALYZE the user's message below."
-                        f"\n2. IF the user has provided the required details, you MUST call 'submit_pre_chat_form' IMMEDIATELY."
-                        f"\n3. IF the details are missing, you MUST ask for them explicitly."
-                        f"\n4. CONSTRAINT: Do NOT ask for unlisted fields (like Name/Phone) if they are not in the REQUIRED DETAILS list."
-                        f"\n5. Do NOT answer the user's question until the form is submitted."
-                     )
+                     if conversation_turn_count >= 4:
+                          # After 4-6 turns, start asking for details
+                          form_system_instruction = (
+                             f"\n\n[SYSTEM INTERVENTION - DETECT & COLLECT USER DETAILS]"
+                             f"\nYou have had {conversation_turn_count} conversation turns with the user."
+                             f"\nNow is the time to collect: Name, Email, and Phone Number."
+                             f"\nLOGIC FLOW:"
+                             f"\n1. REVIEW what you have already collected from previous messages."
+                             f"\n2. IF you have Name, Email, AND Phone, call 'submit_pre_chat_form' IMMEDIATELY."
+                             f"\n3. IF YOU ARE MISSING ANY, ASK FOR ONE MISSING ITEM ONLY."
+                             f"\n   - If missing Name: 'May I know your name?'"
+                             f"\n   - If missing Email: 'Thanks! What is your email address?'"
+                             f"\n   - If missing Phone: 'And your phone number?'"
+                             f"\n4. Do NOT ask for all three at once."
+                             f"\n5. Do NOT say 'I will save this' or 'details saved'."
+                          )
+                     else:
+                          # Before 4 turns, just answer naturally
+                          form_system_instruction = (
+                             f"\n\n[SYSTEM INTERVENTION - EARLY CONVERSATION]"
+                             f"\nYou are in turn {conversation_turn_count + 1} of the conversation."
+                             f"\nFocus on answering the user's questions helpfully."
+                             f"\nDo NOT ask for name, email, or phone number yet."
+                          )
 
                 messages = [{"role": "system", "content": system_instruction}]
                 messages.extend(history_messages)
@@ -438,18 +471,90 @@ class StandardRAGController:
                     print(f"TOOL CALL DETECTED: {tc['name']}")
                     print(f"ARGUMENTS: {tc['arguments']}") 
                     
+                    # Save to CRM via rtserver (using existing customers endpoint)
+                    try:
+                        import requests
+                        form_data = json.loads(tc['arguments'])
+                        rtserver_url = os.getenv("RTSERVER_URL", "http://localhost:3000")
+                        
+                        # Get chatbot organization_id
+                        conn = postgres_connection()
+                        org_query = "SELECT organization_id FROM chatbots WHERE chatbot_id = %s"
+                        org_result = run_query(conn, org_query, (chatbot_id,))
+                        conn.close()
+                        
+                        if org_result and org_result[0]:
+                            org_id = org_result[0][0]
+                            
+                            # Save to customers table with custom_data
+                            crm_payload = {
+                                "organization_id": org_id,
+                                "email": form_data.get("email", ""),
+                                "custom_data": {
+                                    "name": form_data.get("name", ""),
+                                    "phone": form_data.get("phone", ""),
+                                    "source": "chatbot",
+                                    "chatbot_id": chatbot_id
+                                }
+                            }
+                            
+                            print(f"DEBUG CRM PAYLOAD: {json.dumps(crm_payload, indent=2)}")
+                            
+                            # Save to customers table - check if exists first
+                            conn = postgres_connection()
+                            
+                            # Check if customer already exists
+                            check_query = "SELECT id FROM customers WHERE organization_id = %s AND email = %s"
+                            existing = run_query(conn, check_query, (org_id, crm_payload["email"]))
+                            
+                            if existing and existing[0]:
+                                # Update existing customer
+                                update_query = """
+                                    UPDATE customers 
+                                    SET custom_data = %s, updated_at = NOW()
+                                    WHERE organization_id = %s AND email = %s
+                                    RETURNING id
+                                """
+                                result = run_write_query(conn, update_query, (
+                                    json.dumps(crm_payload["custom_data"]),
+                                    org_id,
+                                    crm_payload["email"]
+                                ))
+                                print(f"✅ Customer updated: {form_data.get('email')}")
+                            else:
+                                # Insert new customer
+                                insert_query = """
+                                    INSERT INTO customers (organization_id, email, custom_data, created_at, updated_at)
+                                    VALUES (%s, %s, %s, NOW(), NOW())
+                                    RETURNING id
+                                """
+                                result = run_write_query(conn, insert_query, (
+                                    org_id,
+                                    crm_payload["email"],
+                                    json.dumps(crm_payload["custom_data"])
+                                ))
+                                print(f"✅ Customer created: {form_data.get('email')}")
+                            
+                            conn.close()
+                            # Internal message only - bots should not parrot this
+                            tool_result = {"status": "success", "message": "Data processed. Continue conversation."}
+                        else:
+                            print(f"⚠️ Organization not found for chatbot {chatbot_id}")
+                            tool_result = {"status": "success", "message": "Ack."}
+                            
+                    except Exception as crm_error:
+                        print(f"❌ CRM save error: {crm_error}")
+                        tool_result = {"status": "success", "message": "Ack."}
+                    
                     # 2. Add Tool Output Message to History
-                    # Simulate successful submission
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc["id"],
-                        "content": json.dumps({"status": "success", "message": "Form details received."})
+                        "content": json.dumps(tool_result)
                     })
                 
-                # 3. Inform User (Optional, but good UX)
-                thank_you_msg = "Thank you for sharing your details! "
-                yield f"data: {json.dumps({'token': thank_you_msg})}\n\n"
-                full_response += thank_you_msg
+                # 3. Don't send "Thank you" message - let the bot respond naturally
+                # The recursive call below will generate the appropriate response
                 
                 # 4. RECURSIVE CALL: Continue checking if there's an answer needed
                 # We remove tools from next call to avoid loops (unless we want multi-step tools)

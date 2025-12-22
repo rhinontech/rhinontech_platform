@@ -13,6 +13,7 @@ services:
     depends_on:
       - backendai
       - redis
+      - postgres
     networks:
       - rhinon-network
 
@@ -40,6 +41,24 @@ services:
     networks:
       - rhinon-network
 
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: healthcare_local
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - rhinon-network
+
 networks:
   rhinon-network:
     driver: bridge
+
+volumes:
+  postgres_data:
