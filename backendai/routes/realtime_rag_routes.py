@@ -145,15 +145,12 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
                     field_descriptions.append(f"- {f_prop['description']} (internal_id: {f_id})")
                 
                 final_instructions += (
-                    f"\n\n[PROGRESSIVE FORM COLLECTION]\n"
-                    f"First, engage naturally with the user. Answer their questions helpfully for 4-6 conversation turns.\n"
-                    f"After 4-6 turns, you must collect: Name, Email, and Phone Number from the user.\n"
-                    f"CRITICAL: Ask for these details ONE BY ONE. Do NOT ask for all three at once.\n"
-                    f"1. Ask for the Name. Wait for answer.\n"
-                    f"2. Ask for the Email. Wait for answer.\n"
-                    f"3. Ask for the Phone Number. Wait for answer.\n"
-                    f"Once you have all three values, call the 'submit_pre_chat_form' tool immediately.\n"
-                    f"After calling the tool, do NOT say 'Details saved'. Just say 'Thanks!' or 'Got it!' and continue."
+                    f"\n\n[CONVERSATION GUIDELINES]\n"
+                    f"Engage naturally with the user. Take your time to respond thoughtfully.\n"
+                    f"After 4-6 conversation turns, collect Name, Email, and Phone Number.\n"
+                    f"Ask for ONE detail at a time. Wait for their response before asking the next.\n"
+                    f"Once you have all three, call 'submit_pre_chat_form' tool.\n"
+                    f"After calling the tool, acknowledge briefly and continue the conversation."
                 )
         else:
             print(f"⚠️ DEBUG: No form_config found for chatbot_id={chatbot_id}")
@@ -166,9 +163,16 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
             "Content-Type": "application/json",
         }
         payload = {
-            "model": "gpt-4o-realtime-preview",
+            "model": "gpt-realtime-mini",
             "voice": "alloy",  # Professional, neutral English voice (other options: echo, shimmer, ash, ballad, coral, sage, verse)
-            "instructions": f"You must ALWAYS respond in English.\n\n{final_instructions}",
+            "instructions": final_instructions,
+            "modalities": ["text", "audio"],
+            "turn_detection": {
+                "type": "server_vad",
+                "threshold": 0.5,
+                "prefix_padding_ms": 300,
+                "silence_duration_ms": 700  # Wait 700ms of silence before responding
+            }
         }
         
         if tools:
