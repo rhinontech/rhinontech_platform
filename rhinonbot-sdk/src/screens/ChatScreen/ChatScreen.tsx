@@ -461,10 +461,10 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
         console.log('Disconnected from real-person chat');
       });
 
-      // return () => {
-      //   socket.off('message');
-      //   socket.disconnect();
-      // };
+      return () => {
+        socket.off('message');
+        socket.disconnect();
+      };
     }
   }, [isSpeakingWithRealPerson, userId, appId, convoId, isConversationActive]);
 
