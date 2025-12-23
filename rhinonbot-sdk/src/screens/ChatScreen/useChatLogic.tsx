@@ -8,13 +8,15 @@ import SpeechRecognition, {
 // New imports from restructured modules
 import type { Message, ChatWithAssistantRequest } from '@/types';
 import { chatWithAssistant, getChatHistory } from '@/services/chat';
-import { 
-  closeSocketConversation, 
-  getSocketConversationsByUserId, 
-  submitPostChatForm 
+import {
+  closeSocketConversation,
+  getSocketConversationsByUserId,
+  submitPostChatForm
 } from '@/services/chat/socketService';
 import { uploadConversationFile } from '@/services/chat/fileService';
 import { savePreChatCustomValue } from '@/services/config/formService';
+
+
 
 export type { Message, ChatWithAssistantRequest };
 
@@ -128,6 +130,47 @@ export const useChatLogic = ({
 
   const { transcript, resetTranscript } = useSpeechRecognition();
 
+  // sound effect on receive message
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Unlock audio + speech permissions on first click
+  useEffect(() => {
+    const unlock = () => {
+      try {
+        speechSynthesis.getVoices();
+        audioRef.current = new Audio('/confident-543.mp3');
+        audioRef.current.volume = 0.7;
+        audioRef.current.load();
+
+        const AudioContextClass =
+          window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioContextClass();
+        if (ctx.state === "suspended") ctx.resume();
+
+        console.log("🔓 Audio + Speech unlocked");
+      } catch (err) {
+        console.error("Audio unlock error:", err);
+      }
+      window.removeEventListener("click", unlock);
+    };
+    window.addEventListener("click", unlock);
+  }, []);
+
+
+  // Play sound safely
+  function playSound() {
+    if (!audioRef.current) return;
+
+    audioRef.current.currentTime = 0;
+    audioRef.current
+      .play()
+      .then(() => console.log(" Sound played"))
+      .catch((err) => console.warn("Sound play blocked:", err));
+  }
+
+
+
+
   // ====== Timeout Management ======
   const resetInactivityTimeout = () => {
     if (hasTimedOutRef.current) return;
@@ -173,7 +216,9 @@ export const useChatLogic = ({
 
   const handleConversationTimeout = async () => {
     if (hasTimedOutRef.current) return;
+    if (!isSpeakingWithRealPerson) return;
     hasTimedOutRef.current = true;
+
 
     setIsConversationActive(false);
 
@@ -331,6 +376,7 @@ export const useChatLogic = ({
       (token) => {
         if (!firstTokenReceived) {
           setLoading(false); // Stop spinner immediately on first token
+          playSound();
           firstTokenReceived = true;
         }
         assistantResponse += token;
@@ -358,6 +404,7 @@ export const useChatLogic = ({
         // Handle new conversation ID from RAG backend
         if (data?.conversation_id) {
           setConvoId(data.conversation_id);
+          setSelectedChatId(data.conversation_id)
         }
 
         // Handle limit exceeded (legacy support)
@@ -369,7 +416,7 @@ export const useChatLogic = ({
         // Mark loading complete on end event
         if (data?.event === 'end') {
           setLoading(false);
-          
+
           // Force re-render with flag to trigger markdown parsing
           setChatMessages((prev) => {
             const last = prev[prev.length - 1];
@@ -420,9 +467,10 @@ export const useChatLogic = ({
 
     // Append the new outgoing message and reset inactivity baseline
     setChatMessages((prev) => [...prev, newMessage]);
-    resetInactivityTimeout();
+
 
     if (isSpeakingWithRealPerson) {
+      resetInactivityTimeout();
       let updatedConvoId = convoId;
       if (updatedConvoId === 'NEW_CHAT') {
         updatedConvoId = `${Date.now()}-${Math.random()
@@ -653,6 +701,7 @@ export const useChatLogic = ({
     setIsConversationClosed(false);
     setIsSpeakingWithRealPerson(false);
     setConvoId('NEW_CHAT');
+    setSelectedChatId('NEW_CHAT')
     if (isAdmin && adminTestingMode) {
       setChatMessages([
         {
@@ -758,5 +807,6 @@ export const useChatLogic = ({
     isfetching,
     startNewConversation,
     userEmail,
+    playSound,
   };
 };
