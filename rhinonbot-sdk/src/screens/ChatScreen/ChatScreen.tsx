@@ -109,6 +109,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     isfetching,
     startNewConversation,
     setOpenPostChatForm,
+    playSound,
   } = chatLogic;
 
 
@@ -358,7 +359,8 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
   useEffect(() => {
     if (
       conversationId &&
-      lastFetchedConversationIdRef.current !== conversationId
+      lastFetchedConversationIdRef.current !== conversationId &&
+      lastFetchedConversationIdRef.current !== 'NEW_CHAT'
     ) {
       lastFetchedConversationIdRef.current = conversationId;
       fetchChats();
@@ -432,6 +434,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
           }
           return prevName;
         });
+        playSound();
 
         setSupportImage((prevImage) => {
           if (
@@ -458,10 +461,10 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
         console.log('Disconnected from real-person chat');
       });
 
-      return () => {
-        socket.off('message');
-        socket.disconnect();
-      };
+      // return () => {
+      //   socket.off('message');
+      //   socket.disconnect();
+      // };
     }
   }, [isSpeakingWithRealPerson, userId, appId, convoId, isConversationActive]);
 
@@ -583,9 +586,12 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
 
   // ====== Fetch chats on conversation change ======
   useEffect(() => {
+    console.log('conversationId', conversationId);
+    console.log('lastFetchedConversationIdRef.current', lastFetchedConversationIdRef.current);
     if (
       conversationId &&
-      lastFetchedConversationIdRef.current !== conversationId
+      lastFetchedConversationIdRef.current !== conversationId &&
+      lastFetchedConversationIdRef.current !== 'NEW_CHAT'
     ) {
       lastFetchedConversationIdRef.current = conversationId;
       fetchChats();

@@ -64,9 +64,10 @@ module.exports = {
   stats: 'errors-warnings',
   devtool: 'cheap-module-source-map',
   devServer: {
-    static: {
-      directory: path.join(__dirname, '../../dist'),
-    },
+    static: [
+      { directory: path.join(__dirname, '../../dist') },
+      { directory: path.join(__dirname, '../../public') },
+    ],
     open: true,
     hot: true,
     compress: true,
