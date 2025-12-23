@@ -4,7 +4,7 @@ import './Voice.scss';
 
 // New imports from restructured modules
 import type { VoiceScreenProps } from '@/types';
-import { getVoiceSessionToken, submitVoiceLead, searchVoiceKnowledge } from '@/services/voice';
+import { getVoiceSessionToken, submitVoiceLead, searchVoiceKnowledge, handoffSupport } from '@/services/voice';
 import {
   Loader2,
   Mic,
@@ -16,7 +16,21 @@ import {
   X,
 } from 'lucide-react';
 
-const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) => {
+// Helper to get user email
+const getUserEmail = (): string | undefined => {
+  // 1. URL Params
+  const urlParams = new URLSearchParams(window.location.search);
+  const emailFromUrl = urlParams.get('email');
+  if (emailFromUrl) return emailFromUrl;
+
+  // 2. Local Storage
+  const emailFromStorage = localStorage.getItem('user_email');
+  if (emailFromStorage) return emailFromStorage;
+
+  return undefined;
+};
+
+const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin, userEmail }) => {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [loading, setLoading] = useState(false);
 
@@ -157,7 +171,8 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
     try {
       cleanup(); // close any old connection
 
-      const { client_secret } = await getVoiceSessionToken(appId);
+      const emailToUse = userEmail || getUserEmail();
+      const { client_secret } = await getVoiceSessionToken(appId, emailToUse);
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
 
@@ -225,6 +240,11 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
                   phone: args.phone
                 });
 
+                // Save email to local storage for future sessions
+                if (args.email) {
+                  localStorage.setItem('user_email', args.email);
+                }
+
                 console.log("✅ Lead Saved:", result);
 
                 // 2. Send Tool Output back to OpenAI (Required to continue flow)
@@ -280,6 +300,51 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin }) =>
 
               } catch (e) {
                 console.error("Error processing search tool:", e);
+              }
+            } else if (functionName === 'handoff_to_support') {
+              console.log("🤝 Tool Triggered: handoff_to_support", argsString);
+
+              try {
+                const args = JSON.parse(argsString);
+
+                // Prioritize email from tool args, fallback to storage
+                const emailToUse = args.email || getUserEmail();
+
+                let result: any = { result: "Handoff initiated." };
+
+                if (emailToUse) {
+                  const handoffRes = await handoffSupport({
+                    chatbot_id: appId,
+                    email: emailToUse,
+                    name: args.name,
+                    phone: args.phone
+                  });
+                  console.log("✅ Handoff Result:", handoffRes);
+                  result = handoffRes;
+                } else {
+                  console.warn("⚠️ No email found for handoff.");
+                  result = { error: "Email missing. Please provide email." };
+                }
+
+                // 2. Send Tool Output back
+                const toolOutput = {
+                  type: "conversation.item.create",
+                  item: {
+                    type: "function_call_output",
+                    call_id: callId,
+                    output: JSON.stringify(result)
+                  }
+                };
+                dataChannel.send(JSON.stringify(toolOutput));
+
+                // 3. Trigger Bot Response
+                const responseCreate = {
+                  type: "response.create"
+                };
+                dataChannel.send(JSON.stringify(responseCreate));
+
+              } catch (e) {
+                console.error("Error processing handoff tool:", e);
               }
             }
           }

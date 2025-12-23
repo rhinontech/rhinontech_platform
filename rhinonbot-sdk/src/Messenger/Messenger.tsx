@@ -177,6 +177,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
             appId={config?.app_id || ''}
             onButtonClick={() => setActiveScreen('home')}
             isAdmin={config?.admin}
+            userEmail={userEmail}
           />
         );
       case 'help':

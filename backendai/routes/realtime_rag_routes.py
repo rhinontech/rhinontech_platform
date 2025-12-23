@@ -5,8 +5,14 @@ import os
 import requests
 import logging
 
+import uuid
+from datetime import datetime, timezone
+import asyncio
+from DB.postgresDB import get_db_connection, run_query, run_write_query, get_pre_chat_form, get_customer_by_email, search_vectors, move_customer_to_pipeline, save_customer
 from services.openai_services import client
 from controller.standard_rag_controller import standard_rag_controller
+from services.embedding_service import embedding_service
+from resources.industry_prompts import INDUSTRY_PROMPTS
 
 router = APIRouter()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -38,10 +44,6 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
         raise HTTPException(status_code=400, detail="chatbot_id is required")
 
     try:
-        import uuid
-        from datetime import datetime, timezone
-        from DB.postgresDB import get_db_connection, run_query, run_write_query
-        
         system_instruction = ""
         history_text = ""
         
@@ -84,94 +86,243 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
         # C. Get Knowledge Base Content - REMOVED for Optimization
         # stored_knowledge = await standard_rag_controller.get_stored_knowledge(chatbot_id) 
         
+        # C.2 Get Organization Type & Industry Prompt (Parity with Standard RAG)
+        org_type = "Default"
+        try:
+             # Use existing connection or new one? We have 'conn' from depends if we want, or make new.
+             # controller/standard_rag_controller.py uses a static method query on 'chatbots'.
+             # Let's do a quick query here.
+             with get_db_connection() as type_conn:
+                 type_query = """
+                    SELECT o.organization_type 
+                    FROM organizations o
+                    JOIN chatbots c ON o.id = c.organization_id
+                    WHERE c.chatbot_id = %s
+                 """
+                 type_res = run_query(type_conn, type_query, (chatbot_id,))
+                 if type_res and type_res[0]:
+                     org_type = type_res[0][0] or "Default"
+        except Exception as e:
+             logging.error(f"Error fetching org type: {e}")
+             
+        industry_instruction = INDUSTRY_PROMPTS.get(org_type, INDUSTRY_PROMPTS["Default"])
+
         # Base System Instruction
         system_instruction = (
+            f"{industry_instruction}\n\n"
             "You are the AI Assistant for this organization. "
             "Speak as the organization (use 'we', 'us', 'our'). "
             "Do NOT mention 'OpenAI' or being an AI model from another company. "
             "If asked about your identity, say you are the AI Assistant for the organization. "
             "Use the 'search_knowledge_base' tool to find specific answers. "
+            "IMPORTANT: When searching, generate DETAILED, SENTENCE-LENGTH queries that capture the full context. Avoid single-word queries."
             "Always verify your answer with the retrieved context."
         )
         
         # D. Combine Instructions
         final_instructions = f"{system_instruction}{history_text}"
 
-        # D.1 Check for Pre-Chat Form (Function Calling) & Inject Instructions
-        from DB.postgresDB import get_pre_chat_form
-        form_config = get_pre_chat_form(chatbot_id)
+        # D.1 Check for Returning Customer
+        customer_data = None
+        is_returning_user = False
         
-        # Defines tools list with the Search Tool by default
-        tools = [{
-            "type": "function",
-            "name": "search_knowledge_base",
-            "description": "Search for specific facts, prices, policies, or details. Use specific, keyword-rich queries (e.g., 'price of plan A' instead of 'price').",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query to find relevant information."
-                    }
-                },
-                "required": ["query"]
-            }
-        }]
+        if user_email and user_email != "guest@example.com" and "guest@" not in user_email:
+            customer_data = get_customer_by_email(chatbot_id, user_email, conn)
+            if customer_data:
+                 is_returning_user = True
         
-        print(f"🔍 DEBUG: chatbot_id={chatbot_id}, form_config={form_config}")
-        logging.info(f"🔍 DEBUG: chatbot_id={chatbot_id}, form_config={form_config}")
-        
-        if form_config:
-            # Generate Tool Definition from Form Config
-            properties = {}
-            required_fields = []
+        # D.2 Build Instructions Based on Status
+        if is_returning_user:
+            customer_name = customer_data.get("name", "")
+            customer_phone = customer_data.get("phone")
             
-            for field in form_config:
-                field_id = field.get("id", "unknown")
-                field_type = "string" # Default
-                if field.get("type") == "number": field_type = "number"
-                
-                properties[field_id] = {
-                    "type": field_type,
-                    "description": field.get("label", field_id)
+            print(f"✅ RETURNING USER: {customer_name} ({user_email})")
+            logging.info(f"✅ RETURNING USER: {customer_name} ({user_email})")
+            
+            missing_phone_instruction = ""
+            missing_phone_instruction = ""
+            if not customer_phone:
+                missing_phone_instruction = "Note: You are MISSING their Phone Number. Only ask for it IF they want to proceed with a purchase or support. Do not ask immediately."
+
+            final_instructions += (
+                f"\n\n[USER CONTEXT]\n"
+                f"You are speaking with a user whose email is: {user_email}.\n"
+                f"You MUST use this email ('{user_email}') when calling any tools.\n"
+                f"The user is {customer_name}, a valued returning customer.\n"
+                f"Greet them warmly by name at the start of the conversation.\n"
+                f"{missing_phone_instruction}\n"
+                f"Your goal is to answer their questions AND detect if they want support/purchasing.\n"
+            )
+            # Returning user -> Search Tool ONLY
+            tools = [{
+                "type": "function",
+                "name": "search_knowledge_base",
+                "description": "Search for specific facts, prices, policies, or details. Use verbose, sentence-like queries.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "A detailed search query including all relevant context from the user's question. Do not use short keywords."
+                        }
+                    },
+                    "required": ["query"]
                 }
-                if field.get("required"):
-                    required_fields.append(field_id)
+            }]
+
+            # Add Handoff Tool for Returning Users too
+            tools.append({
+                "type": "function",
+                "name": "handoff_to_support",
+                "description": "PRIORITY TOOL. Connects user to support team / human agent. Use IMMEDIATELY if user asks for 'support', 'human', 'team' OR shows strong interest. Do NOT ask 'what area' - just connect.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "email": {"type": "string", "description": "Customer email"},
+                        "name": {"type": "string", "description": "Customer name"},
+                        "phone": {"type": "string", "description": "Customer phone"}
+                    },
+                "required": ["email"]
+                }
+            })
+
+            final_instructions += (
+                f"\n[LEAD QUALIFICATION & HANDOFF]\n"
+                f"RULES FOR HANDOFF:\n"
+                f"1. IF user asks for 'Support', 'Human', 'Connect' OR shows High Interest -> HANDOFF IMMEDIATELY.\n"
+                f"2. You MUST pass the email '{user_email}' to the tool.\n"
+                f"3. Do NOT ask 'What specific area?'.\n"
+                f"4. Say 'Connecting you now... Our team will reach out to you soon!' and call the tool."
+            )
             
-            print(f"🔍 DEBUG: properties={properties}, required_fields={required_fields}")
-            logging.info(f"🔍 DEBUG: properties={properties}, required_fields={required_fields}")
-            
-            if properties:
-                tools.append({
-                    "type": "function",
-                    "name": "submit_pre_chat_form",
-                    "description": "Submit user form data when they provide it.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": properties,
-                        "required": required_fields
-                    }
-                })
-                
-                print(f"✅ DEBUG: Tools generated: {len(tools)} tool(s)")
-                logging.info(f"✅ DEBUG: Tools generated: {len(tools)} tool(s)")
-                
-                # Append to System Instruction
-                field_descriptions = []
-                for f_id, f_prop in properties.items():
-                    field_descriptions.append(f"- {f_prop['description']} (internal_id: {f_id})")
-                
-                final_instructions += (
-                    f"\n\n[CONVERSATION GUIDELINES]\n"
-                    f"Engage naturally with the user. Take your time to respond thoughtfully.\n"
-                    f"After 4-6 conversation turns, collect Name, Email, and Phone Number.\n"
-                    f"Ask for ONE detail at a time. Wait for their response before asking the next.\n"
-                    f"Once you have all three, call 'submit_pre_chat_form' tool.\n"
-                    f"After calling the tool, acknowledge briefly and continue the conversation."
-                )
         else:
-            print(f"⚠️ DEBUG: No form_config found for chatbot_id={chatbot_id}")
-            logging.warning(f"⚠️ DEBUG: No form_config found for chatbot_id={chatbot_id}")
+             # NEW USER Logic -> Add Form Collection
+             form_config = get_pre_chat_form(chatbot_id, conn)
+        
+             # Default Tool: Search
+             tools = [{
+                "type": "function",
+                "name": "search_knowledge_base",
+                "description": "Search for specific facts, prices, policies, or details. do NOT use if user asks for 'Support', 'Human', or 'Team' - use handoff_to_support instead.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "A detailed search query including all relevant context from the user's question. Do not use short keywords."
+                        }
+                    },
+                    "required": ["query"]
+                }
+             }]
+        
+             print(f"🔍 DEBUG: chatbot_id={chatbot_id}, form_config={form_config}")
+             logging.info(f"🔍 DEBUG: chatbot_id={chatbot_id}, form_config={form_config}")
+        
+             if form_config:
+                properties = {}
+                required_fields = []
+            
+                for field in form_config:
+                    field_id = field.get("id", "unknown")
+                    field_type = "string" # Default
+                    if field.get("type") == "number": field_type = "number"
+                
+                    properties[field_id] = {
+                        "type": field_type,
+                        "description": field.get("label", field_id)
+                    }
+                    if field.get("required"):
+                        required_fields.append(field_id)
+            
+                if properties:
+                    tools.append({
+                        "type": "function",
+                        "name": "submit_pre_chat_form",
+                        "description": "Submit user form data. You MUST have collected Name, Email, and Phone before calling this function.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": properties,
+                            "required": required_fields # Enforce required fields defined in form config
+                        }
+                    })
+
+                    # Add Handoff Tool
+                    tools.append({
+                        "type": "function",
+                        "name": "handoff_to_support",
+                        "description": "PRIORITY TOOL. Connects user to support team / human agent. Use IMMEDIATELY if user asks for 'support', 'human', 'team' OR shows strong interest. Do NOT ask 'what area' - just connect.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "email": {"type": "string", "description": "Customer email"},
+                                "name": {"type": "string", "description": "Customer name"},
+                                "phone": {"type": "string", "description": "Customer phone"}
+                            },
+                            "required": ["email"]
+                        }
+                    })
+                
+                    # Append to System Instruction
+                    field_descriptions = []
+                    for f_id, f_prop in properties.items():
+                        field_descriptions.append(f"- {f_prop['description']} (internal_id: {f_id})")
+                
+                    # Updated system instruction - wait 3 messages before asking for details
+                    if is_returning_user:
+                         # Fetch Customer Details to inject into context
+                         customer_context_str = ""
+                         try:
+                             # We need to make a fresh connection or use existing if accessible. 
+                             # Since we are in an async route, we should use a new connection or the one used before if still open?
+                             # safer to open a quick one.
+                             with get_db_connection() as conn:
+                                 cust = get_customer_by_email(chatbot_id, user_email, conn)
+                                 if cust:
+                                     c_name = cust.get("name")
+                                     c_phone = cust.get("phone")
+                                     if c_name: 
+                                         customer_context_str += f"Name: {c_name}\n"
+                                         # Add friendly instruction
+                                         customer_context_str += f"IMPORTANT: Address the user by their name ({c_name}) occasionally, but NOT in every sentence.\n"
+                                     if c_phone: customer_context_str += f"Phone: {c_phone}\n"
+                         except Exception as e:
+                             print(f"Error fetching customer context for voice: {e}")
+
+                         # If we already know the email (returning user or context), just ask for missing info or confirm.
+                         final_instructions += (
+                            f"\n\n[USER CONTEXT]\n"
+                            f"You are speaking with a user whose email is: {user_email}.\n"
+                            f"{customer_context_str}"
+                            f"Since you already have their email, do NOT ask for it again.\n"
+                            f"However, if you do not have their Name or Phone in the context above, please ask for those politely after 3 turns.\n"
+                            f"IMPORTANT: Do NOT say 'Welcome back' at the start of every response. Speak naturally."
+                         )
+                    else:
+                         final_instructions += (
+                            f"\n\n[PROGRESSIVE FORM COLLECTION]\n"
+                            f"First, engage naturally with the user. Answer their questions helpfully for 3 conversation turns.\n"
+                            f"After 3 turns, you must collect: Name, Email, and Phone Number.\n"
+                            f"CRITICAL: Ask for these details ONE BY ONE. Do NOT ask for all three at once.\n"
+                            f"1. Ask for the Name. Wait for answer.\n"
+                            f"2. Ask for the Email. Wait for answer.\n"
+                            f"3. Ask for the Phone Number. Wait for answer.\n"
+                            f"Once you have all three values (name, email, phone), call the 'submit_pre_chat_form' function immediately.\n"
+                            f"After calling the function, do NOT tell the user 'I have saved your details'. Just say 'Thanks!' or 'Got it!' and continue.\n"
+                         )
+
+                    final_instructions += (
+                        f"\n[LEAD QUALIFICATION & HANDOFF]\n"
+                        f"RULES FOR HANDOFF:\n"
+                        f"1. IF user asks for 'Support', 'Human', 'Connect' OR shows High Interest -> HANDOFF IMMEDIATELY.\n"
+                        f"2. Do NOT ask 'What specific area?' or 'What is your query?'.\n"
+                        f"3. CHECK CONTEXT: If you strictly need Name/Email/Phone and don't have them, ASK for them first. Then call 'handoff_to_support'.\n"
+                        f"3. CHECK CONTEXT: If you strictly need Name/Email/Phone and don't have them, ASK for them first. Then call 'handoff_to_support'.\n"
+                        f"4. Say 'Connecting you now... Our team will reach out to you soon!' and call the tool."
+                    )
+             else:
+                print(f"⚠️ DEBUG: No form_config found for chatbot_id={chatbot_id}")
+                logging.warning(f"⚠️ DEBUG: No form_config found for chatbot_id={chatbot_id}")
 
         # E. Create Session
         url = "https://api.openai.com/v1/realtime/sessions"
@@ -233,9 +384,10 @@ async def save_realtime_conversation(request: RealtimeSaveRequest):
     if not conversation_id or not new_messages:
          return {"message": "No data to save"}
 
+    if not conversation_id or not new_messages:
+         return {"message": "No data to save"}
+
     try:
-        from datetime import datetime, timezone
-        from DB.postgresDB import get_db_connection, run_query, run_write_query
         import json
         
         current_time = datetime.now(timezone.utc)
@@ -278,7 +430,7 @@ async def save_realtime_conversation(request: RealtimeSaveRequest):
 
 class RealtimeLeadRequest(BaseModel):
     chatbot_id: str
-    email: str
+    email: Optional[str] = None
     name: Optional[str] = ""
     phone: Optional[str] = ""
     
@@ -289,11 +441,14 @@ async def submit_realtime_lead(request: RealtimeLeadRequest):
     Saves the lead details to the customers table.
     """
     try:
-        from DB.postgresDB import get_db_connection, run_query, run_write_query
         import json
         
         chatbot_id = request.chatbot_id
         email = request.email
+        
+        print(f"📝 SUBMIT LEAD DEBUG: email='{email}', name='{request.name}', phone='{request.phone}'")
+        logging.info(f"📝 SUBMIT LEAD DEBUG: email='{email}', name='{request.name}', phone='{request.phone}'")
+
         custom_data = {
             "name": request.name,
             "phone": request.phone,
@@ -301,37 +456,20 @@ async def submit_realtime_lead(request: RealtimeLeadRequest):
             "chatbot_id": chatbot_id
         }
         
-        with get_db_connection() as conn:
-            # 1. Get Organization ID
-            org_query = "SELECT organization_id FROM chatbots WHERE chatbot_id = %s"
-            org_result = run_query(conn, org_query, (chatbot_id,))
-            
-            if not org_result or not org_result[0]:
-                raise HTTPException(status_code=404, detail="Chatbot not found")
-                
-            org_id = org_result[0][0]
-            
-            # 2. Check if customer exists
-            check_query = "SELECT id FROM customers WHERE organization_id = %s AND email = %s"
-            existing = run_query(conn, check_query, (org_id, email))
-            
-            if existing and existing[0]:
-                 # Update
-                 update_query = """
-                    UPDATE customers 
-                    SET custom_data = custom_data || %s::jsonb, updated_at = NOW()
-                    WHERE organization_id = %s AND email = %s
-                 """
-                 run_write_query(conn, update_query, (json.dumps(custom_data), org_id, email))
-                 return {"status": "success", "message": "Lead updated"}
-            else:
-                 # Insert
-                 insert_query = """
-                    INSERT INTO customers (organization_id, email, custom_data, created_at, updated_at)
-                    VALUES (%s, %s, %s, NOW(), NOW())
-                 """
-                 run_write_query(conn, insert_query, (org_id, email, json.dumps(custom_data)))
-                 return {"status": "success", "message": "Lead created"}
+        # Guard clause: If email is missing, we cannot save properly via save_customer (DB constraint).
+        if not email:
+             # We received some data (like name), but can't save to DB yet.
+             # Return success so the bot continues to ask for the next field.
+             return {"status": "partial", "message": "Details received. Please ask for Email to complete the record."}
+
+        # Use shared helper
+        success = save_customer(chatbot_id, email, custom_data)
+        
+        if success:
+             return {"status": "success", "message": "Lead saved/updated"}
+        else:
+             return {"status": "error", "message": "Failed to save lead"}
+
 
     except Exception as e:
         logging.error(f"Error submitting lead: {e}")
@@ -348,23 +486,11 @@ async def search_knowledge_base_endpoint(request: RealtimeSearchRequest):
     Performs a vector search and returns relevant chunks.
     """
     try:
-        from services.embedding_service import embedding_service
-        from controller.standard_rag_controller import standard_rag_controller # Ensure import
-        
-        # Reuse standard RAG logic: Embed -> Search
-        # But wait, standard_rag_controller.chat_stream does it all. 
-        # We just want the vector search part.
-        # standard_rag_controller has search_vectors imported from DB.postgresDB
-        from DB.postgresDB import search_vectors
-        
-        # Embed query
-        query_vector = embedding_service.embed_text(request.query)
-        if not query_vector:
-             return {"result": "Could not process query."}
-             
         # Search
+        # Embed query first
+        query_vector = embedding_service.embed_text(request.query)
+        
         # Run in thread since DB ops are blocking if not async specific
-        import asyncio
         results = await asyncio.to_thread(search_vectors, request.chatbot_id, query_vector, limit=5)
         
         if results:
@@ -378,3 +504,48 @@ async def search_knowledge_base_endpoint(request: RealtimeSearchRequest):
         logging.error(f"Error searching knowledge base: {e}")
         # Don't fail the client call entirely, just return error text
         return {"result": "Error searching knowledge base."}
+
+class RealtimeHandoffRequest(BaseModel):
+    chatbot_id: str
+    email: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+
+@router.post("/realtime/handoff_support")
+async def handoff_support_endpoint(request: RealtimeHandoffRequest):
+    """
+    Endpoint for 'handoff_to_support' tool.
+    Moves customer to pipeline.
+    """
+    try:
+        chatbot_id = request.chatbot_id
+        email = request.email
+        name = request.name
+        phone = request.phone
+        
+        if not email:
+             return {"result": "Email required for handoff."}
+             
+        # 1. Update/Save Customer
+        if name or phone:
+            c_data = {
+                "name": name,
+                "phone": phone,
+                "source": "voice_chatbot",
+                "chatbot_id": chatbot_id
+            }
+            # Use save_customer imported helper
+            save_customer(chatbot_id, email, c_data)
+
+        # 2. Move to Pipeline
+        with get_db_connection() as conn:
+             success = move_customer_to_pipeline(chatbot_id, email, conn)
+             
+        if success:
+             return {"result": "Customer moved to priority support pipeline."}
+        else:
+             return {"result": "Failed to move to pipeline. Please try again."}
+
+    except Exception as e:
+        logging.error(f"Error in handoff: {e}")
+        return {"result": "Error processing handoff."}
