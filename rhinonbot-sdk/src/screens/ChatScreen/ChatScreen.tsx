@@ -45,33 +45,6 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     ticketForm,
     setWindowWidth,
     adminTestingMode,
-  } = props;
-
-  // Custom hook for all business logic
-  const chatLogic = useChatLogic({
-    userId,
-    userEmail,
-    appId,
-    conversationId,
-    isAdmin,
-    chatAvatar,
-    chatbot_config,
-    setSelectedChatId,
-    timeoutDuration,
-    onConversationTimeout,
-    setUserEmail,
-    setIsEmailAvailable,
-    isSpeakingWithRealPerson,
-    setIsSpeakingWithRealPerson,
-    onBack,
-    setWindowWidth,
-    postChatForm,
-    isEmailAvailable,
-    preChatForm,
-    adminTestingMode,
-  });
-
-  const {
     chatMessages,
     message,
     setMessage,
@@ -85,6 +58,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     setSupportName,
     supportImage,
     setSupportImage,
+    setChatMessages,
     showTyping,
     setShowTyping,
     isListening,
@@ -110,7 +84,72 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     startNewConversation,
     setOpenPostChatForm,
     playSound,
-  } = chatLogic;
+  } = props;
+
+  // Custom hook for all business logic
+  // const chatLogic = useChatLogic({
+  //   userId,
+  //   userEmail,
+  //   appId,
+  //   conversationId,
+  //   isAdmin,
+  //   chatAvatar,
+  //   chatbot_config,
+  //   setSelectedChatId,
+  //   timeoutDuration,
+  //   onConversationTimeout,
+  //   setUserEmail,
+  //   setIsEmailAvailable,
+  //   isSpeakingWithRealPerson,
+  //   setIsSpeakingWithRealPerson,
+  //   onBack,
+  //   setWindowWidth,
+  //   postChatForm,
+  //   isEmailAvailable,
+  //   preChatForm,
+  //   adminTestingMode,
+  // });
+
+  // const {
+  //   chatMessages,
+  //   message,
+  //   setMessage,
+  //   loading,
+  //   convoId,
+  //   setConvoId,
+  //   isConversationActive,
+  //   isConversationClosed,
+  //   reachedLimit,
+  //   supportName,
+  //   setSupportName,
+  //   supportImage,
+  //   setSupportImage,
+  //   showTyping,
+  //   setShowTyping,
+  //   isListening,
+  //   setIsListening,
+  //   openPostChatForm,
+  //   lastFetchedConversationIdRef,
+  //   socketRef,
+  //   fileInputRef,
+  //   typingRef,
+  //   transcript,
+  //   resetInactivityTimeout,
+  //   handleSend,
+  //   handleFileUpload,
+  //   handleSaveEmail,
+  //   handlePostFormSubmit,
+  //   handleCloseChat,
+  //   startListening,
+  //   stopListening,
+  //   cancelListening,
+  //   handleSwitchToRealPerson,
+  //   fetchChats,
+  //   isfetching,
+  //   startNewConversation,
+  //   setOpenPostChatForm,
+  //   playSound,
+  // } = chatLogic;
 
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -356,16 +395,16 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
   }, [chatMessages, message]);
 
   // ====== Fetch chats on conversation change ======
-  useEffect(() => {
-    if (
-      conversationId &&
-      lastFetchedConversationIdRef.current !== conversationId &&
-      lastFetchedConversationIdRef.current !== 'NEW_CHAT'
-    ) {
-      lastFetchedConversationIdRef.current = conversationId;
-      fetchChats();
-    }
-  }, [conversationId]);
+  // useEffect(() => {
+  //   if (
+  //     conversationId &&
+  //     lastFetchedConversationIdRef.current !== conversationId &&
+  //     lastFetchedConversationIdRef.current !== 'NEW_CHAT'
+  //   ) {
+  //     lastFetchedConversationIdRef.current = conversationId;
+  //     fetchChats();
+  //   }
+  // }, [conversationId]);
 
   // ====== Typing indicator logic ======
   useEffect(() => {
@@ -389,89 +428,89 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
   }, [showTyping]);
 
   // ====== WebSocket connection ======
-  useEffect(() => {
-    if (isSpeakingWithRealPerson && isConversationActive) {
-      let activeConvoId = convoId;
-      if (activeConvoId === 'NEW_CHAT') {
-        activeConvoId = `${Date.now()}-${Math.random()
-          .toString(36)
-          .substring(2, 15)}`;
-      }
+  // useEffect(() => {
+  //   if (isSpeakingWithRealPerson && isConversationActive) {
+  //     let activeConvoId = convoId;
+  //     if (activeConvoId === 'NEW_CHAT') {
+  //       activeConvoId = `${Date.now()}-${Math.random()
+  //         .toString(36)
+  //         .substring(2, 15)}`;
+  //     }
 
-      const socket = io(process.env.REACT_APP_SOCKET_URL, {
-        query: {
-          user_email: userEmail,
-          chatbot_id: appId,
-          conversation_id: activeConvoId,
-          user_id: userId,
-        },
-      });
+  //     const socket = io(process.env.REACT_APP_SOCKET_URL, {
+  //       query: {
+  //         user_email: userEmail,
+  //         chatbot_id: appId,
+  //         conversation_id: activeConvoId,
+  //         user_id: userId,
+  //       },
+  //     });
 
-      socketRef.current = socket;
+  //     socketRef.current = socket;
 
-      socket.on('connect', () => {
-        console.log('Connected to real-person chat');
+  //     socket.on('connect', () => {
+  //       console.log('Connected to real-person chat');
 
-        if (convoId === 'NEW_CHAT' && isSpeakingWithRealPerson) {
-          const firstMessage: Message = {
-            user_email: userEmail,
-            user_id: userId,
-            chatbot_id: appId,
-            role: 'trigger',
-            text: 'start the conversation..',
-            chatbot_history: activeConvoId,
-            timestamp: new Date().toISOString(),
-          };
-          setConvoId(activeConvoId);
-          socket.emit('message', firstMessage);
-        }
-      });
+  //       if (convoId === 'NEW_CHAT' && isSpeakingWithRealPerson) {
+  //         const firstMessage: Message = {
+  //           user_email: userEmail,
+  //           user_id: userId,
+  //           chatbot_id: appId,
+  //           role: 'trigger',
+  //           text: 'start the conversation..',
+  //           chatbot_history: activeConvoId,
+  //           timestamp: new Date().toISOString(),
+  //         };
+  //         setConvoId(activeConvoId);
+  //         socket.emit('message', firstMessage);
+  //       }
+  //     });
 
-      socket.on('message', (incoming: Message) => {
-        setSupportName((prevName) => {
-          if (incoming.sender_name && incoming.sender_name !== prevName) {
-            return incoming.sender_name;
-          }
-          return prevName;
-        });
-        playSound();
+  //     socket.on('message', (incoming: Message) => {
+  //       setSupportName((prevName) => {
+  //         if (incoming.sender_name && incoming.sender_name !== prevName) {
+  //           return incoming.sender_name;
+  //         }
+  //         return prevName;
+  //       });
+  //       playSound();
 
-        setSupportImage((prevImage) => {
-          if (
-            incoming.sender_image !== null &&
-            incoming.sender_image !== prevImage
-          ) {
-            return incoming.sender_image;
-          } else if (incoming.sender_image === '') {
-            return chatAvatar;
-          }
-          return prevImage;
-        });
+  //       setSupportImage((prevImage) => {
+  //         if (
+  //           incoming.sender_image !== null &&
+  //           incoming.sender_image !== prevImage
+  //         ) {
+  //           return incoming.sender_image;
+  //         } else if (incoming.sender_image === '') {
+  //           return chatAvatar;
+  //         }
+  //         return prevImage;
+  //       });
 
-        if (incoming.chatbot_history === activeConvoId) {
-          // Fix: Prevent duplicate messages for user's own messages
-          if (incoming.role === 'user') return;
+  //       if (incoming.chatbot_history === activeConvoId) {
+  //         // Fix: Prevent duplicate messages for user's own messages
+  //         if (incoming.role === 'user') return;
 
-          chatLogic.setChatMessages((prev) => [...prev, incoming]);
-          resetInactivityTimeout();
-        }
-      });
+  //         setChatMessages((prev) => [...prev, incoming]);
+  //         resetInactivityTimeout();
+  //       }
+  //     });
 
-      socket.on('disconnect', () => {
-        console.log('Disconnected from real-person chat');
-      });
+  //     socket.on('disconnect', () => {
+  //       console.log('Disconnected from real-person chat');
+  //     });
 
-      return () => {
-        socket.off('message');
-        socket.disconnect();
-      };
-    }
-  }, [isSpeakingWithRealPerson, userId, appId, convoId, isConversationActive]);
+  //     return () => {
+  //       socket.off('message');
+  //       socket.disconnect();
+  //     };
+  //   }
+  // }, [isSpeakingWithRealPerson, userId, appId, convoId, isConversationActive]);
 
   const handlePhoneSubmitted = () => {
     if (!whatsappConfig) return;
 
-    chatLogic.setChatMessages((prev) => {
+    setChatMessages((prev) => {
       const messages = [...prev];
       const lastIndex = messages.length - 1;
 
@@ -506,7 +545,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     if (lastMessage?.role === 'whatsapp_trigger' && whatsappConfig) {
       // Trigger phone validation flow
       const handleWhatsAppTrigger = async () => {
-        const email = chatLogic.userEmail;
+        const email = userEmail;
         if (!email) {
           console.error('No email found for customer');
           return;
@@ -516,7 +555,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
 
         if (data && data.hasPhone && data.phoneNumber) {
           // Has phone - show WhatsApp QR directly
-          chatLogic.setChatMessages((prev: Message[]) => [
+          setChatMessages((prev: Message[]) => [
             ...prev,
             {
               role: 'whatsapp_qr',
@@ -526,7 +565,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
           ]);
         } else {
           // No phone - ask for phone number first
-          chatLogic.setChatMessages((prev: Message[]) => [
+          setChatMessages((prev: Message[]) => [
             ...prev,
             {
               role: 'support',
@@ -550,14 +589,14 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     if (secondLastMessage?.role === 'phone_request' && whatsappConfig) {
       // Re-check phone and show QR if now available
       const checkPhoneAndShowQR = async () => {
-        const email = chatLogic.userEmail;
+        const email = userEmail;
         if (!email) return;
 
         const data = await checkCustomerPhone(email);
 
         if (data && data.hasPhone && data.phoneNumber) {
           // Phone was saved, show QR
-          chatLogic.setChatMessages((prev: Message[]) => {
+          setChatMessages((prev: Message[]) => {
             // Only add QR if not already present
             const hasQR = prev.some((m) => m.role === 'whatsapp_qr');
             if (hasQR) return prev;
@@ -585,18 +624,18 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
   }, [chatMessages, message]);
 
   // ====== Fetch chats on conversation change ======
-  useEffect(() => {
-    console.log('conversationId', conversationId);
-    console.log('lastFetchedConversationIdRef.current', lastFetchedConversationIdRef.current);
-    if (
-      conversationId &&
-      lastFetchedConversationIdRef.current !== conversationId &&
-      lastFetchedConversationIdRef.current !== 'NEW_CHAT'
-    ) {
-      lastFetchedConversationIdRef.current = conversationId;
-      fetchChats();
-    }
-  }, [conversationId]);
+  // useEffect(() => {
+  //   console.log('conversationId', conversationId);
+  //   console.log('lastFetchedConversationIdRef.current', lastFetchedConversationIdRef.current);
+  //   if (
+  //     conversationId &&
+  //     lastFetchedConversationIdRef.current !== conversationId &&
+  //     lastFetchedConversationIdRef.current !== 'NEW_CHAT'
+  //   ) {
+  //     lastFetchedConversationIdRef.current = conversationId;
+  //     fetchChats();
+  //   }
+  // }, [conversationId]);
 
   // ====== Typing indicator logic ======
   useEffect(() => {
@@ -912,7 +951,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
         whatsappConfig={whatsappConfig}
         onWhatsAppClick={async () => {
           // Check if customer has phone number
-          const email = chatLogic.userEmail;
+          const email = userEmail;
           if (!email) {
             console.error('No email found for customer');
             return;
@@ -922,7 +961,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
 
           if (data && data.hasPhone && data.phoneNumber) {
             // Has phone - show WhatsApp QR directly
-            chatLogic.setChatMessages((prev) => [
+            setChatMessages((prev) => [
               ...prev,
               {
                 role: 'whatsapp_qr',
@@ -932,7 +971,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
             ]);
           } else {
             // No phone - ask for phone number first
-            chatLogic.setChatMessages((prev) => [
+            setChatMessages((prev) => [
               ...prev,
               {
                 role: 'support',
