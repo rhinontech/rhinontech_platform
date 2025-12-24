@@ -14,6 +14,14 @@ DB_NAME = os.getenv("POSTGRES_DB") or os.getenv("DB_NAME")
 DB_HOST = os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("POSTGRES_PORT") or os.getenv("DB_PORT", "5432")
 
+# CRM DB Config (may be same or different)
+CRM_DB_SCHEMA = os.getenv("CRM_DB_SCHEMA", "public")
+CRM_DB_NAME = os.getenv("CRM_DB_NAME") or DB_NAME
+CRM_DB_USER = os.getenv("CRM_DB_USER") or DB_USERNAME
+CRM_DB_PASS = os.getenv("CRM_DB_PASSWORD") or DB_PASSWORD
+CRM_DB_HOST = os.getenv("CRM_DB_HOST") or DB_HOST
+CRM_DB_PORT = os.getenv("CRM_DB_PORT") or DB_PORT
+
 # DB_USERNAME=postgres
 # DB_PASSWORD=Rhinonserver
 # DB_SCHEMA=public
@@ -41,7 +49,17 @@ pg_pool = None
 def init_db_pool():
     global pg_pool
     try:
-        pg_pool = pool.SimpleConnectionPool(1, 20, **DB_CONFIG)
+        # Use primary config, but if CRM schema is different, we might need to handle it.
+        # Assuming for now everything is in same DB but possibly different schema or just publicly available if configured.
+        # But based on user feedback "same database", likely just same DB.
+        # If 'pipelines' table is missing, maybe it's in a specific schema that needs to be in search path.
+        
+        # Let's add options to set search_path if CRM_DB_SCHEMA is set and not public
+        db_args = DB_CONFIG.copy()
+        if CRM_DB_SCHEMA and CRM_DB_SCHEMA != "public":
+             db_args["options"] = f"-c search_path={CRM_DB_SCHEMA},public"
+
+        pg_pool = pool.SimpleConnectionPool(1, 20, **db_args)
         if pg_pool:
             print("PostgreSQL Connection Pool created successfully")
     except (Exception, psycopg2.DatabaseError) as error:
@@ -78,17 +96,297 @@ def release_connection(conn):
             # If connection is already closed/broken, just ignore
             print(f"Error releasing connection: {e}")
 
-def get_pre_chat_form(chatbot_id):
+def get_pre_chat_form(chatbot_id, conn=None):
     """
     Fetches the pre_chat_form JSON for a given chatbot.
     Returns a list of form fields or empty list.
     """
-    with get_db_connection() as conn:
+    if conn:
         query = "SELECT pre_chat_form FROM forms WHERE chatbot_id = %s;"
         result = run_query(conn, query, (chatbot_id,))
         if result and result[0][0]:
             return result[0][0] # Returns JSON list
         return []
+
+    with get_db_connection() as new_conn:
+        return get_pre_chat_form(chatbot_id, new_conn)
+
+def get_customer_by_email(chatbot_id: str, email: str, conn=None):
+    """
+    Looks up a customer by email for a given chatbot's organization.
+    Returns: dict with {name, phone, email} or None if not found
+    """
+    # 1. Get Org ID from Chatbot DB
+    org_id = None
+    
+    # helper to run query on specific connection
+    def query_db(connection, q, p):
+        with connection.cursor() as cur:
+            cur.execute(q, p)
+            return cur.fetchall()
+
+    if conn:
+        try:
+            org_query = "SELECT organization_id FROM chatbots WHERE chatbot_id = %s"
+            org_result = query_db(conn, org_query, (chatbot_id,))
+            if org_result and org_result[0]:
+                org_id = org_result[0][0]
+        except Exception as e:
+            print(f"Error finding org in chatbot db: {e}")
+            return None
+    else:
+        with get_db_connection() as cb_conn:
+            return get_customer_by_email(chatbot_id, email, cb_conn)
+            
+    if not org_id:
+        return None
+
+    # 2. Lookup customer in Chatbot DB (Default)
+    # The 'customers' table is in the same DB as chatbots
+    try:
+        customer_query = """
+            SELECT email, custom_data 
+            FROM customers 
+            WHERE organization_id = %s AND email = %s
+        """
+        if conn:
+             # Reuse existing connection if provided (and safe) or use pool
+             customer_result = query_db(conn, customer_query, (org_id, email))
+        else:
+             with get_db_connection() as cb_conn:
+                 customer_result = run_query(cb_conn, customer_query, (org_id, email))
+        
+        if customer_result and customer_result[0]:
+            email_val, custom_data = customer_result[0]
+            if not custom_data:
+                custom_data = {}
+            return {
+                "email": email_val,
+                "name": custom_data.get("name", ""),
+                "phone": custom_data.get("phone", "")
+            }
+        
+        return None
+    except Exception as e:
+        print(f"Error reading from Customers DB: {e}")
+        return None
+
+
+def get_crm_db_connection():
+    """
+    Establishes a connection to the CRM database.
+    This is separate from the Chatbot DB pool.
+    """
+    try:
+        conn = psycopg2.connect(
+            dbname=CRM_DB_NAME,
+            user=CRM_DB_USER,
+            password=CRM_DB_PASS,
+            host=CRM_DB_HOST,
+            port=CRM_DB_PORT
+        )
+        return conn
+    except Exception as e:
+        print(f"Error connecting to CRM DB: {e}")
+        return None
+
+def move_customer_to_pipeline(chatbot_id: str, email: str, conn=None):
+    """
+    Moves a customer to the 'default_customers' pipeline for the organization.
+    Adds them to the first stage.
+    """
+    # 1. Get Org ID from Chatbot DB (conn provided or new)
+    org_id = None
+    
+    # helper to run query on specific connection
+    def query_db(connection, q, p):
+        with connection.cursor() as cur:
+            cur.execute(q, p)
+            return cur.fetchall()
+
+    if conn:
+        try:
+            org_query = "SELECT organization_id FROM chatbots WHERE chatbot_id = %s"
+            org_result = query_db(conn, org_query, (chatbot_id,))
+            if org_result and org_result[0]:
+                org_id = org_result[0][0]
+        except Exception as e:
+            print(f"Error finding org in chatbot db: {e}")
+            return False
+    else:
+        # Create temp connection for chatbot DB
+        with get_db_connection() as cb_conn:
+            return move_customer_to_pipeline(chatbot_id, email, cb_conn)
+            
+    if not org_id:
+        print(f"Organization not found for chatbot {chatbot_id}")
+        return False
+
+    
+    # 2. Get Customer ID from Chatbot DB (Same as Org)
+    # Reusing the 'conn' logic from step 1
+    try:
+        cust_query = "SELECT id FROM customers WHERE organization_id = %s AND email = %s"
+        if conn:
+            cust_result = query_db(conn, cust_query, (org_id, email))
+        else:
+             with get_db_connection() as cb_conn:
+                 cust_result = run_query(cb_conn, cust_query, (org_id, email))
+
+        if not cust_result or not cust_result[0]:
+            print(f"Customer {email} not found in Chatbot DB for org {org_id}")
+            return False 
+        customer_id = cust_result[0][0]
+    except Exception as e:
+        print(f"Error finding customer: {e}")
+        return False
+        
+    # 3. Connect to CRM DB for Pipeline operations ONLY
+    crm_conn = get_crm_db_connection()
+    if not crm_conn:
+        print("Failed to connect to CRM DB")
+        return False
+
+    try:
+        # 3a. Get Pipeline form CRM DB
+        pipe_query = """
+            SELECT id, stages 
+            FROM pipelines 
+            WHERE organization_id = %s AND pipeline_manage_type = 'default_customers'
+            ORDER BY created_at ASC 
+            LIMIT 1
+        """
+        pipe_result = query_db(crm_conn, pipe_query, (org_id,))
+        
+        if not pipe_result or not pipe_result[0]:
+            print("Default pipeline not found in CRM DB")
+            return False 
+        
+        pipeline_id = pipe_result[0][0]
+        stages = pipe_result[0][1] # JSON list
+        
+        if not stages:
+            return False
+
+        # 4. Add to First Stage
+        first_stage = stages[0]
+        if "entities" not in first_stage:
+            first_stage["entities"] = []
+            
+        # Check if already there
+        exists = False
+        for entity in first_stage["entities"]:
+            if entity.get("entity_type") == "default_customers" and entity.get("entity_id") == customer_id:
+                exists = True
+                break
+        
+        if not exists:
+            first_stage["entities"].append({
+                "entity_type": "default_customers",
+                "entity_id": customer_id,
+                "sort": len(first_stage["entities"])
+            })
+            
+            # Update DB
+            import json
+            update_q = "UPDATE pipelines SET stages = %s::jsonb WHERE id = %s"
+            
+            # Write to CRM DB
+            with crm_conn.cursor() as cur:
+                cur.execute(update_q, (json.dumps(stages), pipeline_id))
+                crm_conn.commit()
+            return True
+            
+        return True # Already there
+
+    except Exception as e:
+        print(f"Error in CRM DB operations: {e}")
+        if crm_conn: crm_conn.rollback()
+        return False
+    finally:
+        if crm_conn: crm_conn.close()
+
+def save_customer(chatbot_id: str, email: str, custom_data: dict, conn=None):
+    """
+    Saves or updates a customer in the Chatbot DB.
+    """
+    # 1. Get Org ID from Chatbot DB
+    org_id = None
+    
+    # helper to run query on specific connection
+    def query_db(connection, q, p):
+        with connection.cursor() as cur:
+            cur.execute(q, p)
+            return cur.fetchall()
+
+    target_conn = conn
+    should_close = False
+    
+    if not target_conn:
+        target_conn = postgres_connection() # Get raw connection from pool
+        should_close = True
+        
+    try:
+        if not target_conn:
+             return False
+
+        org_query = "SELECT organization_id FROM chatbots WHERE chatbot_id = %s"
+        org_result = query_db(target_conn, org_query, (chatbot_id,))
+        if org_result and org_result[0]:
+            org_id = org_result[0][0]
+            
+        if not org_id:
+            print(f"Organization not found for chatbot {chatbot_id}")
+            return False
+
+        # Check if customer already exists
+        check_query = "SELECT id, custom_data FROM customers WHERE organization_id = %s AND email = %s"
+        existing = query_db(target_conn, check_query, (org_id, email))
+        
+        # Write to Chatbot DB
+        import json
+        with target_conn.cursor() as cur:
+            if existing and existing[0]:
+                # Merge existing custom_data
+                existing_data = existing[0][1]
+                if not existing_data:
+                    existing_data = {}
+                elif isinstance(existing_data, str):
+                    try:
+                        existing_data = json.loads(existing_data)
+                    except:
+                        existing_data = {}
+                
+                # Update with new data
+                existing_data.update(custom_data)
+                
+                # Update existing customer
+                update_query = """
+                    UPDATE customers 
+                    SET custom_data = %s, updated_at = NOW()
+                    WHERE organization_id = %s AND email = %s
+                """
+                cur.execute(update_query, (json.dumps(existing_data), org_id, email))
+                print(f"✅ Customer updated: {email}")
+            else:
+                # Insert new customer
+                insert_query = """
+                    INSERT INTO customers (organization_id, email, custom_data, created_at, updated_at)
+                    VALUES (%s, %s, %s, NOW(), NOW())
+                """
+                cur.execute(insert_query, (org_id, email, json.dumps(custom_data)))
+                print(f"✅ Customer created: {email}")
+            
+            target_conn.commit()
+        return True
+    
+    except Exception as db_error:
+        print(f"❌ Customer save error: {db_error}")
+        if target_conn: target_conn.rollback()
+        return False
+    finally:
+        if should_close and target_conn:
+             release_connection(target_conn)
 
 @contextmanager
 def get_db_connection():
@@ -133,6 +431,43 @@ def run_write_query(connection, query, params=None):
         connection.rollback()
         print(f"Database write error: {e}")
         return False
+
+def get_conversation_metadata(conversation_id: str, conn=None):
+    """
+    Fetches metadata (user_email, user_id) for a conversation.
+    """
+    query = "SELECT user_email, user_id, chatbot_id FROM bot_conversations WHERE conversation_id = %s"
+    
+    if conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (conversation_id,))
+            res = cur.fetchone()
+    else:
+        with get_db_connection() as c_conn:
+            with c_conn.cursor() as cur:
+                cur.execute(query, (conversation_id,))
+                res = cur.fetchone()
+                
+    if res:
+        return {"user_email": res[0], "user_id": res[1], "chatbot_id": res[2]}
+    return None
+
+def update_conversation_email(conversation_id: str, email: str, conn=None):
+    """
+    Updates the email associated with a conversation.
+    """
+    query = "UPDATE bot_conversations SET user_email = %s, updated_at = NOW() WHERE conversation_id = %s"
+    
+    if conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (email, conversation_id))
+        conn.commit()
+    else:
+        with get_db_connection() as c_conn:
+            with c_conn.cursor() as cur:
+                cur.execute(query, (email, conversation_id))
+            c_conn.commit()
+    return True
 
 def init_vector_db():
     try:

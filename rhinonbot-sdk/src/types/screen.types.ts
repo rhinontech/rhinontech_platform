@@ -87,6 +87,7 @@ export interface VoiceScreenProps {
   appId: string;
   onButtonClick: () => void;
   isAdmin?: boolean;
+  userEmail?: string;
 }
 
 export interface TicketScreenProps {
