@@ -46,7 +46,7 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin, user
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement | null>(null); // 🔥 Added
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null)
   const initializedRef = useRef(false);
 
   const baseStyle: React.CSSProperties = {
