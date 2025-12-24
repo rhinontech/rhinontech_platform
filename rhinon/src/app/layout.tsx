@@ -4,6 +4,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/Common/providers/ThemeProvider";
 import { KBarCommandPalette } from "@/components/Common/kbar/KBarProvider";
 import { SonnerProvider } from "@/context/SonnerProvider";
+import { CallProvider } from "@/context/CallContext";
+import { GlobalCallWidget } from "@/components/Common/Call/GlobalCallWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,9 +30,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <KBarCommandPalette>{children}</KBarCommandPalette>
-          <SonnerProvider />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <KBarCommandPalette>
+            <CallProvider>
+              <SonnerProvider />
+              <GlobalCallWidget />
+              {children}
+            </CallProvider>
+          </KBarCommandPalette>
         </ThemeProvider>
       </body>
     </html>

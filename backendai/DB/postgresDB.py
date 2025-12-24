@@ -672,3 +672,72 @@ try:
     init_vector_db()
 except:
     pass
+
+def create_notification(chatbot_id: str, type: str, title: str, message: str, data: dict = None):
+    """
+    Creates a new notification.
+    type: 'call', 'info', 'alert'
+    """
+    try:
+        with get_db_connection() as conn:
+             # Get Org ID
+            with conn.cursor() as cur:
+                cur.execute("SELECT organization_id FROM chatbots WHERE chatbot_id = %s", (chatbot_id,))
+                res = cur.fetchone()
+                if not res: return False
+                org_id = res[0]
+                
+                # Insert
+                import json
+                cur.execute("""
+                    INSERT INTO notifications (id, organization_id, type, title, message, data, status, created_at, updated_at)
+                    VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, 'unread', NOW(), NOW())
+                    RETURNING id
+                """, (org_id, type, title, message, json.dumps(data) if data else '{}'))
+                conn.commit()
+                print(f"✅ Notification created: {title}")
+                return True
+    except Exception as e:
+        print(f"Error creating notification: {e}")
+        return False
+
+def get_unread_notifications(chatbot_id: str):
+    """
+    Returns list of unread notifications for the chatbot's organization.
+    """
+    try:
+        with get_db_connection() as conn:
+             with conn.cursor() as cur:
+                # Get Org ID
+                cur.execute("SELECT organization_id FROM chatbots WHERE chatbot_id = %s", (chatbot_id,))
+                res = cur.fetchone()
+                if not res: return []
+                org_id = res[0]
+
+                cur.execute("""
+                    SELECT id, type, title, message, data, created_at 
+                    FROM notifications 
+                    WHERE organization_id = %s AND status = 'unread'
+                    ORDER BY created_at DESC
+                """, (org_id,))
+                rows = cur.fetchall()
+                return [{
+                    "id": str(r[0]),
+                    "type": r[1],
+                    "title": r[2],
+                    "message": r[3],
+                    "data": r[4] if r[4] else {},
+                    "created_at": r[5].isoformat() if r[5] else None
+                } for r in rows]
+    except Exception as e:
+        print(f"Error fetching notifications: {e}")
+        return []
+
+def mark_notification_read(notification_id: str):
+    try:
+        with get_db_connection() as conn:
+            run_write_query(conn, "UPDATE notifications SET status = 'read', updated_at = NOW() WHERE id = %s", (notification_id,))
+            return True
+    except Exception as e:
+        print(f"Error updating notification: {e}")
+        return False

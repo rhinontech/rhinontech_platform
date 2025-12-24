@@ -13,7 +13,11 @@ import type {
 import { useConfigStore } from '@/store';
 import { getChatbotConfig, getForms } from '@/services/config';
 import { getEffectiveTheme } from '@/constants/theme';
-import { getChatHistory, getConversationByUserId, getSocketConversationsByUserId } from '@/services/chat';
+import {
+  getChatHistory,
+  getConversationByUserId,
+  getSocketConversationsByUserId,
+} from '@/services/chat';
 
 export interface UseMessengerStateReturn {
   // UI State
@@ -29,7 +33,6 @@ export interface UseMessengerStateReturn {
   setEffectiveTheme: React.Dispatch<React.SetStateAction<'light' | 'dark'>>;
   showNotification: boolean;
   mainLoading: boolean;
-
 
   // Chat State
   selectedChatId: string | null;
@@ -49,9 +52,13 @@ export interface UseMessengerStateReturn {
 
   // Content State
   selectedNews: SelectedNewsProps | null;
-  setSelectedNews: React.Dispatch<React.SetStateAction<SelectedNewsProps | null>>;
+  setSelectedNews: React.Dispatch<
+    React.SetStateAction<SelectedNewsProps | null>
+  >;
   selectedHelpArticle: SelectedHelpArticleProps | null;
-  setSelectedHelpArticle: React.Dispatch<React.SetStateAction<SelectedHelpArticleProps | null>>;
+  setSelectedHelpArticle: React.Dispatch<
+    React.SetStateAction<SelectedHelpArticleProps | null>
+  >;
   selectedHelp: Folder | null;
   setSelectedHelp: React.Dispatch<React.SetStateAction<Folder | null>>;
   setShowNotification: React.Dispatch<React.SetStateAction<boolean>>;
@@ -70,7 +77,9 @@ export interface UseMessengerStateReturn {
   chatbot_config: ChatbotConfig;
 }
 
-export function useMessengerState(config: RhinontechConfig | null | undefined): UseMessengerStateReturn {
+export function useMessengerState(
+  config: RhinontechConfig | null | undefined,
+): UseMessengerStateReturn {
   const { chatbot_config, setConfig } = useConfigStore();
 
   // UI State
@@ -78,12 +87,15 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
   const [activeScreen, setActiveScreen] = useState('home');
   const [showPopup, setShowPopup] = useState(false);
   const [windowWidth, setWindowWidth] = useState<string>('400px');
-  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
+  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>(
+    'light',
+  );
   const [showNotification, setShowNotification] = useState(false);
 
   // Chat State
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-  const [isSpeakingWithRealPerson, setIsSpeakingWithRealPerson] = useState(false);
+  const [isSpeakingWithRealPerson, setIsSpeakingWithRealPerson] =
+    useState(false);
   const [isTicketRaised, setIsTicketRaised] = useState<boolean>(false);
 
   // User State
@@ -92,8 +104,11 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
   const [userId, setUserId] = useState<string | null>(null);
 
   // Content State
-  const [selectedNews, setSelectedNews] = useState<SelectedNewsProps | null>(null);
-  const [selectedHelpArticle, setSelectedHelpArticle] = useState<SelectedHelpArticleProps | null>(null);
+  const [selectedNews, setSelectedNews] = useState<SelectedNewsProps | null>(
+    null,
+  );
+  const [selectedHelpArticle, setSelectedHelpArticle] =
+    useState<SelectedHelpArticleProps | null>(null);
   const [selectedHelp, setSelectedHelp] = useState<Folder | null>(null);
 
   // API State
@@ -101,7 +116,9 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
   const [freePlan, setFreePlan] = useState<boolean>(false);
 
   // Campaign State
-  const [activeCampaign, setActiveCampaign] = useState<Campaign | undefined>(undefined);
+  const [activeCampaign, setActiveCampaign] = useState<Campaign | undefined>(
+    undefined,
+  );
   const campaignFoundRef = useRef(false);
   const campaignsRef = useRef<Campaign[]>([]);
 
@@ -151,10 +168,18 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
               secondaryColor: cfg.secondaryColor || '#f3f6ff',
               chatbotName: cfg.chatbotName || 'Rhinon',
               navigationOptions: cfg.navigationOptions,
-              popupMessage: cfg.popupMessage || 'Hey, I am Rhinon AI Assistant, How can I help you?',
-              greetings: cfg.greetings?.length ? cfg.greetings : ['Hi there👋', 'How can we help?'],
-              primaryLogo: cfg.primaryLogo || 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_White.png',
-              secondaryLogo: cfg.secondaryLogo || 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png',
+              popupMessage:
+                cfg.popupMessage ||
+                'Hey, I am Rhinon AI Assistant, How can I help you?',
+              greetings: cfg.greetings?.length
+                ? cfg.greetings
+                : ['Hi there👋', 'How can we help?'],
+              primaryLogo:
+                cfg.primaryLogo ||
+                'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_White.png',
+              secondaryLogo:
+                cfg.secondaryLogo ||
+                'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png',
               preChatForm: formResponse.pre_chat_form,
               postChatForm: formResponse.post_chat_form,
               ticketForm: formResponse.ticket_form,
@@ -196,7 +221,11 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
       setIsEmailAvailable(true);
     } else {
       setIsEmailAvailable(false);
-      setUserEmail(isSpeakingWithRealPerson && !savedEmail ? 'New Customer' : savedEmail || null);
+      setUserEmail(
+        isSpeakingWithRealPerson && !savedEmail
+          ? 'New Customer'
+          : savedEmail || null,
+      );
     }
   }, [isSpeakingWithRealPerson]);
 
@@ -222,9 +251,10 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
     }
   }, [activeCampaign]);
 
-
   const fetchConversation = async () => {
+    if (!userId || !config?.app_id) return;
     setMainLoading(true);
+
     try {
       const response = await getConversationByUserId(userId, config.app_id);
       const sortedConversations = response.conversation.sort(
@@ -233,8 +263,11 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
           new Date(a.last_chat_time).getTime(),
       );
 
-
-      setSelectedChatId(sortedConversations.length > 0 ? sortedConversations[0].conversation_id : 'NEW_CHAT');
+      setSelectedChatId(
+        sortedConversations.length > 0
+          ? sortedConversations[0].conversation_id
+          : 'NEW_CHAT',
+      );
 
       if (sortedConversations.length > 0) {
         const resultSocket = await getSocketConversationsByUserId(
@@ -243,24 +276,19 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
           sortedConversations[0].conversation_id,
         );
         if (resultSocket.is_closed) {
-          setSelectedChatId("NEW_CHAT")
+          setSelectedChatId('NEW_CHAT');
         }
-
       }
-
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
       setMainLoading(false);
     }
-
   };
 
   useEffect(() => {
     fetchConversation();
   }, [userId, config.app_id]);
-
-
 
   return {
     // UI State

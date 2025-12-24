@@ -35,6 +35,8 @@ export interface RealtimeHandoffRequest {
   email: string;
   name?: string;
   phone?: string;
+  urgency?: string;
+  user_id?: string | null;
 }
 
 /**

@@ -346,13 +346,18 @@ class StandardRAGController:
                     "type": "function",
                     "function": {
                         "name": "handoff_to_support",
-                        "description": "Moves the customer to the priority support pipeline. Use ONLY when user explicitly requests support AND you have their details.",
+                        "description": "Moves the customer to the priority support pipeline OR requests an immediate call. Use when user explicitly creates a support request.",
                         "parameters": {
                             "type": "object",
                             "properties": {
                                 "email": {"type": "string", "description": "Customer email"},
                                 "name": {"type": "string", "description": "Customer name"},
-                                "phone": {"type": "string", "description": "Customer phone"}
+                                "phone": {"type": "string", "description": "Customer phone"},
+                                "urgency": {
+                                    "type": "string", 
+                                    "enum": ["immediate", "later"],
+                                    "description": "If user wants 'immediate' call/help right now, or 'later' (scheduled/pipeline)."
+                                }
                             },
                             "required": ["email"]
                         }
@@ -369,7 +374,6 @@ class StandardRAGController:
                 fields_str = "\n".join(field_descriptions)
                 
                 
-                # Updated system instruction - wait 3 messages before asking for details
                 # Updated system instruction - wait 3 messages before asking for details
                 if user_email:
                      # 2a. Fetch Customer Details if available
@@ -409,11 +413,19 @@ class StandardRAGController:
                      )
 
                 system_instruction += (
-                    f"\n[SUPPORT HANDOFF]\n"
-                    f"If the user EXPLICITLY asks to speak to support/human:\n"
-                    f"1. Check if you have Name, Email, Phone. If missing, ask for them.\n"
-                    f"2. Once you have them, call 'handoff_to_support'.\n"
-                    f"3. Tell the user: 'I have passed your details to our support team. They will contact you shortly.'"
+                    f"\n[SUPPORT HANDOFF (CRITICAL)]\n"
+                    f"You must proactively capture the user's details (Name, Email, Phone) and move them to the pipeline if they show HIGH INTEREST.\n"
+                    f"Triggers for HIGH INTEREST include:\n"
+                    f"1. Asking about PRICING or cost.\n"
+                    f"2. Asking for comparisons with COMPITITORS (e.g., Freshworks, Intercom).\n"
+                    f"3. Asking deep/detailed questions about COMPANY FEATURES or technical specs.\n"
+                    f"4. Explicitly asking to speak to a human or support.\n"
+                    f"ACTION IF TRIGGERED:\n"
+                    f"1. Check if you have Name, Email, Phone. If missing, ASK for them politely one by one.\n"
+                    f"2. Once you have the details, call 'handoff_to_support' with urgency='later' to save them to the pipeline first.\n"
+                    f"3. AFTER saving, ASK the user: 'I have added you to our priority queue. would you like to connect with a support agent immediately?'\n"
+                    f"4. IF USER SAYS YES: Call 'handoff_to_support' AGAIN with urgency='immediate'.\n"
+                    f"5. IF USER SAYS NO: Say 'Great! Our team will reach out to you shortly.'\n"
                 )
 
         # 3. Manage Thread/Conversation
@@ -630,9 +642,10 @@ class StandardRAGController:
                             email_arg = args.get("email") or user_email
                             name_arg = args.get("name")
                             phone_arg = args.get("phone")
-                            
+                            urgency_arg = args.get("urgency")
+
                             if email_arg:
-                                # 1. Update/Save Customer Data First
+                                # 1. Update/Save Customer Data
                                 if name_arg or phone_arg:
                                     c_data = {
                                         "name": name_arg,
@@ -642,18 +655,36 @@ class StandardRAGController:
                                     }
                                     save_customer(chatbot_id, email_arg, c_data)
 
-                                # 2. Move to Pipeline
-                                with get_db_connection() as conn:
-                                     success = move_customer_to_pipeline(chatbot_id, email_arg, conn)
+                                # 2. Handle Urgency
+                                if urgency_arg == 'immediate':
+                                     from DB.postgresDB import create_notification
+                                     title = f"Urgent Callback: {name_arg or email_arg}"
+                                     message = f"User has requested an immediate callback via standard chat. Phone: {phone_arg or 'N/A'}"
+                                     # Include user_id for generic 'call' targeting (since Messenger registers with it)
+                                     data = {
+                                         "email": email_arg, 
+                                         "phone": phone_arg, 
+                                         "name": name_arg, 
+                                         "chatbot_id": chatbot_id,
+                                         "user_id": user_id 
+                                     }
+                                     create_notification(chatbot_id, "call", title, message, data)
+                                     tool_result = {"status": "success", "message": "Immediate callback requested. Team notified!"}
                                 
-                                if success:
-                                     tool_result = {"status": "success", "message": "Handoff complete. Customer moved to priority queue."}
                                 else:
-                                     tool_result = {"status": "error", "message": "Handoff failed (pipeline not found or user missing)."}
+                                    # 3. Move to Pipeline (Schedule/Later)
+                                    with get_db_connection() as conn:
+                                         success = move_customer_to_pipeline(chatbot_id, email_arg, conn)
+                                    
+                                    if success:
+                                         tool_result = {"status": "success", "message": "Handoff complete. Customer moved to priority queue."}
+                                    else:
+                                         tool_result = {"status": "error", "message": "Handoff failed (pipeline not found or user missing)."}
                             else:
                                  tool_result = {"status": "error", "message": "Email is required. Please ask the user for their email."}
                         except Exception as e:
                             print(f"❌ Handoff Error: {e}")
+                            logging.error(f"Handoff Error: {e}") 
                             tool_result = {"status": "error", "message": "Server error during handoff."}
 
                     elif tc['name'] == 'submit_pre_chat_form':

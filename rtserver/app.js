@@ -172,6 +172,7 @@ app.use("/api/teamchat", /** #swagger.tags = ['TEAMCHAT'] */ teamChatRoutes);
 app.use("/api/tasks", /** #swagger.tags = ['TASKS'] */ require("./routes/taskRoutes"));
 app.use("/api/linkedin", /** #swagger.tags = ['LINKEDIN-AUTH'] */ linkedInAuthRoutes);
 app.use("/api/linkedin-campaigns", /** #swagger.tags = ['LINKEDIN-CAMPAIGNS'] */ linkedInCampaignRoutes);
+app.use("/api/notifications", /** #swagger.tags = ['NOTIFICATIONS'] */ require("./routes/notificationRoutes.js"));
 
 //swagger
 swaggerDocs(app);

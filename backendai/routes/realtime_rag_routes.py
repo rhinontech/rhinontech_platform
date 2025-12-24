@@ -180,7 +180,12 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
                     "properties": {
                         "email": {"type": "string", "description": "Customer email"},
                         "name": {"type": "string", "description": "Customer name"},
-                        "phone": {"type": "string", "description": "Customer phone"}
+                        "phone": {"type": "string", "description": "Customer phone"},
+                        "urgency": {
+                            "type": "string",
+                            "enum": ["immediate", "later"],
+                            "description": "Set to 'immediate' if user explicitly asks for a call NOW or URGENTLY. Set to 'later' for general interest."
+                        }
                     },
                 "required": ["email"]
                 }
@@ -192,7 +197,10 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
                 f"1. IF user asks for 'Support', 'Human', 'Connect' OR shows High Interest -> HANDOFF IMMEDIATELY.\n"
                 f"2. You MUST pass the email '{user_email}' to the tool.\n"
                 f"3. Do NOT ask 'What specific area?'.\n"
-                f"4. Say 'Connecting you now... Our team will reach out to you soon!' and call the tool."
+                f"4. FIRST: Call 'handoff_to_support' with urgency='later' to save lead.\n"
+                f"5. THEN ASK: 'Would you like to connect with an agent right now?'\n"
+                f"6. IF YES: Call 'handoff_to_support' AGAIN with urgency='immediate'.\n"
+                f"7. IF NO: Say 'Okay, our team will contact you soon!'"
             )
             
         else:
@@ -254,10 +262,15 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
                         "description": "PRIORITY TOOL. Connects user to support team / human agent. Use IMMEDIATELY if user asks for 'support', 'human', 'team' OR shows strong interest. Do NOT ask 'what area' - just connect.",
                         "parameters": {
                             "type": "object",
-                            "properties": {
+                        "properties": {
                                 "email": {"type": "string", "description": "Customer email"},
                                 "name": {"type": "string", "description": "Customer name"},
-                                "phone": {"type": "string", "description": "Customer phone"}
+                                "phone": {"type": "string", "description": "Customer phone"},
+                                "urgency": {
+                                    "type": "string",
+                                    "enum": ["immediate", "later"],
+                                    "description": "Set to 'immediate' if user explicitly asks for a call NOW or URGENTLY. Set to 'later' for general interest."
+                                }
                             },
                             "required": ["email"]
                         }
@@ -314,11 +327,13 @@ async def generate_realtime_session(request: RealtimeSessionRequest):
                     final_instructions += (
                         f"\n[LEAD QUALIFICATION & HANDOFF]\n"
                         f"RULES FOR HANDOFF:\n"
-                        f"1. IF user asks for 'Support', 'Human', 'Connect' OR shows High Interest -> HANDOFF IMMEDIATELY.\n"
-                        f"2. Do NOT ask 'What specific area?' or 'What is your query?'.\n"
-                        f"3. CHECK CONTEXT: If you strictly need Name/Email/Phone and don't have them, ASK for them first. Then call 'handoff_to_support'.\n"
-                        f"3. CHECK CONTEXT: If you strictly need Name/Email/Phone and don't have them, ASK for them first. Then call 'handoff_to_support'.\n"
-                        f"4. Say 'Connecting you now... Our team will reach out to you soon!' and call the tool."
+                        f"1. Trigger Handoff IF: User asks for 'Support'/'Human' OR shows HIGH INTEREST (asking about Pricing, Competitors like Freshworks/Intercom, or Deep Company Details).\n"
+                        f"2. ACTION: If triggers are met, you MUST ensure you have their Name, Email, and Phone.\n"
+                        f"3. IF MISSING: Ask for the missing details politely first. 'Before I connect you, may I have your name/email?'\n"
+                        f"4. FIRST: Call 'handoff_to_support' with urgency='later' to save lead.\n"
+                        f"5. THEN ASK: 'Would you like to connect with an agent right now?'\n"
+                        f"6. IF YES: Call 'handoff_to_support' AGAIN with urgency='immediate'.\n"
+                        f"7. IF NO: Say 'Okay, our team will contact you soon!'"
                     )
              else:
                 print(f"⚠️ DEBUG: No form_config found for chatbot_id={chatbot_id}")
@@ -510,6 +525,8 @@ class RealtimeHandoffRequest(BaseModel):
     email: str
     name: Optional[str] = None
     phone: Optional[str] = None
+    urgency: Optional[str] = None
+    user_id: Optional[str] = None
 
 @router.post("/realtime/handoff_support")
 async def handoff_support_endpoint(request: RealtimeHandoffRequest):
@@ -518,10 +535,12 @@ async def handoff_support_endpoint(request: RealtimeHandoffRequest):
     Moves customer to pipeline.
     """
     try:
+        from DB.postgresDB import create_notification
         chatbot_id = request.chatbot_id
         email = request.email
         name = request.name
         phone = request.phone
+        urgency = request.urgency
         
         if not email:
              return {"result": "Email required for handoff."}
@@ -537,7 +556,21 @@ async def handoff_support_endpoint(request: RealtimeHandoffRequest):
             # Use save_customer imported helper
             save_customer(chatbot_id, email, c_data)
 
-        # 2. Move to Pipeline
+        # 2. Check Urgency
+        if urgency == 'immediate':
+             title = f"Urgent Callback: {name or email}"
+             message = f"User has requested an immediate callback. Phone: {phone or 'N/A'}"
+             data = {
+                 "email": email, 
+                 "phone": phone, 
+                 "name": name, 
+                 "chatbot_id": chatbot_id,
+                 "user_id": request.user_id 
+             }
+             create_notification(chatbot_id, "call", title, message, data)
+             return {"result": "Immediate callback requested. Our team has been notified!"}
+
+        # 3. Move to Pipeline
         with get_db_connection() as conn:
              success = move_customer_to_pipeline(chatbot_id, email, conn)
              
