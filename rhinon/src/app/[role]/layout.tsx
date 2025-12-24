@@ -142,7 +142,12 @@ export default function RootLayout({
     });
     socketRef.current = socket;
 
-    socket.on("connect", () => console.log("Socket connected:", socket.id));
+    socket.on("connect", () => {
+      console.log("Socket connected:", socket.id);
+      if (organizationId) {
+        socket.emit("join_org", { organization_id: organizationId });
+      }
+    });
 
     // Onboarding update
     socket.on("onboarding:updated", async ({ organization_id }) => {
@@ -301,7 +306,7 @@ export default function RootLayout({
       toast.error(data.message || "SEO Compliance check failed.");
     });
 
-    socket.on("voice-call-started", () => {});
+    socket.on("voice-call-started", () => { });
 
     // Cleanup
     return () => {

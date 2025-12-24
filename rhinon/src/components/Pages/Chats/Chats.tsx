@@ -24,7 +24,7 @@ import {
 import { getUsers } from "@/services/teams/teamServices";
 import { getSocket } from "@/services/webSocket";
 import { getCustomers } from "@/services/crm/entitiesServices";
-import { getWhatsAppContacts } from "@/services/settings/whatsappServices";
+import { getWhatsAppContacts, getWhatsAppAccounts } from "@/services/settings/whatsappServices";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +82,32 @@ export default function Chats() {
   const firstName = useUserStore((state) => state.userData.userFirstName);
   const lastName = useUserStore((state) => state.userData.userLastName);
   const chatbot_id = useUserStore((state) => state.userData.chatbotId);
+
+  const [hasWhatsAppAccounts, setHasWhatsAppAccounts] = useState(false);
+
+  // Check for active WA accounts on mount
+  useEffect(() => {
+    const checkAccounts = async () => {
+      try {
+        const accounts = await getWhatsAppAccounts();
+        const hasActive = accounts && accounts.some((acc: any) => acc.status === "active");
+        setHasWhatsAppAccounts(!!hasActive);
+      } catch (e) {
+        console.error("Failed to check WA accounts", e);
+      }
+    };
+    checkAccounts();
+  }, []);
+
+  // Auto-switch tab if conditions not met
+  useEffect(() => {
+    if (rightPanelTab === "whatsapp") {
+      const hasPhone = !!selectedConversation?.phone_number;
+      if (!hasPhone || !hasWhatsAppAccounts) {
+        setRightPanelTab("details");
+      }
+    }
+  }, [rightPanelTab, selectedConversation, hasWhatsAppAccounts]);
 
   // Utility functions
   const groupConversationsByUser = (conversations: any[]) => {
@@ -739,7 +765,7 @@ export default function Chats() {
                     )}>
                     <Info className="h-4 w-4" />
                   </button>
-                  {selectedConversation?.phone_number && (
+                  {selectedConversation?.phone_number && hasWhatsAppAccounts && (
                     <button
                       onClick={() => setRightPanelTab("whatsapp")}
                       className={cn(
