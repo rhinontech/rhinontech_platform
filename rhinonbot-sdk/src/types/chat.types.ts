@@ -90,6 +90,9 @@ export interface ChatScreenProps {
   startNewConversation: () => void;
   setOpenPostChatForm: React.Dispatch<React.SetStateAction<boolean>>;
   playSound: () => void;
+  setShowNotification: React.Dispatch<React.SetStateAction<boolean>>;
+  showNotification: boolean;
+  mainLoading: boolean;
 }
 
 export interface ChatLogicProps {

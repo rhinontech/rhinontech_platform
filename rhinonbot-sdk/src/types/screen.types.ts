@@ -43,6 +43,8 @@ export interface HomeScreenProps {
   ticketForm: TicketField[];
   userEmail: string;
   onChatSelect: (chatId: string) => void;
+  mainLoading: boolean;
+  showNotification: boolean;
 }
 
 export interface ChatHistoryScreenProps {

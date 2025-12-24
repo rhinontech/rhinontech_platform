@@ -84,6 +84,9 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     startNewConversation,
     setOpenPostChatForm,
     playSound,
+    setShowNotification,
+    showNotification,
+    mainLoading,
   } = props;
 
   // Custom hook for all business logic
@@ -658,7 +661,12 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     }
   }, [showTyping]);
 
-  if (isfetching) {
+
+  useEffect(() => {
+    setShowNotification(false);
+  }, [showNotification]);
+
+  if (isfetching || mainLoading) {
     return (
       <div
         style={{
@@ -682,7 +690,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
       }}
       style={{ position: 'relative' }}
     >
-      
+
 
       {/* Header */}
       <ChatHeader

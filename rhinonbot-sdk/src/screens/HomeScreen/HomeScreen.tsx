@@ -64,6 +64,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   ticketForm,
   userEmail,
   onChatSelect,
+  mainLoading,
+  showNotification,
 }) => {
   const [conversationIds, setConversationIds] = useState<IConversationIds>();
   const [loading, setLoading] = useState<boolean>(true);
@@ -135,7 +137,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   };
 
-  if (loading) {
+  if (loading || mainLoading) {
     return (
       <div
         style={{
@@ -492,6 +494,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               whileHover={{ y: -5, boxShadow: "0 10px 20px rgba(0,0,0,0.1)" }}
               whileTap={{ scale: 0.98 }}
             >
+              {showNotification && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    backgroundColor: 'red',
+                    zIndex: 10,
+                  }}
+                />
+              )}
               <div
                 style={{ display: 'flex', gap: '10px', alignItems: 'center' }}
               >
