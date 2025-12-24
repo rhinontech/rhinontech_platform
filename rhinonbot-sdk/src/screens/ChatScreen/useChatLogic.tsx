@@ -133,7 +133,12 @@ export const useChatLogic = ({
   // sound effect on receive message
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+
   // Unlock audio + speech permissions on first click
+  useEffect(() => {
+    setConvoId(conversationId);
+  }, [conversationId]);
+
   useEffect(() => {
     const unlock = () => {
       try {
@@ -467,10 +472,9 @@ export const useChatLogic = ({
 
     // Append the new outgoing message and reset inactivity baseline
     setChatMessages((prev) => [...prev, newMessage]);
-
+    resetInactivityTimeout();
 
     if (isSpeakingWithRealPerson) {
-      resetInactivityTimeout();
       let updatedConvoId = convoId;
       if (updatedConvoId === 'NEW_CHAT') {
         updatedConvoId = `${Date.now()}-${Math.random()

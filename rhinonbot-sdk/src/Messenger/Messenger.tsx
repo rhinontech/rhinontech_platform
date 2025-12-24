@@ -1,5 +1,5 @@
-import React, { Suspense, lazy, useEffect } from 'react';
-import { Minus } from 'lucide-react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Minus, Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import './Messenger.scss';
 import { io } from 'socket.io-client';
 import type { Message, ChatScreenProps } from '@/types';
@@ -47,6 +47,27 @@ interface MessengerProps {
 const Messenger: React.FC<MessengerProps> = ({ config }) => {
   // Use centralized state management hook
   const state = useMessengerState(config);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [socket, setSocket] = useState<any>(null);
+
+  const [callStartTime, setCallStartTime] = useState<number | null>(null);
+  const [callDuration, setCallDuration] = useState('00:00');
+
+  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+
+  const [incomingCall, setIncomingCall] = useState<null | {
+    from: string;
+    fromName: string;
+    fromCallId: string;
+  }>(null);
+  const [isInCall, setIsInCall] = useState(false);
+  const [activeCallName, setActiveCallName] = useState<string>('');
+
+  // --- Audio control states ---
+  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const {
     isOpen,
@@ -267,7 +288,207 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
     }
   }, [isSpeakingWithRealPerson, userId, config?.app_id, convoId, isConversationActive]);
 
+  useEffect(() => {
+    console.log("selectedChatId", selectedChatId)
 
+  }, [selectedChatId])
+
+  // ======= calling logic =======
+  useEffect(() => {
+    const newSocket = io(process.env.REACT_APP_SOCKET_URL);
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      console.log(' Connected:', newSocket.id);
+
+      // Auto-register with userId as callId
+      if (userId) {
+        newSocket.emit('register_manual', {
+          callId: userId,
+          username: 'Visitor',
+        });
+        console.log(`Auto-registering Visitor with ID: ${userId}`);
+      }
+    });
+
+    newSocket.on('registered_manual', ({ callId }) => {
+      setIsRegistered(true);
+      console.log(`Registered with Call ID: ${callId}`);
+    });
+
+    // Incoming call
+    newSocket.on('call_request_manual', ({ from, fromName, fromCallId }) => {
+      console.log(`Incoming call from ${fromName} (${fromCallId})`);
+      setIncomingCall({ from, fromName, fromCallId });
+    });
+
+    // ICE + offer handlers
+    newSocket.on('offer_manual', async ({ offer, from }) => {
+      if (!peerRef.current) return;
+      await peerRef.current.setRemoteDescription(
+        new RTCSessionDescription(offer),
+      );
+      const answer = await peerRef.current.createAnswer();
+      await peerRef.current.setLocalDescription(answer);
+      newSocket.emit('answer_manual', { answer, to: from });
+    });
+
+    newSocket.on('ice_candidate_manual', ({ candidate }) => {
+      if (peerRef.current)
+        peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+
+    newSocket.on('call_ended_manual', () => {
+      console.log('Call ended by other side');
+      setIsInCall(false);
+      setIncomingCall(null);
+      setCallStartTime(null);
+
+      if (peerRef.current) {
+        peerRef.current.close();
+        peerRef.current = null;
+      }
+
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
+      }
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [userId]);
+
+  const handleAcceptCall = async () => {
+    if (!incomingCall || !socket) return;
+    const { from } = incomingCall;
+    if (activeScreen === 'voice') {
+      setActiveScreen('home')
+    }
+
+    console.log('Accepting call from:', from);
+
+    // Step 1: Ask for microphone permission FIRST
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      console.error('Mic access error:', err);
+      alert('Please allow microphone access to accept the call.');
+      return;
+    }
+
+    // Step 2: Only after permission granted — proceed with connection
+    const peer = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: [
+            'stun:3.109.172.202:3478',
+            'turn:3.109.172.202:3478?transport=udp',
+            'turn:3.109.172.202:3478?transport=tcp',
+          ],
+          username: 'rhinon',
+          credential: 'rtWebRtc@123',
+        },
+      ],
+    });
+    peerRef.current = peer;
+
+    localStreamRef.current = stream;
+    stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+
+    peer.onicecandidate = (e) => {
+      if (e.candidate)
+        socket.emit('ice_candidate_manual', {
+          candidate: e.candidate,
+          to: from,
+        });
+    };
+
+    peer.ontrack = (e) => {
+      console.log('Remote audio received:', e.streams[0]);
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = e.streams[0];
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.autoplay = true;
+      } else {
+        const audio = new Audio();
+        audio.srcObject = e.streams[0];
+        audio.autoplay = true;
+        audio.muted = false;
+        document.body.appendChild(audio);
+        remoteAudioRef.current = audio;
+      }
+    };
+
+    // Step 3: Update state & notify server
+    setIncomingCall(null);
+    setIsInCall(true);
+    setActiveCallName(incomingCall.fromName || incomingCall.fromCallId || 'Support Agent');
+    setCallStartTime(Date.now());
+    setIsMuted(false);
+    setIsSpeakerOn(true);
+
+    socket.emit('call_accepted_manual', { to: from });
+  };
+
+  const handleRejectCall = () => {
+    if (!incomingCall || !socket) return;
+    const { from } = incomingCall;
+    console.log('Rejected call from:', from);
+    socket.emit('call_rejected_manual', { to: from });
+    setIncomingCall(null);
+
+    // Stop mic if it was accessed
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+  };
+
+  const handleEndCall = () => {
+    console.log('Ending call...');
+
+    if (peerRef.current) {
+      peerRef.current.close();
+      peerRef.current = null;
+    }
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    }
+
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+      remoteAudioRef.current.muted = false;
+    }
+
+    if (socket) socket.emit('end_call_manual');
+
+    setIsInCall(false);
+    setCallStartTime(null);
+    setIsMuted(false);
+    setIsSpeakerOn(true);
+    console.log('Call ended and audio reset');
+  };
+
+  // ====== Call Timer ======
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isInCall && callStartTime) {
+      interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+        const minutes = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const seconds = String(elapsed % 60).padStart(2, '0');
+        setCallDuration(`${minutes}:${seconds}`);
+      }, 1000);
+    } else {
+      setCallDuration('00:00');
+    }
+    return () => clearInterval(interval);
+  }, [isInCall, callStartTime]);
 
 
 
@@ -562,6 +783,282 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
               role="dialog"
               aria-label="Chat window"
             >
+              {incomingCall && (
+                <div
+                  className='overlay'
+
+                >
+                  <motion.div
+                    className='incoming-call-overlay'
+                    style={{
+                      position: 'absolute',
+                      top: '24px',
+                      left: '50%',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      borderRadius: '24px',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                      padding: '24px',
+                      zIndex: 2000,
+                      textAlign: 'center',
+                      width: '70%',
+                      maxWidth: '320px',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '16px'
+                    }}
+                    initial={{ opacity: 0, y: -50, x: '-50%' }}
+                    animate={{ opacity: 1, y: 0, x: '-50%' }}
+                    exit={{ opacity: 0, y: -50, x: '-50%' }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%'
+                    }}>
+                      <span style={{
+                        fontSize: '11px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1.5px',
+                        color: '#6b7280',
+                        fontWeight: '700'
+                      }}>
+                        Incoming Call
+                      </span>
+                      <h3 style={{
+                        fontSize: '20px',
+                        fontWeight: '700',
+                        color: '#111827',
+                        margin: 0,
+                        lineHeight: '1.3'
+                      }}>
+                        {incomingCall.fromName || 'Unknown Caller'} <br /> <span style={{ fontSize: '15px', color: '#6b7280' }}>{incomingCall.fromCallId}</span>
+                      </h3>
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      gap: '32px',
+                      width: '100%',
+                      justifyContent: 'center',
+                      marginTop: '8px'
+                    }}>
+                      <button
+                        onClick={handleRejectCall}
+                        title="Decline"
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          background: '#fee2e2',
+                          color: '#ef4444',
+                          border: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        <PhoneOff size={24} />
+                      </button>
+
+                      <button
+                        onClick={handleAcceptCall}
+                        title="Accept"
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          background: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                          animation: 'pulse 2s infinite'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        <Phone size={24} />
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+
+              {/* ====== In-Call Overlay ====== */}
+              {isInCall && (
+                <div
+                  className='overlay'
+
+                >
+                  <motion.div
+                    className='in-call-overlay'
+                    style={{
+                      position: 'absolute',
+                      top: '24px',
+                      left: '50%',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      borderRadius: '24px',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                      padding: '24px',
+                      zIndex: 2000,
+                      textAlign: 'center',
+                      width: '70%',
+                      maxWidth: '320px',
+                      border: '1px solid rgba(255, 255, 255, 0.5)'
+                    }}
+                    initial={{ opacity: 0, y: -50, x: '-50%' }}
+                    animate={{ opacity: 1, y: 0, x: '-50%' }}
+                    exit={{ opacity: 0, y: -50, x: '-50%' }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  >
+                    <div style={{ marginBottom: '24px' }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        padding: '6px 16px',
+                        borderRadius: '20px',
+                        marginBottom: '16px'
+                      }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#10b981',
+                          boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.2)',
+                          animation: 'pulse 2s infinite'
+                        }} />
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#059669', letterSpacing: '0.5px' }}>
+                          LIVE CALL
+                        </span>
+                      </div>
+
+                      <h3 style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: '#111827',
+                        margin: '0 0 4px 0'
+                      }}>
+                        {activeCallName || 'Support Agent'}
+                      </h3>
+
+                      <div style={{
+                        fontSize: '32px',
+                        fontWeight: '300',
+                        color: '#374151',
+                        fontVariantNumeric: 'tabular-nums',
+                        letterSpacing: '-1px'
+                      }}>
+                        {callDuration}
+                      </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '24px' }}>
+                      <button
+                        title={isMuted ? "Unmute" : "Mute"}
+                        onClick={() => {
+                          if (localStreamRef.current) {
+                            localStreamRef.current.getAudioTracks().forEach((t) => {
+                              t.enabled = !t.enabled;
+                            });
+                            setIsMuted((prev) => !prev);
+                          }
+                        }}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '50%',
+                          background: isMuted ? '#fee2e2' : '#f3f4f6',
+                          color: isMuted ? '#ef4444' : '#4b5563',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+                      </button>
+
+                      <button
+                        title={isSpeakerOn ? "Turn Speaker Off" : "Turn Speaker On"}
+                        onClick={() => {
+                          setIsSpeakerOn((prev) => {
+                            const newVal = !prev;
+                            if (remoteAudioRef.current)
+                              remoteAudioRef.current.muted = !newVal;
+                            return newVal;
+                          });
+                        }}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '50%',
+                          background: isSpeakerOn ? '#d1fae5' : '#f3f4f6',
+                          color: isSpeakerOn ? '#059669' : '#4b5563',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        {isSpeakerOn ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                      </button>
+
+                      <button
+                        title="End Call"
+                        onClick={handleEndCall}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '50%',
+                          background: '#fee2e2',
+                          color: '#ef4444',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        <PhoneOff size={20} />
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+
               <div className='chat-bot-header'>
                 <button
                   className='chat-bot-header-button'
