@@ -101,6 +101,9 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
     campaignFoundRef,
     campaignsRef,
     chatbot_config,
+    showNotification,
+    setShowNotification,
+    mainLoading,
   } = state;
 
   // Use screen navigation hook
@@ -149,6 +152,8 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
     isEmailAvailable,
     preChatForm: chatbot_config?.preChatForm,
     adminTestingMode: config?.adminTestingMode,
+    activeScreen,
+    setShowNotification,
   });
 
   const {
@@ -255,6 +260,9 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
           return prevName;
         });
         playSound();
+        
+        setShowNotification(true);
+        
 
         setSupportImage((prevImage) => {
           if (
@@ -528,6 +536,8 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
             setIsTicketRaised={setIsTicketRaised}
             ticketForm={chatbot_config?.ticketForm}
             onChatSelect={handleChatSelect}
+            mainLoading={mainLoading}
+            showNotification={showNotification}
           />
         );
       case 'chats':
@@ -596,6 +606,9 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
             startNewConversation={startNewConversation}
             setOpenPostChatForm={setOpenPostChatForm}
             playSound={playSound}
+            setShowNotification={setShowNotification}
+            showNotification={showNotification}
+            mainLoading={mainLoading}
           />
         );
       case 'voice':
@@ -710,6 +723,9 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
             startNewConversation={startNewConversation}
             setOpenPostChatForm={setOpenPostChatForm}
             playSound={playSound}
+            setShowNotification={setShowNotification}
+            showNotification={showNotification}
+            mainLoading={mainLoading}
           />
         );
     }
@@ -1101,6 +1117,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
         isApiKeyProvided={isApiKeyProvided}
         onToggle={toggleChat}
         onClose={handleClose}
+        showNotification={showNotification}
       />
     </div>
   );

@@ -12,6 +12,7 @@ interface ChatButtonProps {
   isApiKeyProvided: boolean;
   onToggle: () => void;
   onClose: () => void;
+  showNotification: boolean;
 }
 
 export const ChatButton: React.FC<ChatButtonProps> = memo(({
@@ -22,6 +23,7 @@ export const ChatButton: React.FC<ChatButtonProps> = memo(({
   isApiKeyProvided,
   onToggle,
   onClose,
+  showNotification,
 }) => {
   // Hide button if free plan + no API key
   if (freePlan && !isApiKeyProvided) {
@@ -43,6 +45,22 @@ export const ChatButton: React.FC<ChatButtonProps> = memo(({
       aria-haspopup="dialog"
       role="button"
     >
+      {(showNotification && !isOpen) && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            backgroundColor: 'red',
+            zIndex: 10,
+          }}
+        />
+      )}
+
+
       {!isAdmin && isOpen ? (
         <X size={24} color='#fff' aria-hidden="true" />
       ) : (

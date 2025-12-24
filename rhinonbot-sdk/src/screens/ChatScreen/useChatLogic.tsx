@@ -40,7 +40,9 @@ export const useChatLogic = ({
   postChatForm,
   preChatForm,
   isEmailAvailable,
-  adminTestingMode
+  adminTestingMode,
+  activeScreen,
+  setShowNotification,
 }: any) => {
   const [conversation, setConversation] = useState<any>(null);
   const [message, setMessage] = useState('');
@@ -382,6 +384,8 @@ export const useChatLogic = ({
         if (!firstTokenReceived) {
           setLoading(false); // Stop spinner immediately on first token
           playSound();
+          setShowNotification(true);
+
           firstTokenReceived = true;
         }
         assistantResponse += token;

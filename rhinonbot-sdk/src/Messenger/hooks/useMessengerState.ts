@@ -27,6 +27,9 @@ export interface UseMessengerStateReturn {
   setWindowWidth: React.Dispatch<React.SetStateAction<string>>;
   effectiveTheme: 'light' | 'dark';
   setEffectiveTheme: React.Dispatch<React.SetStateAction<'light' | 'dark'>>;
+  showNotification: boolean;
+  mainLoading: boolean;
+
 
   // Chat State
   selectedChatId: string | null;
@@ -51,6 +54,7 @@ export interface UseMessengerStateReturn {
   setSelectedHelpArticle: React.Dispatch<React.SetStateAction<SelectedHelpArticleProps | null>>;
   selectedHelp: Folder | null;
   setSelectedHelp: React.Dispatch<React.SetStateAction<Folder | null>>;
+  setShowNotification: React.Dispatch<React.SetStateAction<boolean>>;
 
   // API State
   isApiKeyProvided: boolean;
@@ -75,6 +79,7 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
   const [showPopup, setShowPopup] = useState(false);
   const [windowWidth, setWindowWidth] = useState<string>('400px');
   const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
+  const [showNotification, setShowNotification] = useState(false);
 
   // Chat State
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -99,6 +104,8 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
   const [activeCampaign, setActiveCampaign] = useState<Campaign | undefined>(undefined);
   const campaignFoundRef = useRef(false);
   const campaignsRef = useRef<Campaign[]>([]);
+
+  const [mainLoading, setMainLoading] = useState(false);
 
   // Initialize / Fetch config
   useEffect(() => {
@@ -217,6 +224,7 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
 
 
   const fetchConversation = async () => {
+    setMainLoading(true);
     try {
       const response = await getConversationByUserId(userId, config.app_id);
       const sortedConversations = response.conversation.sort(
@@ -242,7 +250,10 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
 
     } catch (error) {
       console.error('Error fetching messages:', error);
+    } finally {
+      setMainLoading(false);
     }
+
   };
 
   useEffect(() => {
@@ -263,6 +274,8 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
     setWindowWidth,
     effectiveTheme,
     setEffectiveTheme,
+    showNotification,
+    mainLoading,
 
     // Chat State
     selectedChatId,
@@ -287,6 +300,7 @@ export function useMessengerState(config: RhinontechConfig | null | undefined): 
     setSelectedHelpArticle,
     selectedHelp,
     setSelectedHelp,
+    setShowNotification,
 
     // API State
     isApiKeyProvided,

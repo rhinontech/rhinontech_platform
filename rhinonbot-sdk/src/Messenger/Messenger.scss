@@ -77,6 +77,7 @@
 }
 
 .chat-button {
+  position: relative;
   width: 50px;
   height: 50px;
   border-radius: 10% 35% 25% 35%;
@@ -119,7 +120,7 @@
   overflow: hidden;
   transition: width 0.5s ease, background 0.3s ease, color 0.3s ease;
   border: 1px solid var(--border-color);
-  
+
   // Prevent iOS rubber-banding on the container
   overscroll-behavior: contain;
 
@@ -318,11 +319,11 @@
     border-radius: 0;
     z-index: 9999;
     position: fixed;
-    
+
     // Prevent iOS rubber-banding
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-    
+
     // Safe area for notched devices (iPhone X+)
     padding-bottom: env(safe-area-inset-bottom, 0px);
 
@@ -378,12 +379,12 @@
   .header-btn-extend {
     display: none;
   }
-  
+
   // Ensure bottom nav respects safe area
   .bottom-nav {
     margin-bottom: env(safe-area-inset-bottom, 0px);
   }
-  
+
   // Ensure footer respects safe area
   .footer {
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -405,7 +406,7 @@
     height: 100dvh;
     height: 100vh; // Fallback
   }
-  
+
   .bottom-nav {
     height: 55px; // Slightly smaller in landscape
   }
