@@ -44,6 +44,7 @@ export interface ChatScreenProps {
   setSelectedChatId: React.Dispatch<React.SetStateAction<string>>;
   isSpeakingWithRealPerson: boolean;
   setIsSpeakingWithRealPerson: React.Dispatch<React.SetStateAction<boolean>>;
+  setChatMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   timeoutDuration?: number;
   onConversationTimeout?: () => void;
   chatbot_config: ChatbotConfig;
@@ -51,6 +52,44 @@ export interface ChatScreenProps {
   ticketForm: FormField[];
   setWindowWidth: React.Dispatch<React.SetStateAction<string>>;
   adminTestingMode?: boolean;
+  chatMessages: Message[];
+  message: string;
+  setMessage: React.Dispatch<React.SetStateAction<string>>;
+  loading: boolean;
+  convoId: string;
+  setConvoId: React.Dispatch<React.SetStateAction<string>>;
+  isConversationActive: boolean;
+  isConversationClosed: boolean;
+  reachedLimit: boolean;
+  supportName: string;
+  setSupportName: React.Dispatch<React.SetStateAction<string>>;
+  supportImage: string | null;
+  setSupportImage: React.Dispatch<React.SetStateAction<string | null>>;
+  showTyping: boolean;
+  setShowTyping: React.Dispatch<React.SetStateAction<boolean>>;
+  isListening: boolean;
+  setIsListening: React.Dispatch<React.SetStateAction<boolean>>;
+  openPostChatForm: boolean;
+  lastFetchedConversationIdRef: React.MutableRefObject<string | null>;
+  socketRef: React.MutableRefObject<any>;
+  fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
+  typingRef: React.MutableRefObject<HTMLDivElement | null>;
+  transcript: string;
+  resetInactivityTimeout: () => void;
+  handleSend: (text?: string) => void;
+  handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSaveEmail: (values: Record<string, string>) => Promise<void>;
+  handlePostFormSubmit: (values: Record<string, string>) => Promise<void>;
+  handleCloseChat: () => Promise<void>;
+  startListening: () => void;
+  stopListening: () => void;
+  cancelListening: () => void;
+  handleSwitchToRealPerson: () => void;
+  fetchChats: () => Promise<void>;
+  isfetching: boolean;
+  startNewConversation: () => void;
+  setOpenPostChatForm: React.Dispatch<React.SetStateAction<boolean>>;
+  playSound: () => void;
 }
 
 export interface ChatLogicProps {

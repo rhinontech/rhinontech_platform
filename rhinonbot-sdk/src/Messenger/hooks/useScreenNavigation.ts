@@ -42,7 +42,7 @@ export function useScreenNavigation({ state }: UseScreenNavigationProps) {
   // Go back to chat list
   const handleBackToChats = useCallback(() => {
     // setSelectedChatId(null);
-    setIsSpeakingWithRealPerson(false);
+    // setIsSpeakingWithRealPerson(false);
     setActiveScreen('home');
   }, [setSelectedChatId, setIsSpeakingWithRealPerson]);
 
