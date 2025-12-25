@@ -62,11 +62,11 @@ export function SettingSidebar({ children }: { children: React.ReactNode }) {
           label: "Install Messenger",
           path: `${BASE_PATH}/messenger`,
         },
-        // {
-        //   id: "whatsapp-account",
-        //   label: "Whatsapp Messenger",
-        //   path: `${BASE_PATH}/whatsapp-account`,
-        // },
+        {
+          id: "whatsapp-account",
+          label: "Whatsapp Messenger",
+          path: `${BASE_PATH}/whatsapp-account`,
+        },
       ],
     },
     {

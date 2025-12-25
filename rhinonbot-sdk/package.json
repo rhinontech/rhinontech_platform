@@ -1,6 +1,6 @@
 {
-  "name": "@rhinon/botsdk",
-  "version": "0.6.7",
+  "name": "@rhinon/botsdk-test",
+  "version": "0.0.1",
   "description": "",
   "license": "MIT",
   "publishConfig": {

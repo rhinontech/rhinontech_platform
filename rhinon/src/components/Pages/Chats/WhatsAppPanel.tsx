@@ -19,7 +19,7 @@ import {
   AudioLines,
   Download,
   ExternalLink,
-  Play
+  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -31,7 +31,7 @@ import {
   getWhatsAppMediaUrl,
   uploadWhatsAppMedia,
   type WhatsAppAccount,
-  type WhatsAppMessage
+  type WhatsAppMessage,
 } from "@/services/settings/whatsappServices";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -46,7 +46,10 @@ interface WhatsAppPanelProps {
   isOnline: boolean;
 }
 
-export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelProps) {
+export function WhatsAppPanel({
+  selectedConversation,
+  isOnline,
+}: WhatsAppPanelProps) {
   // core
   const [whatsappMessages, setWhatsappMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -67,22 +70,30 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
 
   // template input state
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
-  const [templateParams, setTemplateParams] = useState<Record<string, string>>({});
+  const [templateParams, setTemplateParams] = useState<Record<string, string>>(
+    {}
+  );
   const [templatePreview, setTemplatePreview] = useState("");
 
   // file viewer
-  const [viewerFile, setViewerFile] = useState<{ url: string; name: string; type: "image" | "pdf" | "video" } | null>(null);
+  const [viewerFile, setViewerFile] = useState<{
+    url: string;
+    name: string;
+    type: "image" | "pdf" | "video";
+  } | null>(null);
 
   const { userData } = useUserStore();
   const socket = getSocket();
-
 
   const normalizePhone = (phone: string) => {
     if (!phone) return "";
     return phone.replace(/\D/g, "");
   };
 
-  const fetchWhatsAppHistory = async (phoneNumber: string, accountId: number) => {
+  const fetchWhatsAppHistory = async (
+    phoneNumber: string,
+    accountId: number
+  ) => {
     setLoading(true);
     setWaitingForUser(false);
     setWhatsappMessages([]);
@@ -95,7 +106,10 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
       const contact = contacts.find((c: any) => {
         const normalizedContact = normalizePhone(c.phone_number);
         if (normalizedInput.length > 6 && normalizedContact.length > 6) {
-          return normalizedInput.endsWith(normalizedContact) || normalizedContact.endsWith(normalizedInput);
+          return (
+            normalizedInput.endsWith(normalizedContact) ||
+            normalizedContact.endsWith(normalizedInput)
+          );
         }
         return normalizedInput === normalizedContact;
       });
@@ -119,7 +133,9 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file || !selectedAccount || !selectedConversation) return;
 
@@ -143,14 +159,13 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
           type: type,
           media: {
             link: uploadRes.media_id, // We pass the ID as the 'link' for the API to use
-            caption: file.name
-          }
+            caption: file.name,
+          },
         });
 
         // Clear input
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
-
     } catch (error) {
       console.error("Failed to send media:", error);
       // You might want to show a toast error here
@@ -160,7 +175,12 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
   };
 
   const handleSendMessage = async () => {
-    if (!message.trim() || !selectedConversation?.phone_number || !selectedAccount) return;
+    if (
+      !message.trim() ||
+      !selectedConversation?.phone_number ||
+      !selectedAccount
+    )
+      return;
 
     try {
       setIsSending(true);
@@ -168,7 +188,7 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
         account_id: selectedAccount,
         to: selectedConversation.phone_number,
         type: "text",
-        text: { body: message }
+        text: { body: message },
       });
 
       // Optimistic update
@@ -178,9 +198,9 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
         content: message,
         direction: "outbound",
         created_at: new Date().toISOString(),
-        status: "sent"
+        status: "sent",
       };
-      setWhatsappMessages(prev => [...prev, newMessage]);
+      setWhatsappMessages((prev) => [...prev, newMessage]);
       setMessage("");
     } catch (error) {
       console.error("Send failed", error);
@@ -191,9 +211,16 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
   };
 
   const handleSendTemplate = async () => {
-    if (!selectedTemplate || !selectedAccount || !selectedConversation?.phone_number) return;
+    if (
+      !selectedTemplate ||
+      !selectedAccount ||
+      !selectedConversation?.phone_number
+    )
+      return;
 
-    const bodyComponent = selectedTemplate.components?.find((c: any) => c.type === "BODY");
+    const bodyComponent = selectedTemplate.components?.find(
+      (c: any) => c.type === "BODY"
+    );
     const paramMatches = bodyComponent?.text?.match(/\{\{(\d+)\}\}/g);
 
     // Validation
@@ -213,7 +240,7 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
       // Build params
       const paramArray = Object.keys(templateParams)
         .sort((a, b) => parseInt(a) - parseInt(b))
-        .map(key => ({ type: "text", text: templateParams[key] }));
+        .map((key) => ({ type: "text", text: templateParams[key] }));
 
       await sendWhatsAppMessage({
         account_id: selectedAccount,
@@ -222,8 +249,11 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
         template: {
           name: selectedTemplate.name,
           language: { code: selectedTemplate.language },
-          components: paramArray.length > 0 ? [{ type: "body", parameters: paramArray }] : undefined
-        }
+          components:
+            paramArray.length > 0
+              ? [{ type: "body", parameters: paramArray }]
+              : undefined,
+        },
       });
 
       toast.success("Template sent!");
@@ -241,10 +271,9 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
         content: `Template: ${selectedTemplate.name}`, // Simple placeholder
         direction: "outbound",
         created_at: new Date().toISOString(),
-        status: "sent"
+        status: "sent",
       };
-      setWhatsappMessages(prev => [...prev, newMessage]);
-
+      setWhatsappMessages((prev) => [...prev, newMessage]);
     } catch (error) {
       console.error("Failed to send template", error);
       toast.error("Failed to send template");
@@ -260,19 +289,54 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
   };
 
   const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
-
-
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "sent": return <Check className="h-3 w-3 text-muted-foreground" />;
-      case "delivered": return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
-      case "read": return <CheckCheck className="h-3 w-3 text-blue-500" />;
-      default: return <Clock className="h-3 w-3 text-muted-foreground" />;
+      case "sent":
+        return <Check className="h-3 w-3 text-muted-foreground" />;
+      case "delivered":
+        return <CheckCheck className="h-3 w-3 text-muted-foreground" />;
+      case "read":
+        return <CheckCheck className="h-3 w-3 text-blue-500" />;
+      default:
+        return <Clock className="h-3 w-3 text-muted-foreground" />;
     }
   };
+
+  // Helper: Check 24h Window
+  const isSessionActive = () => {
+    // Find latest INBOUND message
+    const lastInbound = [...whatsappMessages]
+      .reverse()
+      .find((m) => m.direction === "inbound");
+
+    if (!lastInbound) return false;
+
+    const lastTime = new Date(lastInbound.created_at).getTime();
+    const now = Date.now();
+    const diffHours = (now - lastTime) / (1000 * 60 * 60);
+
+    return diffHours < 24;
+  };
+
+  const sessionActive = isSessionActive();
+
+  // Force template mode if session inactive
+  useEffect(() => {
+    if (
+      !loading &&
+      !waitingForUser &&
+      !sessionActive &&
+      inputMode !== "template"
+    ) {
+      setInputMode("template");
+    }
+  }, [sessionActive, loading, waitingForUser, inputMode]);
 
   if (!selectedConversation) {
     return (
@@ -294,11 +358,14 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
     const initAccounts = async () => {
       try {
         const data = await getWhatsAppAccounts();
-        const activeAccounts = (data || []).filter(acc => acc.status === "active");
+        const activeAccounts = (data || []).filter(
+          (acc) => acc.status === "active"
+        );
         setAccounts(activeAccounts);
 
         // Find default
-        const def = activeAccounts.find(a => a.is_default) || activeAccounts[0];
+        const def =
+          activeAccounts.find((a) => a.is_default) || activeAccounts[0];
         if (def) {
           setSelectedAccount(def.id);
         }
@@ -316,7 +383,9 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
         try {
           const data = await getWhatsAppTemplates(selectedAccount);
           // Filter approved templates
-          setTemplates((data || []).filter((t: any) => t.status === "APPROVED"));
+          setTemplates(
+            (data || []).filter((t: any) => t.status === "APPROVED")
+          );
         } catch (e) {
           console.error("Failed to load templates", e);
         }
@@ -333,7 +402,6 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
       setWaitingForUser(true);
     }
   }, [selectedConversation, selectedAccount]);
-
 
   // Socket: Real-time Messages
   useEffect(() => {
@@ -354,12 +422,19 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
         const normMsgTo = normalizePhone(msg.to_number);
         const normSelected = normalizePhone(phone);
 
-        const isMatch = (normMsgFrom && normSelected && (normMsgFrom.includes(normSelected) || normSelected.includes(normMsgFrom))) ||
-          (normMsgTo && normSelected && (normMsgTo.includes(normSelected) || normSelected.includes(normMsgTo)));
+        const isMatch =
+          (normMsgFrom &&
+            normSelected &&
+            (normMsgFrom.includes(normSelected) ||
+              normSelected.includes(normMsgFrom))) ||
+          (normMsgTo &&
+            normSelected &&
+            (normMsgTo.includes(normSelected) ||
+              normSelected.includes(normMsgTo)));
 
         if (isMatch) {
-          setWhatsappMessages(prev => {
-            if (prev.some(m => m.id === msg.id)) return prev;
+          setWhatsappMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev;
             return [...prev, msg];
           });
           setWaitingForUser(false);
@@ -420,16 +495,24 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
       <div className="p-4 border-b bg-[#075E54]/5">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={selectedConversation.avatar || "/placeholder.svg"} />
+            <AvatarImage
+              src={selectedConversation.avatar || "/placeholder.svg"}
+            />
             <AvatarFallback className="bg-[#25D366] text-white">
               {selectedConversation.user_email?.[0]?.toUpperCase() || "W"}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 overflow-hidden">
-            <p className="font-medium text-sm truncate">{selectedConversation.user_email || "WhatsApp User"}</p>
+            <p className="font-medium text-sm truncate">
+              {selectedConversation.user_email || "WhatsApp User"}
+            </p>
             <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
               {selectedConversation.phone_number || "No Number"}
-              {selectedAccount && <span className="text-[10px] ml-1 opacity-70">(Default Acct)</span>}
+              {selectedAccount && (
+                <span className="text-[10px] ml-1 opacity-70">
+                  (Default Acct)
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -447,237 +530,311 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
           {!loading && waitingForUser && (
             <div className="flex flex-col items-center justify-center h-full min-h-[150px] text-muted-foreground opacity-70">
               <MessageCircle className="h-10 w-10 mb-2" />
-              <p className="text-sm">No history found.</p>
-              <p className="text-xs">Send a message or template to start.</p>
+              <p className="text-sm">Waiting for user message</p>
+              <p className="text-xs">
+                Send a template to start the conversation.
+              </p>
             </div>
           )}
 
-          {!loading && !waitingForUser && whatsappMessages.map((msg, idx) => (
-            <div
-              key={msg.id || idx}
-              className={cn(
-                "flex",
-                msg.direction === "outbound" ? "justify-end" : "justify-start"
-              )}
-            >
+          {!loading &&
+            !waitingForUser &&
+            whatsappMessages.map((msg, idx) => (
               <div
+                key={msg.id || idx}
                 className={cn(
-                  "max-w-[85%] rounded-lg px-3 py-2 shadow-sm",
-                  msg.direction === "outbound"
-                    ? "bg-[#DCF8C6] text-gray-900 rounded-br-none"
-                    : "bg-white text-gray-900 rounded-bl-none"
-                )}
-              >
-                {msg.message_type === "image" && (
-                  <div
-                    className="mb-1 rounded overflow-hidden relative group cursor-pointer hover:opacity-95 transition-opacity"
-                    onClick={() => setViewerFile({
-                      url: getWhatsAppMediaUrl(msg.media_url || msg.content, selectedAccount || msg.account_id),
-                      name: "Image",
-                      type: "image"
-                    })}
-                  >
-                    <img
-                      src={getWhatsAppMediaUrl(msg.media_url || msg.content, selectedAccount || msg.account_id)}
-                      alt="Shared Image"
-                      className="max-w-full h-auto object-cover rounded-md max-h-[300px]"
-                      loading="lazy"
-                    />
-                  </div>
-                )}
-
-                {msg.message_type === "sticker" && (
-                  <div className="mb-1">
-                    <img
-                      src={getWhatsAppMediaUrl(msg.media_url, selectedAccount || msg.account_id)}
-                      alt="Sticker"
-                      className="w-32 h-32 object-contain drop-shadow-sm"
-                      loading="lazy"
-                    />
-                  </div>
-                )}
-
-                {msg.message_type === "video" && (
-                  <div
-                    className="mb-1 rounded-md overflow-hidden bg-black/5 relative max-w-[280px] group cursor-pointer"
-                    onClick={() => setViewerFile({
-                      url: getWhatsAppMediaUrl(msg.media_url, selectedAccount || msg.account_id),
-                      name: "Video",
-                      type: "video"
-                    })}
-                  >
-                    <video
-                      playsInline
-                      preload="auto"
-                      src={getWhatsAppMediaUrl(msg.media_url, selectedAccount || msg.account_id)}
-                      className="max-w-full max-h-[300px] w-full bg-black/10 rounded-md"
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                    {/* Play Icon Overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
-                      <div className="bg-black/50 p-3 rounded-full backdrop-blur-sm">
-                        <Play className="h-6 w-6 text-white fill-current" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {msg.message_type === "audio" && (
-                  <div className="mb-1 min-w-[200px]">
-                    <audio
-                      controls
-                      src={getWhatsAppMediaUrl(msg.media_url, selectedAccount || msg.account_id)}
-                      className="max-w-full h-10"
-                    />
-                  </div>
-                )}
-
-                {msg.message_type === "document" && (
-                  <div className="flex flex-col gap-2">
-                    {/* Download/Preview Card - Clickable */}
+                  "flex",
+                  msg.direction === "outbound" ? "justify-end" : "justify-start"
+                )}>
+                <div
+                  className={cn(
+                    "max-w-[85%] rounded-lg px-3 py-2 shadow-sm",
+                    msg.direction === "outbound"
+                      ? "bg-[#DCF8C6] text-gray-900 rounded-br-none"
+                      : "bg-white text-gray-900 rounded-bl-none"
+                  )}>
+                  {msg.message_type === "image" && (
                     <div
-                      className="flex items-center gap-3 p-3 bg-muted/50 rounded-md border border-border/50 max-w-[240px] cursor-pointer hover:bg-muted/80 transition-colors group"
-                      onClick={() => setViewerFile({
-                        url: getWhatsAppMediaUrl(msg.media_url, selectedAccount || msg.account_id),
-                        name: msg.caption || "Document",
-                        type: "pdf"
-                      })}
-                    >
-                      <div className="shrink-0 bg-red-100 p-2 rounded-full">
-                        <FileIcon className="h-5 w-5 text-red-500" />
-                      </div>
-                      <div className="overflow-hidden flex-1">
-                        <p className="text-sm font-medium truncate" title={msg.caption || "Document"}>
-                          {msg.caption || "Document"}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground uppercase">PDF / DOC</p>
-                      </div>
-
-                      {/* Direct Download Fallback - Click propagation stopped so it doesn't open viewer */}
-                      <a
-                        href={getWhatsAppMediaUrl(msg.media_url, selectedAccount || msg.account_id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="shrink-0 p-1.5 hover:bg-black/10 rounded-full transition-colors"
-                        title="Direct Download"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Download className="h-4 w-4 text-muted-foreground" />
-                      </a>
+                      className="mb-1 rounded overflow-hidden relative group cursor-pointer hover:opacity-95 transition-opacity"
+                      onClick={() =>
+                        setViewerFile({
+                          url: getWhatsAppMediaUrl(
+                            msg.media_url || msg.content,
+                            selectedAccount || msg.account_id
+                          ),
+                          name: "Image",
+                          type: "image",
+                        })
+                      }>
+                      <img
+                        src={getWhatsAppMediaUrl(
+                          msg.media_url || msg.content,
+                          selectedAccount || msg.account_id
+                        )}
+                        alt="Shared Image"
+                        className="max-w-full h-auto object-cover rounded-md max-h-[300px]"
+                        loading="lazy"
+                      />
                     </div>
+                  )}
+
+                  {msg.message_type === "sticker" && (
+                    <div className="mb-1">
+                      <img
+                        src={getWhatsAppMediaUrl(
+                          msg.media_url,
+                          selectedAccount || msg.account_id
+                        )}
+                        alt="Sticker"
+                        className="w-32 h-32 object-contain drop-shadow-sm"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+
+                  {msg.message_type === "video" && (
+                    <div
+                      className="mb-1 rounded-md overflow-hidden bg-black/5 relative max-w-[280px] group cursor-pointer"
+                      onClick={() =>
+                        setViewerFile({
+                          url: getWhatsAppMediaUrl(
+                            msg.media_url,
+                            selectedAccount || msg.account_id
+                          ),
+                          name: "Video",
+                          type: "video",
+                        })
+                      }>
+                      <video
+                        playsInline
+                        preload="auto"
+                        src={getWhatsAppMediaUrl(
+                          msg.media_url,
+                          selectedAccount || msg.account_id
+                        )}
+                        className="max-w-full max-h-[300px] w-full bg-black/10 rounded-md">
+                        Your browser does not support the video tag.
+                      </video>
+                      {/* Play Icon Overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+                        <div className="bg-black/50 p-3 rounded-full backdrop-blur-sm">
+                          <Play className="h-6 w-6 text-white fill-current" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {msg.message_type === "audio" && (
+                    <div className="mb-1 min-w-[200px]">
+                      <audio
+                        controls
+                        src={getWhatsAppMediaUrl(
+                          msg.media_url,
+                          selectedAccount || msg.account_id
+                        )}
+                        className="max-w-full h-10"
+                      />
+                    </div>
+                  )}
+
+                  {msg.message_type === "document" && (
+                    <div className="flex flex-col gap-2">
+                      {/* Download/Preview Card - Clickable */}
+                      <div
+                        className="flex items-center gap-3 p-3 bg-muted/50 rounded-md border border-border/50 max-w-[240px] cursor-pointer hover:bg-muted/80 transition-colors group"
+                        onClick={() =>
+                          setViewerFile({
+                            url: getWhatsAppMediaUrl(
+                              msg.media_url,
+                              selectedAccount || msg.account_id
+                            ),
+                            name: msg.caption || "Document",
+                            type: "pdf",
+                          })
+                        }>
+                        <div className="shrink-0 bg-red-100 p-2 rounded-full">
+                          <FileIcon className="h-5 w-5 text-red-500" />
+                        </div>
+                        <div className="overflow-hidden flex-1">
+                          <p
+                            className="text-sm font-medium truncate"
+                            title={msg.caption || "Document"}>
+                            {msg.caption || "Document"}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground uppercase">
+                            PDF / DOC
+                          </p>
+                        </div>
+
+                        {/* Direct Download Fallback - Click propagation stopped so it doesn't open viewer */}
+                        <a
+                          href={getWhatsAppMediaUrl(
+                            msg.media_url,
+                            selectedAccount || msg.account_id
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="shrink-0 p-1.5 hover:bg-black/10 rounded-full transition-colors"
+                          title="Direct Download"
+                          onClick={(e) => e.stopPropagation()}>
+                          <Download className="h-4 w-4 text-muted-foreground" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {msg.content && msg.message_type !== "image" && (
+                    <p className="text-sm break-words">{msg.content}</p>
+                  )}
+
+                  <div className="flex items-center justify-end gap-1 mt-1">
+                    <span className="text-[10px] text-gray-500">
+                      {formatTime(msg.created_at)}
+                    </span>
+                    {msg.direction === "outbound" && getStatusIcon(msg.status)}
                   </div>
-                )}
-
-                {msg.content && msg.message_type !== "image" && <p className="text-sm break-words">{msg.content}</p>}
-
-                <div className="flex items-center justify-end gap-1 mt-1">
-                  <span className="text-[10px] text-gray-500">
-                    {formatTime(msg.created_at)}
-                  </span>
-                  {msg.direction === "outbound" && getStatusIcon(msg.status)}
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
           <div ref={scrollRef} />
         </div>
       </ScrollArea>
 
       {/* Input Area */}
       <div className="bg-background border-t">
-        <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as any)} className="w-full">
+        <Tabs
+          value={inputMode}
+          onValueChange={(v) => setInputMode(v as any)}
+          className="w-full">
           <div className="px-3 pt-2">
             <TabsList className="grid w-full grid-cols-2 h-8">
-              <TabsTrigger value="text" className="text-xs">Message</TabsTrigger>
-              <TabsTrigger value="template" className="text-xs">Template</TabsTrigger>
+              <TabsTrigger
+                value="text"
+                className="text-xs"
+                disabled={!sessionActive} // 🔥 Disable text input if session inactive
+              >
+                Message
+              </TabsTrigger>
+              <TabsTrigger value="template" className="text-xs">
+                Template
+              </TabsTrigger>
             </TabsList>
           </div>
 
           {/* Text Input */}
           <TabsContent value="text" className="p-3 mt-0">
-            <div className="flex gap-2 items-center">
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                onChange={handleFileUpload}
-                accept="image/*,video/*,audio/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isSending}
-              >
-                <Paperclip className="h-4 w-4 text-gray-500" />
-              </Button>
-              <Input
-                placeholder="Type a message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                className="flex-1 h-9 text-sm"
-              />
-              <Button
-                size="icon"
-                className="h-9 w-9 shrink-0 bg-[#075E54] hover:bg-[#064E45]"
-                onClick={handleSendMessage}
-                disabled={!message.trim() || isSending}
-              >
-                {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
-            </div>
+            {!sessionActive ? (
+              <div className="flex items-center justify-center p-4 bg-yellow-50 text-yellow-800 text-xs rounded-md border border-yellow-200">
+                <Clock className="h-3 w-3 mr-2" />
+                Session expired. Send a template message to reconnect.
+              </div>
+            ) : (
+              <div className="flex gap-2 items-center">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  accept="image/*,video/*,audio/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSending}>
+                  <Paperclip className="h-4 w-4 text-gray-500" />
+                </Button>
+                <Input
+                  placeholder="Type a message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                  className="flex-1 h-9 text-sm"
+                />
+                <Button
+                  size="icon"
+                  className="h-9 w-9 shrink-0 bg-[#075E54] hover:bg-[#064E45]"
+                  onClick={handleSendMessage}
+                  disabled={!message.trim() || isSending}>
+                  {isSending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           {/* Template Input */}
           <TabsContent value="template" className="p-3 mt-0 space-y-3">
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Select Template</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Select Template
+                </Label>
                 <select
                   className="w-full text-sm border rounded-md p-2 bg-background"
                   value={selectedTemplate?.name || ""}
                   onChange={(e) => {
-                    const t = templates.find(temp => temp.name === e.target.value);
+                    const t = templates.find(
+                      (temp) => temp.name === e.target.value
+                    );
                     setSelectedTemplate(t);
                     setTemplateParams({});
-                  }}
-                >
+                  }}>
                   <option value="">Choose a template...</option>
-                  {templates.map(t => (
+                  {templates.map((t) => (
                     <option key={t.name} value={t.name}>
-                      {t.name} {getTemplateParamCount(t) > 0 ? `(${getTemplateParamCount(t)} params)` : ''}
+                      {t.name}{" "}
+                      {getTemplateParamCount(t) > 0
+                        ? `(${getTemplateParamCount(t)} params)`
+                        : ""}
                     </option>
                   ))}
                 </select>
               </div>
 
               {/* Params Input */}
-              {selectedTemplate && getTemplateParamCount(selectedTemplate) > 0 && (
-                <div className="space-y-2 bg-muted/30 p-2 rounded-md border">
-                  <Label className="text-xs font-medium">Enter Parameters</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Array.from({ length: getTemplateParamCount(selectedTemplate) }, (_, i) => i + 1).map(num => (
-                      <div key={num} className="space-y-1">
-                        <span className="text-[10px] text-muted-foreground ml-1">Variable {'{{' + num + '}}'}</span>
-                        <Input
-                          placeholder={`Value for {{${num}}}`}
-                          className="h-8 text-xs bg-background"
-                          value={templateParams[num] || ""}
-                          onChange={(e) => setTemplateParams(prev => ({ ...prev, [num]: e.target.value }))}
-                        />
-                      </div>
-                    ))}
+              {selectedTemplate &&
+                getTemplateParamCount(selectedTemplate) > 0 && (
+                  <div className="space-y-2 bg-muted/30 p-2 rounded-md border">
+                    <Label className="text-xs font-medium">
+                      Enter Parameters
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Array.from(
+                        { length: getTemplateParamCount(selectedTemplate) },
+                        (_, i) => i + 1
+                      ).map((num) => (
+                        <div key={num} className="space-y-1">
+                          <span className="text-[10px] text-muted-foreground ml-1">
+                            Variable {"{{" + num + "}}"}
+                          </span>
+                          <Input
+                            placeholder={`Value for {{${num}}}`}
+                            className="h-8 text-xs bg-background"
+                            value={templateParams[num] || ""}
+                            onChange={(e) =>
+                              setTemplateParams((prev) => ({
+                                ...prev,
+                                [num]: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Message Preview */}
               {selectedTemplate && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Message Preview</Label>
+                  <Label className="text-xs text-muted-foreground">
+                    Message Preview
+                  </Label>
                   <Textarea
                     className="min-h-[80px] text-sm bg-muted/10 resize-none focus-visible:ring-0"
                     value={templatePreview}
@@ -690,9 +847,12 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
               <Button
                 className="w-full h-9 text-xs bg-[#075E54] hover:bg-[#064E45] mt-2"
                 disabled={!selectedTemplate || isSending}
-                onClick={handleSendTemplate}
-              >
-                {isSending ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Send className="h-3 w-3 mr-2" />}
+                onClick={handleSendTemplate}>
+                {isSending ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                ) : (
+                  <Send className="h-3 w-3 mr-2" />
+                )}
                 Send Template Message
               </Button>
             </div>
@@ -710,6 +870,6 @@ export function WhatsAppPanel({ selectedConversation, isOnline }: WhatsAppPanelP
           fileType={viewerFile.type}
         />
       )}
-    </div >
+    </div>
   );
 }

@@ -1,4 +1,8 @@
-const { bot_conversations, support_conversations, customers } = require("../models");
+const {
+  bot_conversations,
+  support_conversations,
+  customers,
+} = require("../models");
 
 // Get all support conversations for a chatbot
 const getAllSocketConversation = async (req, res) => {
@@ -101,18 +105,21 @@ const getSocketConversationByUserId = async (req, res) => {
 
     // --- ENRICH WITH PHONE NUMBER (via Customers table) ---
     let phone_number = null;
+
     try {
       const customer = await customers.findOne({
         where: {
           email: socketConversation.user_email,
-          organization_id
+          organization_id,
         },
       });
 
-      if (customer && customer.custom_data && customer.custom_data.phone_number) {
-        phone_number = customer.custom_data.phone_number;
+      if (customer?.custom_data) {
+        phone_number =
+          customer.custom_data.phone_number ||
+          customer.custom_data.phone ||
+          null;
       }
-
     } catch (e) {
       console.error("Error fetching customer phone for conversation", e);
     }

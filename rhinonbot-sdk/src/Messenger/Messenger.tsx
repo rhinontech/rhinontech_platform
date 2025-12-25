@@ -1,517 +1,524 @@
-import React, { useEffect, useState, useRef } from 'react';
-import {
-  MessageCircle,
-  X,
-  Home,
-  MessageSquare,
-  HelpCircle,
-  Mic,
-  Newspaper,
-  Minus,
-} from 'lucide-react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Minus, Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import './Messenger.scss';
-import ChatScreen from './ChatScreen/ChatScreen';
-import ChatHistoryScreen from './ChatHistoryScreen/ChatHistoryScreen';
-import HelpScreen from './HelpScreen/HelpScreen';
-import HomeScreen from './HomeScreen/HomeScreen';
-import Voice from './Voice/Voice';
-import { themeVars } from '@tools/utils/theme';
-import useTracking from '@tools/utils/useTracking';
-import Cookies from 'js-cookie';
-import { useConfigStore } from '@tools/utils/chatbotConfigStore';
-import NewsScreen from './NewsScreen/NewsScreen';
-import NewsPage from './NewsPage/NewsPage';
-import HelpAriclePage from './HelpArticlePage/HelpArticlePage';
-import { getForms } from '@tools/services/formServices';
-import RaiseTicket from './TicketScreen/RaiseTicket';
+import { io } from 'socket.io-client';
+import type { Message, ChatScreenProps } from '@/types';
+
+// Lazy load screens for better initial bundle size
+const ChatScreen = lazy(() => import('@/screens/ChatScreen/ChatScreen'));
+// ChatHistoryScreen removed - using unified chat screen instead
+const HelpScreen = lazy(() => import('@/screens/HelpScreen/HelpScreen'));
+const HomeScreen = lazy(() => import('@/screens/HomeScreen/HomeScreen'));
+const Voice = lazy(() => import('@/screens/VoiceScreen/Voice'));
+const NewsScreen = lazy(() => import('@/screens/NewsScreen/NewsScreen'));
+const NewsPage = lazy(() => import('@/screens/NewsPage/NewsPage'));
+const HelpAriclePage = lazy(() => import('@/screens/HelpArticlePage/HelpArticlePage'));
+const Campaigns = lazy(() =>
+  import('@/screens/Campaigns/Campaigns').then(module => ({ default: module.Campaigns }))
+);
+
 import { AnimatePresence, motion } from 'motion/react';
-import { getChatbotConfig } from '@tools/services/chatbotConfigService';
-import svgIcons from '@tools/assets/svgIcons';
-import { getCampaignsChatbot } from '@tools/services/Campaigns/chatbotService';
-import { Campaigns } from './Campaigns/Campaigns';
-import { evaluateTargeting } from '@tools/utils/campaignTargeting';
+
+// Common components
+import { Loader } from '@/components/common';
+
+// Types
+import type { RhinontechConfig } from '@/types';
+
+// Hooks - centralized state and logic
 import {
-  canShowCampaign,
-  recordCampaignView,
-} from '@tools/utils/campaignFrequency';
-import {
-  isReturningVisitor,
-  getCurrentUrl,
-  getReferrerUrl,
-  getPageLoadTime,
-  initVisitorTracking,
-} from '@tools/utils/visitorTracking';
-import { trackCampaignImpression } from '@tools/utils/campaignAnalytics';
+  useMessengerState,
+  useCampaignLogic,
+  useScreenNavigation
+} from './hooks';
+
+// Components - extracted UI pieces
+import { BottomNav, MessengerFooter, ChatButton } from './components';
+
+// Utilities
+import { themeVars } from '@/utils/theme';
+import useTracking from '@/utils/useTracking';
+import { useChatLogic } from '@src/screens/ChatScreen/useChatLogic';
 
 interface MessengerProps {
-  config?: {
-    app_id: string;
-    admin?: boolean;
-    adminTestingMode?: boolean;
-    chatbot_config?: any;
-  } | null;
-}
-
-export interface PostChatFormConfig {
-  enabled: boolean;
-  elements: any[]; // or FormField[]
-}
-
-interface selectedNewsProps {
-  title: string;
-  content: string;
-  img: string;
-  tags: string[];
-  authorImg: string;
-  authorName: string;
-  updatedAt: string;
-}
-interface selectedHelpArticleProps {
-  articleId: string;
-  title: string;
-  content: string;
-  status: string;
-  views: number;
-  likes: number;
-  dislikes: number;
-  createdAt: string;
-  updatedAt: string;
-}
-interface Article {
-  articleId: string;
-  title: string;
-  content: string;
-  status: string;
-  views: number;
-  likes: number;
-  dislikes: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Folder {
-  folderId: string;
-  name: string;
-  description: string;
-  articles: Article[];
-}
-
-interface ButtonElement {
-  id: string;
-  text: string;
-  url: string;
-  style: 'primary' | 'secondary';
-}
-
-interface TemplateMedia {
-  src: string;
-  alt: string;
-  type: string;
-}
-
-interface CampaignContent {
-  media: TemplateMedia | null;
-  layout: string;
-  buttons: ButtonElement[];
-  heading: string;
-  hasImage: boolean;
-  subheading: string;
-  templateId: string;
-}
-
-interface Campaign {
-  id: number;
-  organization_id: number;
-  type: 'recurring' | 'one-time';
-  status: string;
-  content: CampaignContent;
-  targeting: any;
-  created_at: string;
-  updated_at: string;
+  config?: RhinontechConfig | null;
 }
 
 const Messenger: React.FC<MessengerProps> = ({ config }) => {
-  const { chatbot_config, setConfig } = useConfigStore();
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeScreen, setActiveScreen] = useState('home');
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-  const [isEmailAvailable, setIsEmailAvailable] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  // Use centralized state management hook
+  const state = useMessengerState(config);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [socket, setSocket] = useState<any>(null);
 
-  // const [preChatForm, setPreChatForm] = useState<any | null>(null);
-  // const [postChatForm, setPostChatForm] = useState<PostChatFormConfig | null>(
-  //   null,
-  // );
-  // const [ticketForm, setTicketForm] = useState<any | null>(null);
-  const [isSpeakingWithRealPerson, setIsSpeakingWithRealPerson] =
-    useState(false);
-  const [showPopup, setShowPopup] = useState(false);
-  const [isTicketRaised, setIsTicketRaised] = useState<boolean>(false);
-  const [windowWidth, setWindowWidth] = useState<string>('400px');
-  const [selectedNews, setSelectedNews] = useState<selectedNewsProps | null>(
-    null,
-  );
-  const [selectedHelpArticle, setSelectedHelpArticle] =
-    useState<selectedHelpArticleProps | null>(null);
-  const [helpArticles, setHelpArticles] = useState<Folder[]>([]);
+  const [callStartTime, setCallStartTime] = useState<number | null>(null);
+  const [callDuration, setCallDuration] = useState('00:00');
 
-  const [selectedHelp, setSelectedHelp] = useState<Folder | null>(null);
-  const [isApiKeyProvided, setIsApiKeyProvided] = useState<boolean>(false);
-  const [freePlan, setFreePlan] = useState<boolean>(false);
-  const [isVoiceMode, setIsVoiceMode] = useState<boolean>(false);
-  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>(
-    'light',
-  );
-  const [activeCampaign, setActiveCampaign] = useState<Campaign | undefined>(
-    undefined,
-  );
+  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
 
-  // Ref to track if campaign has been found (persists across renders)
-  const campaignFoundRef = useRef(false);
+  const [incomingCall, setIncomingCall] = useState<null | {
+    from: string;
+    fromName: string;
+    fromCallId: string;
+  }>(null);
+  const [isInCall, setIsInCall] = useState(false);
+  const [activeCallName, setActiveCallName] = useState<string>('');
 
-  // Function to get effective theme based on config
-  const getEffectiveTheme = (
-    configTheme?: 'light' | 'dark' | 'system',
-  ): 'light' | 'dark' => {
-    if (configTheme === 'system' || !configTheme) {
-      // Detect system preference
-      const prefersDark = window.matchMedia(
-        '(prefers-color-scheme: dark)',
-      ).matches;
-      return prefersDark ? 'dark' : 'light';
-    }
-    return configTheme;
-  };
+  // --- Audio control states ---
+  const [isMuted, setIsMuted] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Initialize / Fetch config
+  const {
+    isOpen,
+    setIsOpen,
+    activeScreen,
+    setActiveScreen,
+    showPopup,
+    windowWidth,
+    setWindowWidth,
+    effectiveTheme,
+    selectedChatId,
+    setSelectedChatId,
+    isSpeakingWithRealPerson,
+    setIsSpeakingWithRealPerson,
+    setIsTicketRaised,
+    isEmailAvailable,
+    setIsEmailAvailable,
+    userEmail,
+    setUserEmail,
+    userId,
+    selectedNews,
+    setSelectedNews,
+    selectedHelpArticle,
+    setSelectedHelpArticle,
+    selectedHelp,
+    setSelectedHelp,
+    isApiKeyProvided,
+    freePlan,
+    activeCampaign,
+    setActiveCampaign,
+    campaignFoundRef,
+    campaignsRef,
+    chatbot_config,
+    showNotification,
+    setShowNotification,
+    mainLoading,
+  } = state;
+
+  // Use screen navigation hook
+  const {
+    toggleChat,
+    handleNavigate,
+    handleChatSelect,
+    handleBackToChats,
+    raiseTicket,
+    handleClose,
+  } = useScreenNavigation({
+    state: {
+      setIsOpen,
+      setActiveScreen,
+      setSelectedChatId,
+      setIsSpeakingWithRealPerson,
+    },
+  });
+
+  // Use campaign logic hook
+  useCampaignLogic({
+    appId: config?.app_id || '',
+    campaignsRef,
+    campaignFoundRef,
+    setActiveCampaign,
+  });
+
+  // chat logic
+  const chatLogic = useChatLogic({
+    userId,
+    userEmail,
+    appId: config?.app_id || '',
+    conversationId: selectedChatId,
+    isAdmin: config?.admin,
+    chatAvatar: "https://img.freepik.com/premium-photo/beautiful-woman-with-natural-makeup-women-with-clean-fresh-skin-dark-hear-blue-eyes_150254-452.jpg?semt=ais_hybrid&w=740",
+    chatbot_config,
+    setSelectedChatId,
+    timeoutDuration: 15 * 60 * 1000,
+    setUserEmail,
+    setIsEmailAvailable,
+    isSpeakingWithRealPerson,
+    setIsSpeakingWithRealPerson,
+    onBack: handleBackToChats,
+    setWindowWidth,
+    postChatForm: chatbot_config?.postChatForm,
+    isEmailAvailable,
+    preChatForm: chatbot_config?.preChatForm,
+    adminTestingMode: config?.adminTestingMode,
+    activeScreen,
+    setShowNotification,
+  });
+
+  const {
+    chatMessages,
+    message,
+    setMessage,
+    loading,
+    convoId,
+    setConvoId,
+    isConversationActive,
+    isConversationClosed,
+    reachedLimit,
+    supportName,
+    setSupportName,
+    setChatMessages,
+    supportImage,
+    setSupportImage,
+    showTyping,
+    setShowTyping,
+    isListening,
+    setIsListening,
+    openPostChatForm,
+    lastFetchedConversationIdRef,
+    socketRef,
+    fileInputRef,
+    typingRef,
+    transcript,
+    resetInactivityTimeout,
+    handleSend,
+    handleFileUpload,
+    handleSaveEmail,
+    handlePostFormSubmit,
+    handleCloseChat,
+    startListening,
+    stopListening,
+    cancelListening,
+    handleSwitchToRealPerson,
+    fetchChats,
+    isfetching,
+    startNewConversation,
+    setOpenPostChatForm,
+    playSound,
+  } = chatLogic;
+
   useEffect(() => {
-    const fetchConfig = async () => {
-      if (config?.admin && config.chatbot_config) {
-        // Admin mode: apply config locally but don’t store selectedPage
-        const { selectedPage, ...restConfig } = config.chatbot_config;
+    if (
+      selectedChatId &&
+      lastFetchedConversationIdRef.current !== selectedChatId &&
+      lastFetchedConversationIdRef.current !== 'NEW_CHAT'
+    ) {
+      lastFetchedConversationIdRef.current = selectedChatId;
+      fetchChats();
+    }
+  }, [selectedChatId]);
 
-        setConfig({
-          app_id: config.app_id,
-          admin: true,
-          chatbot_config: restConfig, // exclude selectedPage
+  let chatAvatar = 'https://img.freepik.com/premium-photo/beautiful-woman-with-natural-makeup-women-with-clean-fresh-skin-dark-hear-blue-eyes_150254-452.jpg?semt=ais_hybrid&w=740';
+
+
+
+  // ====== WebSocket connection ======
+  useEffect(() => {
+    if (isSpeakingWithRealPerson && isConversationActive) {
+      let activeConvoId = convoId;
+      if (activeConvoId === 'NEW_CHAT') {
+        activeConvoId = `${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 15)}`;
+      }
+
+      const socket = io(process.env.REACT_APP_SOCKET_URL, {
+        query: {
+          user_email: userEmail,
+          chatbot_id: config?.app_id,
+          conversation_id: activeConvoId,
+          user_id: userId,
+        },
+      });
+
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        console.log('Connected to real-person chat');
+
+        if (convoId === 'NEW_CHAT' && isSpeakingWithRealPerson) {
+          const firstMessage: Message = {
+            user_email: userEmail,
+            user_id: userId,
+            chatbot_id: config?.app_id,
+            role: 'trigger',
+            text: 'start the conversation..',
+            chatbot_history: activeConvoId,
+            timestamp: new Date().toISOString(),
+          };
+          setConvoId(activeConvoId);
+          socket.emit('message', firstMessage);
+        }
+      });
+
+      socket.on('message', (incoming: Message) => {
+        setSupportName((prevName) => {
+          if (incoming.sender_name && incoming.sender_name !== prevName) {
+            return incoming.sender_name;
+          }
+          return prevName;
+        });
+        playSound();
+        
+        setShowNotification(true);
+        
+
+        setSupportImage((prevImage) => {
+          if (
+            incoming.sender_image !== null &&
+            incoming.sender_image !== prevImage
+          ) {
+            return incoming.sender_image;
+          } else if (incoming.sender_image === '') {
+            return chatAvatar;
+          }
+          return prevImage;
         });
 
-        // Open the selected page if provided
-        if (selectedPage) {
-          setActiveScreen(selectedPage.toLowerCase());
-        } else {
-          setActiveScreen('home'); // fallback
+        if (incoming.chatbot_history === activeConvoId) {
+          // Fix: Prevent duplicate messages for user's own messages
+          if (incoming.role === 'user') return;
+
+          setChatMessages((prev) => [...prev, incoming]);
+          resetInactivityTimeout();
         }
-      } else if (config?.app_id) {
-        try {
-          console.log('Fetching chatbot config from server...');
-          const response = await getChatbotConfig(config.app_id);
+      });
 
-          setIsApiKeyProvided(response.isApiKeyProvided);
-          setFreePlan(response.plan === 'Free' ? true : false);
-          const isFree = response.plan === 'Free' ? true : false;
-          // setIsApiKeyProvided(false);
-          // const isFree = false;
-          // setFreePlan(true);
+      socket.on('disconnect', () => {
+        console.log('Disconnected from real-person chat');
+      });
 
-          const cfg = response.chatbot_config;
+      return () => {
+        socket.off('message');
+        socket.disconnect();
+      };
+    }
+  }, [isSpeakingWithRealPerson, userId, config?.app_id, convoId, isConversationActive]);
 
-          const formResponse = await getForms(config.app_id);
-          console.log('Reseponse ------------->', response);
+  useEffect(() => {
+    console.log("selectedChatId", selectedChatId)
 
-          setConfig({
-            app_id: config.app_id,
-            admin: true,
-            adminTestingMode: config.adminTestingMode,
-            chatbot_config: {
-              theme: cfg.theme || 'dark',
-              isFreePlan: isFree,
-              currentPlan: response.plan || 'Trail',
-              isBackgroundImage: cfg.isBackgroundImage || false,
-              backgroundImage: cfg.backgroundImage || '',
-              isBgFade: cfg.isBgFade ?? true,
-              primaryColor: cfg.primaryColor || '#1403ac',
-              secondaryColor: cfg.secondaryColor || '#f3f6ff',
-              chatbotName: cfg.chatbotName || 'Rhinon',
-              navigationOptions: cfg.navigationOptions,
-              popupMessage:
-                cfg.popupMessage ||
-                'Hey, I am Rhinon AI Assistant, How can I help you?',
-              greetings: cfg.greetings?.length
-                ? cfg.greetings
-                : ['Hi there👋', 'How can we help?'],
-              primaryLogo:
-                cfg.primaryLogo ||
-                'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_White.png',
-              secondaryLogo:
-                cfg.secondaryLogo ||
-                'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png',
+  }, [selectedChatId])
 
-              // forms will be updated after fetchForms()
-              preChatForm: formResponse.pre_chat_form,
-              postChatForm: formResponse.post_chat_form,
-              ticketForm: formResponse.ticket_form,
-            },
-          });
-        } catch (err) {
-          console.error('Failed to fetch chatbot config', err);
-        }
+  // ======= calling logic =======
+  useEffect(() => {
+    const newSocket = io(process.env.REACT_APP_SOCKET_URL);
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      console.log(' Connected:', newSocket.id);
+
+      // Auto-register with userId as callId
+      if (userId) {
+        newSocket.emit('register_manual', {
+          callId: userId,
+          username: 'Visitor',
+        });
+        console.log(`Auto-registering Visitor with ID: ${userId}`);
+      }
+    });
+
+    newSocket.on('registered_manual', ({ callId }) => {
+      setIsRegistered(true);
+      console.log(`Registered with Call ID: ${callId}`);
+    });
+
+    // Incoming call
+    newSocket.on('call_request_manual', ({ from, fromName, fromCallId }) => {
+      console.log(`Incoming call from ${fromName} (${fromCallId})`);
+      setIncomingCall({ from, fromName, fromCallId });
+    });
+
+    // ICE + offer handlers
+    newSocket.on('offer_manual', async ({ offer, from }) => {
+      if (!peerRef.current) return;
+      await peerRef.current.setRemoteDescription(
+        new RTCSessionDescription(offer),
+      );
+      const answer = await peerRef.current.createAnswer();
+      await peerRef.current.setLocalDescription(answer);
+      newSocket.emit('answer_manual', { answer, to: from });
+    });
+
+    newSocket.on('ice_candidate_manual', ({ candidate }) => {
+      if (peerRef.current)
+        peerRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+
+    newSocket.on('call_ended_manual', () => {
+      console.log('Call ended by other side');
+      setIsInCall(false);
+      setIncomingCall(null);
+      setCallStartTime(null);
+
+      if (peerRef.current) {
+        peerRef.current.close();
+        peerRef.current = null;
+      }
+
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
+      }
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [userId]);
+
+  const handleAcceptCall = async () => {
+    if (!incomingCall || !socket) return;
+    const { from } = incomingCall;
+    if (activeScreen === 'voice') {
+      setActiveScreen('home')
+    }
+
+    console.log('Accepting call from:', from);
+
+    // Step 1: Ask for microphone permission FIRST
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      console.error('Mic access error:', err);
+      alert('Please allow microphone access to accept the call.');
+      return;
+    }
+
+    // Step 2: Only after permission granted — proceed with connection
+    const peer = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: [
+            'stun:3.109.172.202:3478',
+            'turn:3.109.172.202:3478?transport=udp',
+            'turn:3.109.172.202:3478?transport=tcp',
+          ],
+          username: 'rhinon',
+          credential: 'rtWebRtc@123',
+        },
+      ],
+    });
+    peerRef.current = peer;
+
+    localStreamRef.current = stream;
+    stream.getTracks().forEach((track) => peer.addTrack(track, stream));
+
+    peer.onicecandidate = (e) => {
+      if (e.candidate)
+        socket.emit('ice_candidate_manual', {
+          candidate: e.candidate,
+          to: from,
+        });
+    };
+
+    peer.ontrack = (e) => {
+      console.log('Remote audio received:', e.streams[0]);
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = e.streams[0];
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.autoplay = true;
+      } else {
+        const audio = new Audio();
+        audio.srcObject = e.streams[0];
+        audio.autoplay = true;
+        audio.muted = false;
+        document.body.appendChild(audio);
+        remoteAudioRef.current = audio;
       }
     };
 
-    fetchConfig();
-  }, [config, setConfig]);
+    // Step 3: Update state & notify server
+    setIncomingCall(null);
+    setIsInCall(true);
+    setActiveCallName(incomingCall.fromName || incomingCall.fromCallId || 'Support Agent');
+    setCallStartTime(Date.now());
+    setIsMuted(false);
+    setIsSpeakerOn(true);
 
-  // Handle system theme detection and changes
-  useEffect(() => {
-    // Set initial theme from chatbot_config
-    setEffectiveTheme(getEffectiveTheme(chatbot_config?.theme));
+    socket.emit('call_accepted_manual', { to: from });
+  };
 
-    // Listen for system theme changes if theme is 'system'
-    if (chatbot_config?.theme === 'system' || !chatbot_config?.theme) {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const handleRejectCall = () => {
+    if (!incomingCall || !socket) return;
+    const { from } = incomingCall;
+    console.log('Rejected call from:', from);
+    socket.emit('call_rejected_manual', { to: from });
+    setIncomingCall(null);
 
-      const handleThemeChange = (e: MediaQueryListEvent) => {
-        const newTheme = e.matches ? 'dark' : 'light';
-        setEffectiveTheme(newTheme);
-      };
-
-      mediaQuery.addEventListener('change', handleThemeChange);
-
-      return () => mediaQuery.removeEventListener('change', handleThemeChange);
+    // Stop mic if it was accessed
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
     }
-  }, [chatbot_config?.theme]);
+  };
 
-  // Compute a flag for whether tracking should run
+  const handleEndCall = () => {
+    console.log('Ending call...');
+
+    if (peerRef.current) {
+      peerRef.current.close();
+      peerRef.current = null;
+    }
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    }
+
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = null;
+      remoteAudioRef.current.muted = false;
+    }
+
+    if (socket) socket.emit('end_call_manual');
+
+    setIsInCall(false);
+    setCallStartTime(null);
+    setIsMuted(false);
+    setIsSpeakerOn(true);
+    console.log('Call ended and audio reset');
+  };
+
+  // ====== Call Timer ======
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isInCall && callStartTime) {
+      interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+        const minutes = String(Math.floor(elapsed / 60)).padStart(2, '0');
+        const seconds = String(elapsed % 60).padStart(2, '0');
+        setCallDuration(`${minutes}:${seconds}`);
+      }, 1000);
+    } else {
+      setCallDuration('00:00');
+    }
+    return () => clearInterval(interval);
+  }, [isInCall, callStartTime]);
+
+
+
+  // Compute tracking flag
   const shouldTrack = !config?.admin && !(freePlan && !isApiKeyProvided);
-  // Call the hook unconditionally
   useTracking(config?.app_id, shouldTrack);
 
-  // Handle chat open event from server
-  useEffect(() => {
-    const handleOpenChat = (event: any) => {
-      const conversationId = event.detail?.conversationId;
-      if (!conversationId) return;
-
-      //  Always ensure chat UI is open
-      setIsOpen(true);
-
-      //  Close or reset the existing conversation if any
-      setSelectedChatId(null);
-
-      // Open new conversation
-      setTimeout(() => {
-        setSelectedChatId(conversationId);
-      }, 0);
-
-      // Set UI state
-      setActiveScreen('chats');
-      setIsSpeakingWithRealPerson(true);
-    };
-
-    window.addEventListener('open_chat_from_server', handleOpenChat);
-    return () => {
-      window.removeEventListener('open_chat_from_server', handleOpenChat);
-    };
-  }, []);
-
-  const campaignsRef = useRef<Campaign[]>([]);
-
-  const checkCampaigns = () => {
-    if (campaignFoundRef.current) return;
-
-    try {
-      const activeCampaigns = campaignsRef.current;
-
-      // Prepare visitor data
-      const visitorData = {
-        isReturning: isReturningVisitor(),
-        timeOnPage: getPageLoadTime(),
-        currentUrl: getCurrentUrl(),
-        referrerUrl: getReferrerUrl(),
-      };
-
-      for (const campaign of activeCampaigns) {
-        // Check frequency capping with campaign type
-        if (!canShowCampaign(campaign.id, campaign.type)) {
-          console.log(
-            `Campaign ${campaign.id} skipped: frequency limit reached`,
-          );
-          continue;
-        }
-
-        // Evaluate targeting
-        if (evaluateTargeting(campaign, visitorData)) {
-          console.log(`Campaign ${campaign.id} matched targeting rules`);
-          setActiveCampaign(campaign);
-          recordCampaignView(campaign.id, campaign.type);
-          trackCampaignImpression(campaign.id, config?.app_id || '');
-          campaignFoundRef.current = true; // Mark as found immediately
-          break; // Show first matching campaign
-        }
-      }
-    } catch (error) {
-      console.error('Error checking campaigns:', error);
-    }
-  };
-
-  useEffect(() => {
-    // Initialize visitor tracking
-    const initTracking = async () => {
-      initVisitorTracking();
-    };
-    initTracking();
-
-    const fetchCampaigns = async () => {
-      try {
-        const response = await getCampaignsChatbot(config?.app_id || '');
-        if (response && response.length > 0) {
-          // Filter only active campaigns
-          campaignsRef.current = response.filter(
-            (c: any) => c.status === 'active',
-          );
-          // Initial check immediately after fetch
-          checkCampaigns();
-        }
-      } catch (error) {
-        console.error('Failed to get campaigns chatbot', error);
-      }
-    };
-
-    fetchCampaigns();
-
-    // Re-check campaigns every 5 seconds for time-based triggers using LOCAL data
-    const interval = setInterval(() => {
-      if (!campaignFoundRef.current) {
-        checkCampaigns();
-      } else {
-        clearInterval(interval);
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []); // Empty dependency array - only run once on mount
-
-  // Update ref when activeCampaign changes (safety check)
-  useEffect(() => {
-    if (activeCampaign) {
-      campaignFoundRef.current = true;
-    }
-  }, [activeCampaign]);
-
-  const toggleChat = () => setIsOpen((prev) => !prev);
-
-  const handleNavigate = (screen: string) => {
-    setActiveScreen(screen);
-    if (screen === 'chats') setSelectedChatId(null);
-  };
-
-  const handleChatSelect = (chatId: string) => setSelectedChatId(chatId);
-
-  const handleBackToChats = () => {
-    setSelectedChatId(null);
-    setIsSpeakingWithRealPerson(false);
-  };
-
-  //  Resolve saved user info
-  useEffect(() => {
-    const savedVisitorId = localStorage.getItem('userId');
-    setUserId(savedVisitorId);
-
-    const savedEmail = Cookies.get('userEmail');
-    if (savedEmail) {
-      setUserEmail(savedEmail);
-      setIsEmailAvailable(true);
-    } else {
-      setIsEmailAvailable(false);
-      setUserEmail(
-        isSpeakingWithRealPerson && !savedEmail ? 'New Customer' : savedEmail,
-      );
-    }
-  }, [isSpeakingWithRealPerson]);
-
-  // Auto open if admin
-  useEffect(() => {
-    if (config.admin) {
-      setIsOpen(true);
-    }
-  }, [config.admin]);
-
-  // Popup
-  useEffect(() => {
-    setTimeout(() => {
-      setShowPopup(true);
-    }, 1000);
-  }, []);
-
+  // Navigation options from config
   const navigationOptions = chatbot_config?.navigationOptions || [
     'Home',
     'Messages',
     'Help',
   ];
 
-  const renderNavButton = (option: string) => {
-    if (
-      freePlan &&
-      !['home', 'help', 'messages'].includes(option.toLowerCase())
-    ) {
-      return null;
-    }
-
-    let icon: JSX.Element | null = null;
-    let screen: 'home' | 'chats' | 'help' | 'voice' | 'news' | null = null;
-
-    switch (option.toLowerCase()) {
-      case 'home':
-        icon = svgIcons.homeIcon();
-        screen = 'home';
-        break;
-      case 'messages':
-        icon = svgIcons.chatIcon();
-        screen = 'chats';
-        break;
-      case 'help':
-        icon = svgIcons.helpIcon();
-        screen = 'help';
-        break;
-      case 'voice':
-        icon = <Mic size={20} />;
-        screen = 'voice';
-        break;
-      case 'news':
-        icon = svgIcons.newsIcon();
-        screen = 'news';
-        break;
-      default:
-        return null;
-    }
-
-    return (
-      <button
-        key={screen}
-        className={`nav-btn ${activeScreen === screen ? 'active' : ''}`}
-        style={{ ['--primary-color' as any]: chatbot_config.primaryColor }}
-        onClick={() => screen && handleNavigate(screen)}
-      >
-        <div className='icon-wrapper'>{icon}</div>
-      </button>
-    );
-  };
-
-  const onToChat = () => {
-    setActiveScreen('chats');
-  };
-  const onToHome = () => {
-    setActiveScreen('home');
-  };
-  const raiseTicket = () => setActiveScreen('raiseTicket');
-
-  const handleClose = () => {
-    setIsOpen(false);
-    const closeChatEvent = new CustomEvent('close_chat_from_server');
-    window.dispatchEvent(closeChatEvent);
-  };
+  // Check if bottom nav should be hidden
+  const shouldHideBottomNav = (
+    (activeScreen === 'chats') ||
+    (activeScreen === 'news' && selectedNews) ||
+    activeScreen === 'raiseTicket' ||
+    (activeScreen === 'help' && selectedHelpArticle) ||
+    activeScreen === 'voice'
+  );
 
   const renderActiveScreen = () => {
     switch (activeScreen) {
@@ -520,63 +527,97 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
           <HomeScreen
             onNavigate={handleNavigate}
             isFreePlan={freePlan}
-            isAdmin={config.admin}
+            isAdmin={config?.admin}
             appId={config?.app_id || ''}
             userId={userId}
             userEmail={userEmail}
+            setSelectedChatId={setSelectedChatId}
             chatbot_config={chatbot_config}
             setIsTicketRaised={setIsTicketRaised}
-            ticketForm={chatbot_config.ticketForm}
+            ticketForm={chatbot_config?.ticketForm}
             onChatSelect={handleChatSelect}
+            mainLoading={mainLoading}
+            showNotification={showNotification}
           />
         );
       case 'chats':
-        if (selectedChatId) {
-          return (
-            <ChatScreen
-              isAdmin={config.admin}
-              isFreePlan={freePlan}
-              onNavigate={handleNavigate}
-              isEmailAvailable={isEmailAvailable}
-              setIsEmailAvailable={setIsEmailAvailable}
-              isSpeakingWithRealPerson={isSpeakingWithRealPerson}
-              setIsSpeakingWithRealPerson={setIsSpeakingWithRealPerson}
-              onBack={handleBackToChats}
-              appId={config?.app_id || ''}
-              userId={userId}
-              setUserEmail={setUserEmail}
-              userEmail={userEmail}
-              conversationId={selectedChatId}
-              chatbot_config={chatbot_config}
-              preChatForm={chatbot_config.preChatForm}
-              raiseTicket={raiseTicket}
-              postChatForm={chatbot_config.postChatForm}
-              setIsTicketRaised={setIsTicketRaised}
-              ticketForm={chatbot_config.ticketForm}
-              setWindowWidth={setWindowWidth}
-              adminTestingMode={config.adminTestingMode}
-            // isPostChatSubmitted={isPostChatSubmitted}
-            // setIsPostChatSubmitted={setIsPostChatSubmitted}
-            />
-          );
-        }
+        // Always show unified ChatScreen directly (like WhatsApp)
+        // Use 'NEW_CHAT' if no conversation selected
         return (
-          <ChatHistoryScreen
+          <ChatScreen
+            isAdmin={config?.admin}
             isFreePlan={freePlan}
+            onNavigate={handleNavigate}
+            isEmailAvailable={isEmailAvailable}
+            setIsEmailAvailable={setIsEmailAvailable}
+            isSpeakingWithRealPerson={isSpeakingWithRealPerson}
             setIsSpeakingWithRealPerson={setIsSpeakingWithRealPerson}
-            onChatSelect={handleChatSelect}
+            onBack={handleBackToChats}
             appId={config?.app_id || ''}
             userId={userId}
+            setUserEmail={setUserEmail}
+            userEmail={userEmail}
+            conversationId={selectedChatId || 'NEW_CHAT'}
+            setSelectedChatId={setSelectedChatId}
             chatbot_config={chatbot_config}
-            isAdmin={config.admin}
+            preChatForm={chatbot_config?.preChatForm}
+            raiseTicket={raiseTicket}
+            postChatForm={chatbot_config?.postChatForm}
+            setIsTicketRaised={setIsTicketRaised}
+            ticketForm={chatbot_config?.ticketForm}
+            setWindowWidth={setWindowWidth}
+            adminTestingMode={config?.adminTestingMode}
+            chatMessages={chatMessages}
+            message={message}
+            setMessage={setMessage}
+            loading={loading}
+            convoId={convoId}
+            setConvoId={setConvoId}
+            isConversationActive={isConversationActive}
+            isConversationClosed={isConversationClosed}
+            reachedLimit={reachedLimit}
+            supportName={supportName}
+            setSupportName={setSupportName}
+            supportImage={supportImage}
+            setSupportImage={setSupportImage}
+            setChatMessages={setChatMessages}
+            showTyping={showTyping}
+            setShowTyping={setShowTyping}
+            isListening={isListening}
+            setIsListening={setIsListening}
+            openPostChatForm={openPostChatForm}
+            lastFetchedConversationIdRef={lastFetchedConversationIdRef}
+            socketRef={socketRef}
+            fileInputRef={fileInputRef}
+            typingRef={typingRef}
+            transcript={transcript}
+            resetInactivityTimeout={resetInactivityTimeout}
+            handleSend={handleSend}
+            handleFileUpload={handleFileUpload}
+            handleSaveEmail={handleSaveEmail}
+            handlePostFormSubmit={handlePostFormSubmit}
+            handleCloseChat={handleCloseChat}
+            startListening={startListening}
+            stopListening={stopListening}
+            cancelListening={cancelListening}
+            handleSwitchToRealPerson={handleSwitchToRealPerson}
+            fetchChats={fetchChats}
+            isfetching={isfetching}
+            startNewConversation={startNewConversation}
+            setOpenPostChatForm={setOpenPostChatForm}
+            playSound={playSound}
+            setShowNotification={setShowNotification}
+            showNotification={showNotification}
+            mainLoading={mainLoading}
           />
         );
       case 'voice':
         return (
           <Voice
             appId={config?.app_id || ''}
-            onButtonClick={onToHome}
-            isAdmin={config.admin}
+            onButtonClick={() => setActiveScreen('home')}
+            isAdmin={config?.admin}
+            userEmail={userEmail}
           />
         );
       case 'help':
@@ -600,19 +641,6 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
             appId={config?.app_id}
           />
         );
-      // case 'raiseTicket':
-      //   return (
-      //     <RaiseTicket
-      //       onButtonClick={onToChat}
-      //       goBackClick={onToChat}
-      //       // userId={email}
-      //       appId={app_id}
-      //       setIsTicketRaised={setIsTicketRaised}
-      //       chatbot_config={chatbot_config}
-      //       ticketForm={ticketForm}
-      //     />
-
-      //   );
       case 'news':
         if (selectedNews) {
           return (
@@ -631,15 +659,73 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
           />
         );
       default:
+        // Default to unified chat screen instead of history
         return (
-          <ChatHistoryScreen
+          <ChatScreen
+            isAdmin={config?.admin}
             isFreePlan={freePlan}
+            onNavigate={handleNavigate}
+            isEmailAvailable={isEmailAvailable}
+            setIsEmailAvailable={setIsEmailAvailable}
+            isSpeakingWithRealPerson={isSpeakingWithRealPerson}
             setIsSpeakingWithRealPerson={setIsSpeakingWithRealPerson}
-            onChatSelect={handleChatSelect}
+            onBack={handleBackToChats}
             appId={config?.app_id || ''}
             userId={userId}
+            setUserEmail={setUserEmail}
+            userEmail={userEmail}
+            conversationId={selectedChatId || 'NEW_CHAT'}
+            setSelectedChatId={setSelectedChatId}
             chatbot_config={chatbot_config}
-            isAdmin={config.admin}
+            preChatForm={chatbot_config?.preChatForm}
+            raiseTicket={raiseTicket}
+            postChatForm={chatbot_config?.postChatForm}
+            setIsTicketRaised={setIsTicketRaised}
+            ticketForm={chatbot_config?.ticketForm}
+            setWindowWidth={setWindowWidth}
+            adminTestingMode={config?.adminTestingMode}
+            chatMessages={chatMessages}
+            message={message}
+            setMessage={setMessage}
+            loading={loading}
+            convoId={convoId}
+            setConvoId={setConvoId}
+            isConversationActive={isConversationActive}
+            isConversationClosed={isConversationClosed}
+            reachedLimit={reachedLimit}
+            supportName={supportName}
+            setSupportName={setSupportName}
+            supportImage={supportImage}
+            setSupportImage={setSupportImage}
+            setChatMessages={setChatMessages}
+            showTyping={showTyping}
+            setShowTyping={setShowTyping}
+            isListening={isListening}
+            setIsListening={setIsListening}
+            openPostChatForm={openPostChatForm}
+            lastFetchedConversationIdRef={lastFetchedConversationIdRef}
+            socketRef={socketRef}
+            fileInputRef={fileInputRef}
+            typingRef={typingRef}
+            transcript={transcript}
+            resetInactivityTimeout={resetInactivityTimeout}
+            handleSend={handleSend}
+            handleFileUpload={handleFileUpload}
+            handleSaveEmail={handleSaveEmail}
+            handlePostFormSubmit={handlePostFormSubmit}
+            handleCloseChat={handleCloseChat}
+            startListening={startListening}
+            stopListening={stopListening}
+            cancelListening={cancelListening}
+            handleSwitchToRealPerson={handleSwitchToRealPerson}
+            fetchChats={fetchChats}
+            isfetching={isfetching}
+            startNewConversation={startNewConversation}
+            setOpenPostChatForm={setOpenPostChatForm}
+            playSound={playSound}
+            setShowNotification={setShowNotification}
+            showNotification={showNotification}
+            mainLoading={mainLoading}
           />
         );
     }
@@ -647,20 +733,17 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
 
   return (
     <div
-      className={`chatbot-container ${config.admin ? 'admin-align' : ''}`}
+      className={`chatbot-container ${config?.admin ? 'admin-align' : ''}`}
       data-theme={effectiveTheme}
       style={{
         ...themeVars,
-        ['--primary-color' as any]: chatbot_config?.primaryColor || '#1403ac',
-        ['--secondary-color' as any]:
-          chatbot_config?.secondaryColor || '#f3f6ff',
+        ['--primary-color' as string]: chatbot_config?.primaryColor || '#1403ac',
+        ['--secondary-color' as string]: chatbot_config?.secondaryColor || '#f3f6ff',
       }}
     >
-      {/* Popup Message */}
-      {!isOpen &&
-        showPopup &&
-        chatbot_config?.popupMessage &&
-        activeCampaign && (
+      {/* Campaign Popup */}
+      {!isOpen && showPopup && chatbot_config?.popupMessage && activeCampaign && (
+        <Suspense fallback={null}>
           <Campaigns
             setIsOpen={(val) => {
               if (val === false) {
@@ -671,46 +754,38 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
             }}
             activeCampaign={activeCampaign}
           />
-        )}
+        </Suspense>
+      )}
 
       {/* Chat Window */}
       <AnimatePresence>
-        {(isOpen || config.admin) &&
-          (config?.admin ? (
+        {(isOpen || config?.admin) && (
+          config?.admin ? (
             // Admin mode: no animation
             <div
               className='chat-window'
-              style={{ ['--set-width' as any]: windowWidth }}
+              style={{ ['--set-width' as string]: windowWidth }}
+              role="dialog"
+              aria-label="Chat window"
             >
-
-              <div className='screen-wrapper'>{renderActiveScreen()}</div>
-
-              {/* Dynamic Bottom Navigation */}
-              {!(
-                (activeScreen === 'chats' && selectedChatId) ||
-                (activeScreen === 'news' && selectedNews) ||
-                activeScreen === 'raiseTicket' ||
-                (activeScreen === 'help' && selectedHelpArticle)
-              ) && (
-                  <div className='bottom-nav'>
-                    {navigationOptions.map((option: string) =>
-                      renderNavButton(option),
-                    )}
-                  </div>
-                )}
-
-              <div className='footer'>
-                <p>Powered by</p>
-                <img
-                  src={
-                    effectiveTheme === 'dark'
-                      ? 'https://rhinon.tech/assets/rhinonlogo.png'
-                      : 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png'
-                  }
-                  alt='Rhinon Logo'
-                  style={{ width: 50 }}
-                />
+              <div className='screen-wrapper'>
+                <Suspense fallback={<div className="screen-loading"><Loader /></div>}>
+                  {renderActiveScreen()}
+                </Suspense>
               </div>
+
+              {/* Bottom Navigation */}
+              {!shouldHideBottomNav && (
+                <BottomNav
+                  navigationOptions={navigationOptions}
+                  activeScreen={activeScreen}
+                  chatbot_config={chatbot_config}
+                  freePlan={freePlan}
+                  onNavigate={handleNavigate}
+                />
+              )}
+
+              <MessengerFooter effectiveTheme={effectiveTheme} />
             </div>
           ) : (
             // Normal mode: with animation
@@ -720,79 +795,330 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
               exit={{ opacity: 0, scale: 0.8, y: 20 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
               className='chat-window'
-              style={{ ['--set-width' as any]: windowWidth }}
+              style={{ ['--set-width' as string]: windowWidth }}
+              role="dialog"
+              aria-label="Chat window"
             >
+              {incomingCall && (
+                <div
+                  className='overlay'
+
+                >
+                  <motion.div
+                    className='incoming-call-overlay'
+                    style={{
+                      position: 'absolute',
+                      top: '24px',
+                      left: '50%',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      borderRadius: '24px',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                      padding: '24px',
+                      zIndex: 2000,
+                      textAlign: 'center',
+                      width: '70%',
+                      maxWidth: '320px',
+                      border: '1px solid rgba(255, 255, 255, 0.5)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '16px'
+                    }}
+                    initial={{ opacity: 0, y: -50, x: '-50%' }}
+                    animate={{ opacity: 1, y: 0, x: '-50%' }}
+                    exit={{ opacity: 0, y: -50, x: '-50%' }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%'
+                    }}>
+                      <span style={{
+                        fontSize: '11px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1.5px',
+                        color: '#6b7280',
+                        fontWeight: '700'
+                      }}>
+                        Incoming Call
+                      </span>
+                      <h3 style={{
+                        fontSize: '20px',
+                        fontWeight: '700',
+                        color: '#111827',
+                        margin: 0,
+                        lineHeight: '1.3'
+                      }}>
+                        {incomingCall.fromName || 'Unknown Caller'} <br /> <span style={{ fontSize: '15px', color: '#6b7280' }}>{incomingCall.fromCallId}</span>
+                      </h3>
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      gap: '32px',
+                      width: '100%',
+                      justifyContent: 'center',
+                      marginTop: '8px'
+                    }}>
+                      <button
+                        onClick={handleRejectCall}
+                        title="Decline"
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          background: '#fee2e2',
+                          color: '#ef4444',
+                          border: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.15)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        <PhoneOff size={24} />
+                      </button>
+
+                      <button
+                        onClick={handleAcceptCall}
+                        title="Accept"
+                        style={{
+                          width: '56px',
+                          height: '56px',
+                          borderRadius: '50%',
+                          background: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                          animation: 'pulse 2s infinite'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        <Phone size={24} />
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+
+              {/* ====== In-Call Overlay ====== */}
+              {isInCall && (
+                <div
+                  className='overlay'
+
+                >
+                  <motion.div
+                    className='in-call-overlay'
+                    style={{
+                      position: 'absolute',
+                      top: '24px',
+                      left: '50%',
+                      background: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      borderRadius: '24px',
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+                      padding: '24px',
+                      zIndex: 2000,
+                      textAlign: 'center',
+                      width: '70%',
+                      maxWidth: '320px',
+                      border: '1px solid rgba(255, 255, 255, 0.5)'
+                    }}
+                    initial={{ opacity: 0, y: -50, x: '-50%' }}
+                    animate={{ opacity: 1, y: 0, x: '-50%' }}
+                    exit={{ opacity: 0, y: -50, x: '-50%' }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  >
+                    <div style={{ marginBottom: '24px' }}>
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        padding: '6px 16px',
+                        borderRadius: '20px',
+                        marginBottom: '16px'
+                      }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#10b981',
+                          boxShadow: '0 0 0 2px rgba(16, 185, 129, 0.2)',
+                          animation: 'pulse 2s infinite'
+                        }} />
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#059669', letterSpacing: '0.5px' }}>
+                          LIVE CALL
+                        </span>
+                      </div>
+
+                      <h3 style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: '#111827',
+                        margin: '0 0 4px 0'
+                      }}>
+                        {activeCallName || 'Support Agent'}
+                      </h3>
+
+                      <div style={{
+                        fontSize: '32px',
+                        fontWeight: '300',
+                        color: '#374151',
+                        fontVariantNumeric: 'tabular-nums',
+                        letterSpacing: '-1px'
+                      }}>
+                        {callDuration}
+                      </div>
+                    </div>
+
+                    {/* Controls */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '24px' }}>
+                      <button
+                        title={isMuted ? "Unmute" : "Mute"}
+                        onClick={() => {
+                          if (localStreamRef.current) {
+                            localStreamRef.current.getAudioTracks().forEach((t) => {
+                              t.enabled = !t.enabled;
+                            });
+                            setIsMuted((prev) => !prev);
+                          }
+                        }}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '50%',
+                          background: isMuted ? '#fee2e2' : '#f3f4f6',
+                          color: isMuted ? '#ef4444' : '#4b5563',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+                      </button>
+
+                      <button
+                        title={isSpeakerOn ? "Turn Speaker Off" : "Turn Speaker On"}
+                        onClick={() => {
+                          setIsSpeakerOn((prev) => {
+                            const newVal = !prev;
+                            if (remoteAudioRef.current)
+                              remoteAudioRef.current.muted = !newVal;
+                            return newVal;
+                          });
+                        }}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '50%',
+                          background: isSpeakerOn ? '#d1fae5' : '#f3f4f6',
+                          color: isSpeakerOn ? '#059669' : '#4b5563',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        {isSpeakerOn ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                      </button>
+
+                      <button
+                        title="End Call"
+                        onClick={handleEndCall}
+                        style={{
+                          width: '48px',
+                          height: '48px',
+                          borderRadius: '50%',
+                          background: '#fee2e2',
+                          color: '#ef4444',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+                        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      >
+                        <PhoneOff size={20} />
+                      </button>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+
               <div className='chat-bot-header'>
-                <button className='chat-bot-header-button' onClick={handleClose}><Minus /> </button>
+                <button
+                  className='chat-bot-header-button'
+                  onClick={handleClose}
+                  aria-label="Minimize chat"
+                >
+                  <Minus aria-hidden="true" />
+                </button>
               </div>
-              <div className='screen-wrapper'>{renderActiveScreen()}</div>
 
-              {/* Dynamic Bottom Navigation */}
-              {!(
-                (activeScreen === 'chats' && selectedChatId) ||
-                (activeScreen === 'news' && selectedNews) ||
-                activeScreen === 'raiseTicket' ||
-                (activeScreen === 'help' && selectedHelpArticle) ||
-                activeScreen === 'voice'
-              ) && (
-                  <div className='bottom-nav'>
-                    {navigationOptions.map((option: string) =>
-                      renderNavButton(option),
-                    )}
-                  </div>
-                )}
+              <div className='screen-wrapper'>
+                <Suspense fallback={<div className="screen-loading"><Loader /></div>}>
+                  {renderActiveScreen()}
+                </Suspense>
+              </div>
 
-              <div className='footer'>
-                <p>Powered by</p>
-                <img
-                  src={
-                    effectiveTheme === 'dark'
-                      ? 'https://rhinon.tech/assets/rhinonlogo.png'
-                      : 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png'
-                  }
-                  alt='Rhinon Logo'
-                  style={{ width: 50 }}
+              {/* Bottom Navigation */}
+              {!shouldHideBottomNav && (
+                <BottomNav
+                  navigationOptions={navigationOptions}
+                  activeScreen={activeScreen}
+                  chatbot_config={chatbot_config}
+                  freePlan={freePlan}
+                  onNavigate={handleNavigate}
                 />
-              </div>
+              )}
+
+              <MessengerFooter effectiveTheme={effectiveTheme} />
             </motion.div>
-          ))}
+          )
+        )}
       </AnimatePresence>
 
       {/* Chat Button */}
-      {!(freePlan && !isApiKeyProvided) && ( // Hide button if free plan + no key
-        <>
-          <motion.button
-            style={{ ['--primary-color' as any]: chatbot_config.primaryColor }}
-            className={`chat-button ${!config.admin && isOpen ? '' : ''}`}
-            onClick={
-              config.admin ? undefined : isOpen ? handleClose : toggleChat
-            }
-            disabled={config.admin}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-          // animate={!isOpen ? {
-          //   boxShadow: [
-          //     "0 0 0 0 rgba(0, 0, 0, 0.2)",
-          //     "0 0 0 10px rgba(0, 0, 0, 0)",
-          //   ],
-          // } : {}}
-          // transition={!isOpen ? {
-          //   duration: 2,
-          //   repeat: Infinity,
-          // } : {}}
-          >
-            {!config.admin && isOpen ? (
-              <X size={24} color='#fff' />
-            ) : (
-              <img
-                src={chatbot_config.primaryLogo}
-                alt='Chat icon'
-                style={{ width: '32px', height: '32px', objectFit: 'fill' }}
-              />
-            )}
-          </motion.button>
-        </>
-      )}
+      <ChatButton
+        chatbot_config={chatbot_config}
+        isOpen={isOpen}
+        isAdmin={config?.admin || false}
+        freePlan={freePlan}
+        isApiKeyProvided={isApiKeyProvided}
+        onToggle={toggleChat}
+        onClose={handleClose}
+        showNotification={showNotification}
+      />
     </div>
   );
 };

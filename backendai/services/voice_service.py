@@ -33,11 +33,9 @@ async def generate_openai_ephemeral_session(chatbot_id) -> dict:
 
     # Add your voice assistant context
     custom_prefix = """
-    You are a  AI voice-assistant for this company, the company name and other instruction or given below.
-    - Always respond in a clear, friendly tone.
-    - Keep replies short and natural for speaking aloud.
-    - If the user pauses for too long, ask if they’re still there.
-    - Use a professional, supportive tone.
+    You are a helpful AI voice assistant. 
+    Respond naturally and conversationally. Take your time to think before responding.
+    Keep replies concise and clear for voice conversation.
     """
 
     # Combine both
@@ -52,9 +50,16 @@ async def generate_openai_ephemeral_session(chatbot_id) -> dict:
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "gpt-4o-realtime-preview-2024-10-01",
+        "model": "gpt-realtime-mini",
         "voice": "verse",
         "instructions": instructions,
+        "modalities": ["text", "audio"],
+        "turn_detection": {
+            "type": "server_vad",
+            "threshold": 0.5,
+            "prefix_padding_ms": 300,
+            "silence_duration_ms": 700
+        }
     }
 
 

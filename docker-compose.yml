@@ -1,4 +1,20 @@
 services:
+  rhinon:
+    build:
+      context: ./rhinon
+      dockerfile: Dockerfile
+    container_name: rhinon
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env.docker
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - rhinon-network
+
   rtserver:
     build:
       context: ./rtserver
@@ -7,10 +23,13 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - .env.dev
+      - .env.docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backendai
       - redis
+      - postgres
     networks:
       - rhinon-network
 
@@ -22,7 +41,9 @@ services:
     ports:
       - "5002:5002"
     env_file:
-      - .env.dev
+      - .env.docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - redis
     networks:
@@ -36,6 +57,24 @@ services:
     networks:
       - rhinon-network
 
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: healthcare_local
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - rhinon-network
+
 networks:
   rhinon-network:
     driver: bridge
+
+volumes:
+  postgres_data:

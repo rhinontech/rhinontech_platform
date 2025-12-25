@@ -45,6 +45,7 @@ interface Website {
   favicon?: string;
   addedAt: Date;
   pageCount?: number;
+  nextAction?: string;
 }
 
 type AnalysisStatus = "idle" | "analyzing" | "success" | "error";
@@ -52,7 +53,9 @@ type AnalysisStatus = "idle" | "analyzing" | "success" | "error";
 export default function Websites() {
   const router = useRouter();
   const { toggleAutomateSidebar } = useSidebar();
-  const [urls, setUrls] = useState<{ url: string; updatedAt: string }[]>([]);
+  const [urls, setUrls] = useState<
+    { url: string; updatedAt: string; sitemap?: boolean }[]
+  >([]);
   const [fetching, setFetching] = useState(true);
   const [showHero, setShowHero] = useState(true);
 
@@ -163,6 +166,8 @@ export default function Websites() {
           url: result.url,
           title: result.title,
           description: `Website found at ${result.domain}`,
+          pageCount: result.sitemap.pageCount,
+          nextAction: result.nextAction,
         };
 
         setAnalyzedWebsite(website);
@@ -197,6 +202,7 @@ export default function Websites() {
     const newWebsite = {
       url: normalizeUrl(analyzedWebsite.url),
       updatedAt: new Date().toISOString(),
+      sitemap: analyzedWebsite.nextAction === "auto_scrape",
       // isActive: true,
     };
 
@@ -210,12 +216,12 @@ export default function Websites() {
       setUrls(updatedUrls);
       handleCloseModal();
       toast.success("Website added successfully.");
-      try {
-        await trainAndSetAssistant(chatbotId);
-      } catch (trainError) {
-        console.error("Failed to retrain chatbot after upload:", trainError);
-        toast.error("Website addedd, but retraining failed.");
-      }
+      // try {
+      //   await trainAndSetAssistant(chatbotId);
+      // } catch (trainError) {
+      //   console.error("Failed to retrain chatbot after upload:", trainError);
+      //   toast.error("Website addedd, but retraining failed.");
+      // }
     } catch (error) {
       console.error("Failed to add website:", error);
       toast.error("Failed to add Website.");
@@ -364,6 +370,17 @@ export default function Websites() {
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span className="truncate">{item.url}</span>
                             <span>•</span>
+                            {item.sitemap ? (
+                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                All pages added automatically
+                              </span>
+                            ) : (
+                              <span className="text-yellow-600 dark:text-yellow-400 font-medium">
+                                Pages need to be added manually
+                              </span>
+                            )}
+
+                            <span>•</span>
                             {new Date(item.updatedAt).toLocaleDateString()}
                             {/* <span>•</span>
                           <div className="flex items-center gap-1">
@@ -438,7 +455,7 @@ export default function Websites() {
                   className={cn(
                     "flex-1",
                     urlError &&
-                    "border-destructive focus-visible:ring-destructive"
+                      "border-destructive focus-visible:ring-destructive"
                   )}
                   disabled={analysisStatus === "analyzing"}
                 />
@@ -488,6 +505,17 @@ export default function Websites() {
                           <span>{analyzedWebsite.pageCount} pages found</span>
                         )}
                       </div>
+                      {analyzedWebsite.nextAction === "auto_scrape" ? (
+                        <p className="text-sm text-green-700">
+                          Sitemap detected. We’ll automatically scrape all
+                          pages.
+                        </p>
+                      ) : (
+                        <p className="text-sm text-yellow-700">
+                          No sitemap found. Please add individual page URLs to
+                          continue.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

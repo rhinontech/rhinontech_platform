@@ -2,20 +2,40 @@ import logging
 import asyncio
 import json
 import os
+import time
+import requests
+import traceback
+import uuid
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 from fastapi import HTTPException
 from services.openai_services import client
 from services.embedding_service import embedding_service
-from DB.postgresDB import postgres_connection, run_query, run_write_query, search_vectors
-from controller.chatbot_config import get_url_data, pdf_data, doc_data, txt_data, ppt_data, image_data
+from DB.postgresDB import (
+    postgres_connection, 
+    run_query, 
+    run_write_query, 
+    search_vectors, 
+    get_db_connection, 
+    delete_chunks, 
+    insert_chunk_batch,
+    save_bot_message,
+    init_vector_db, 
+    get_pre_chat_form,
+    get_customer_by_email,
+    move_customer_to_pipeline,
+    save_customer, 
+    get_conversation_metadata, 
+    update_conversation_email
+)
+from controller.chatbot_config import get_sitemap_urls, get_url_data, pdf_data, doc_data, txt_data, ppt_data, image_data
+from resources.industry_prompts import INDUSTRY_PROMPTS
 
 # Use the environment variable for S3 Base URL
 S3_BASE_URL = os.getenv("S3_BASE_URL", "")
 
 class StandardRAGController:
-    
     @staticmethod
     async def fetch_and_prepare_data(chatbot_id: str) -> str:
         """
@@ -43,8 +63,31 @@ class StandardRAGController:
             if url_data:
                 for url_item in url_data:
                     try:
-                        content = get_url_data(url_item['url'])
-                        combined_text += f"\n\n--- Source: {url_item['url']} ---\n{content}"
+                        if url_item.get("sitemap"):
+                        # Sitemap-based scraping
+                            sitemap_urls = get_sitemap_urls(url_item["url"])
+
+                            for page_url in sitemap_urls:
+                                try:
+                                    content = get_url_data(page_url)
+                                    if content:
+                                        combined_text += (
+                                            f"\n\n--- Source: {page_url} ---\n{content}"
+                                        )
+                                except Exception as e:
+                                    logging.error(f"Error scraping {page_url}: {e}")
+
+                            else:
+                                # Single-page scraping
+                                try:
+                                    content = get_url_data(url_item["url"])
+                                    if content:
+                                        combined_text += (
+                                            f"\n\n--- Source: {url_item['url']} ---\n{content}"
+                                        )
+                                except Exception as e:
+                                    logging.error(f"Error fetching URL {url_item['url']}: {e}")
+
                     except Exception as e:
                         logging.error(f"Error fetching URL {url_item.get('url')}: {e}")
 
@@ -111,7 +154,7 @@ class StandardRAGController:
             conn.close()
 
     @staticmethod
-    def chunk_text(text: str, chunk_size: int = 800, overlap: int = 100) -> list[str]:
+    def chunk_text(text: str, chunk_size: int = 600, overlap: int = 100) -> list[str]:
         """
         Splits text into chunks of roughly chunk_size characters with overlap.
         """
@@ -138,19 +181,22 @@ class StandardRAGController:
         3. Embeds Chunks (Batch).
         4. Replaces old chunks in training_chunks table.
         """
-        from DB.postgresDB import delete_chunks, insert_chunk_batch
-        
+        logging.info(f"🔄 Step 1/4: Fetching training data for chatbot {chatbot_id}")
         text_data = await StandardRAGController.fetch_and_prepare_data(chatbot_id)
         if not text_data:
             raise Exception("No training data found for this chatbot.")
         
+        logging.info(f"✅ Fetched {len(text_data)} characters of training data")
+        
         # 1. Chunking
+        logging.info(f"🔄 Step 2/4: Chunking text data...")
         chunks_text = StandardRAGController.chunk_text(text_data)
-        logging.info(f"Generated {len(chunks_text)} chunks for chatbot {chatbot_id}")
+        logging.info(f"✅ Generated {len(chunks_text)} chunks for chatbot {chatbot_id}")
         
         # 2. Embedding (Batch)
         # We process in small batches of 20 to avoid rate limits if needed, 
         # but OpenAI handles list inputs well.
+        logging.info(f"🔄 Step 3/4: Generating embeddings for {len(chunks_text)} chunks...")
         chunks_data = []
         
         # We need a robust embed function. Since embedding_service.embed_text currently takes str, 
@@ -163,6 +209,8 @@ class StandardRAGController:
         # I must fix that first. I will do loop here for specific reliability now.
         
         for i, chunk in enumerate(chunks_text):
+            if (i + 1) % 10 == 0:  # Log progress every 10 chunks
+                logging.info(f"   Embedded {i + 1}/{len(chunks_text)} chunks...")
             vector = embedding_service.embed_text(chunk) 
             if vector:
                 chunks_data.append({
@@ -171,14 +219,42 @@ class StandardRAGController:
                     "embedding": vector
                 })
         
+        logging.info(f"✅ Generated embeddings for {len(chunks_data)} chunks")
+        
         # 3. Replace Data
+        logging.info(f"🔄 Step 4/4: Saving embeddings to database...")
         # Use Thread for DB Ops
         await asyncio.to_thread(delete_chunks, chatbot_id)
         
         if chunks_data:
             await asyncio.to_thread(insert_chunk_batch, chatbot_id, chunks_data)
         
+        logging.info(f"✅ Successfully saved {len(chunks_data)} chunks to database for chatbot {chatbot_id}")
+        
         return True
+
+    @staticmethod
+    def get_organization_type(chatbot_id: str) -> str:
+        """
+        Fetches the organization type for a given chatbot.
+        """
+        try:
+            with get_db_connection() as conn:
+                query = """
+                    SELECT o.organization_type 
+                    FROM organizations o
+                    JOIN chatbots c ON o.id = c.organization_id
+                    WHERE c.chatbot_id = %s
+                """
+                with conn.cursor() as cur:
+                   cur.execute(query, (chatbot_id,))
+                   result = cur.fetchone()
+                   if result:
+                       return result[0] or "Default"
+            return "Default"
+        except Exception as e:
+            logging.error(f"Error fetching organization type: {e}")
+            return "Default"
 
     @staticmethod
     async def chat_stream(chatbot_id: str, user_id: str, prompt: str, conversation_id: str = None, user_email: str = None, user_plan: str = None):
@@ -189,7 +265,6 @@ class StandardRAGController:
 
 
         
-        import time
         start_time = time.time()
         
         # 1. Embed Prompt & Retrieve Context (Vector Search)
@@ -211,17 +286,23 @@ class StandardRAGController:
         print(f"RAG Context (Vector Search): {context_text[:100]}...")
 
         # 2. Construct System Instruction (Base)
+        
+        # Determine Organization Type and get Industry Instruction
+        org_type = StandardRAGController.get_organization_type(chatbot_id)
+        # Determine Organization Type and get Industry Instruction
+        org_type = StandardRAGController.get_organization_type(chatbot_id)
+        industry_instruction = INDUSTRY_PROMPTS.get(org_type, INDUSTRY_PROMPTS["Default"])
+        
         system_instruction = (
-            "You are a helpful assistant for this organization.\n"
+            f"{industry_instruction}\n\n"
             "Use the following pieces of retrieved context to answer the user's question.\n"
-            "If the answer is not in the context, say you don't know, but answer politely.\n"
+            "If the answer is not in the context, say you don't know, but answer politely based on your persona.\n"
             "Keep answers concise and relevant."
             "\n"
             f"Context:\n{context_text}"
         )
 
         # 2.5. Check for Pre-Chat Form (Function Calling)
-        from DB.postgresDB import get_pre_chat_form
         form_config = get_pre_chat_form(chatbot_id)
         
         tools = None
@@ -259,6 +340,30 @@ class StandardRAGController:
                         }
                     }
                 }]
+                
+                # Add Handoff Tool
+                tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": "handoff_to_support",
+                        "description": "Moves the customer to the priority support pipeline OR requests an immediate call. Use when user explicitly creates a support request.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "email": {"type": "string", "description": "Customer email"},
+                                "name": {"type": "string", "description": "Customer name"},
+                                "phone": {"type": "string", "description": "Customer phone"},
+                                "urgency": {
+                                    "type": "string", 
+                                    "enum": ["immediate", "later"],
+                                    "description": "If user wants 'immediate' call/help right now, or 'later' (scheduled/pipeline)."
+                                }
+                            },
+                            "required": ["email"]
+                        }
+                    }
+                })
+                
                 tool_choice = "auto"
                 
                 # Append to System Instruction
@@ -268,27 +373,79 @@ class StandardRAGController:
                 
                 fields_str = "\n".join(field_descriptions)
                 
+                
+                # Updated system instruction - wait 3 messages before asking for details
+                if user_email:
+                     # 2a. Fetch Customer Details if available
+                     customer_context_str = ""
+                     try:
+                         with get_db_connection() as conn:
+                             cust = get_customer_by_email(chatbot_id, user_email, conn)
+                             if cust:
+                                 c_name = cust.get("name")
+                                 c_phone = cust.get("phone")
+                                 if c_name: 
+                                     customer_context_str += f"Name: {c_name}\n"
+                                     customer_context_str += f"IMPORTANT: Address the user by their name ({c_name}) occasionally to be friendly.\n"
+                                 if c_phone: customer_context_str += f"Phone: {c_phone}\n"
+                     except Exception as e:
+                         print(f"Error fetching customer context: {e}")
+
+                     # If we already know the email (returning user or context), just ask for missing info or confirm.
+                     system_instruction += (
+                        f"\n\n[USER CONTEXT]\n"
+                        f"You are speaking with a user whose email is: {user_email}.\n"
+                        f"{customer_context_str}"
+                        f"Since you already have their email, do NOT ask for it again.\n"
+                        f"However, if you do not have their Name or Phone in the context above, please ask for those politely after 3 turns.\n"
+                     )
+                else:
+                     system_instruction += (
+                        f"\n\n[PROGRESSIVE FORM COLLECTION]\n"
+                        f"First, engage naturally with the user. Answer their questions helpfully for 3 conversation turns.\n"
+                        f"After 3 turns, you must collect: Name, Email, and Phone Number.\n"
+                        f"CRITICAL: Ask for these details ONE BY ONE. Do NOT ask for all three at once.\n"
+                        f"1. Ask for the Name. Wait for answer.\n"
+                        f"2. Ask for the Email. Wait for answer.\n"
+                        f"3. Ask for the Phone Number. Wait for answer.\n"
+                        f"Once you have all three values (name, email, phone), call the 'submit_pre_chat_form' function immediately.\n"
+                        f"After calling the function, do NOT tell the user 'I have saved your details'. Just say 'Thanks!' or 'Got it!' and continue.\n"
+                     )
+
                 system_instruction += (
-                    f"\n\n[MANDATORY FORM COLLECTION]\n"
-                    f"Before providing ANY assistance or answering ANY questions, you MUST collect the following user details: {fields_str}\n"
-                    f"If the user provides only SOME of these details, you must acknowledge them and IMMEDIATELY ask for the remaining missing details.\n"
-                    f"However, collect ONLY the details listed above. Do NOT ask for 'Name' or 'Phone' unless they are explicitly listed in the requirements.\n"
-                    f"Do NOT generate a tool call until you have received ALL the required values.\n"
-                    f"Once you have ALL the values, call the 'submit_pre_chat_form' function immediately."
+                    f"\n[SUPPORT HANDOFF (CRITICAL)]\n"
+                    f"You must proactively capture the user's details (Name, Email, Phone) and move them to the pipeline if they show HIGH INTEREST.\n"
+                    f"Triggers for HIGH INTEREST include:\n"
+                    f"1. Asking about PRICING or cost.\n"
+                    f"2. Asking for comparisons with COMPITITORS (e.g., Freshworks, Intercom).\n"
+                    f"3. Asking deep/detailed questions about COMPANY FEATURES or technical specs.\n"
+                    f"4. Explicitly asking to speak to a human or support.\n"
+                    f"ACTION IF TRIGGERED:\n"
+                    f"1. Check if you have Name, Email, Phone. If missing, ASK for them politely one by one.\n"
+                    f"2. Once you have the details, call 'handoff_to_support' with urgency='later' to save them to the pipeline first.\n"
+                    f"3. AFTER saving, ASK the user: 'I have added you to our priority queue. would you like to connect with a support agent immediately?'\n"
+                    f"4. IF USER SAYS YES: Call 'handoff_to_support' AGAIN with urgency='immediate'.\n"
+                    f"5. IF USER SAYS NO: Say 'Great! Our team will reach out to you shortly.'\n"
                 )
 
         # 3. Manage Thread/Conversation
         # Use Context Manager to automatically get/release pool connection
-        import traceback
-        from DB.postgresDB import get_db_connection
+        # 3. Manage Thread/Conversation
+        # Use Context Manager to automatically get/release pool connection
         
         history_messages = []
         is_new_thread = False
         
         try:
             with get_db_connection() as conn:
+                # 3a. Resolve User Identity if missing
+                if conversation_id and not is_new_thread and not user_email:
+                    meta = get_conversation_metadata(conversation_id, conn)
+                    if meta and meta.get("user_email"):
+                        user_email = meta.get("user_email")
+                        print(f"✅ Resolved User Email from Conversation: {user_email}")
+
                 if not conversation_id or conversation_id == "NEW_CHAT":
-                     import uuid
                      conversation_id = str(uuid.uuid4())
                      is_new_thread = True
                      yield f"data: {json.dumps({'event': 'thread_created', 'thread_id': conversation_id})}\n\n"
@@ -321,37 +478,80 @@ class StandardRAGController:
                      except Exception as e:
                          logging.error(f"Error fetching history: {e}")
 
+                # 4. Detect Returning User
+                is_returning_user = False
+                customer_data = None
+                
+                # We need user_email for detection. Currently it might be in history or passed context?
+                # Standard chat usually doesn't pass email in body unless we update the endpoint signature.
+                # However, we have user_email in the session or context. 
+                # Let's check where 'user_email' comes from. It's passed to generate_realtime_session but here it is chat_stream?
+                # Ah, standard chat uses /standard/chat which has body. 
+                # Assuming the controller method receives it or we need to look it up from conversation_id if stored?
+                # We save email in bot_conversations on creation.
+                
+                # Let's try to get email from conversation record if available
+                if conversation_id:
+                     u_email_query = "SELECT user_email FROM bot_conversations WHERE conversation_id = %s"
+                     email_res = run_query(conn, u_email_query, (conversation_id,))
+                     if email_res and email_res[0][0]:
+                           user_email = email_res[0][0]
+                           if user_email and "guest" not in user_email and "@" in user_email:
+                                customer_data = get_customer_by_email(chatbot_id, user_email, conn)
+                                if customer_data: is_returning_user = True
+
                 # Separate Form Instruction to inject it closer to User Prompt for stronger adherence
                 form_system_instruction = ""
-                if form_config and fields_str:
+                
+                if is_returning_user:
+                     c_name = customer_data.get("name", "")
+                     c_phone = customer_data.get("phone", "")
+                     
                      form_system_instruction = (
-                        f"\n\n[SYSTEM INTERVENTION - MANDATORY FORM]"
-                        f"\nREQUIRED DETAILS: {fields_str}"
-                        f"\nLOGIC FLOW:"
-                        f"\n1. ANALYZE the user's message below."
-                        f"\n2. IF the user has provided the required details, you MUST call 'submit_pre_chat_form' IMMEDIATELY."
-                        f"\n3. IF the details are missing, you MUST ask for them explicitly."
-                        f"\n4. CONSTRAINT: Do NOT ask for unlisted fields (like Name/Phone) if they are not in the REQUIRED DETAILS list."
-                        f"\n5. Do NOT answer the user's question until the form is submitted."
+                        f"\n\n[RETURNING CUSTOMER DETECTED]\n"
+                        f"You are speaking with a valued returning customer.\n"
                      )
+                     
+                     if c_name:
+                         form_system_instruction += (
+                             f"Their name is: {c_name}.\n"
+                             f"IMPORTANT: Greet them by name (e.g., 'Hello {c_name}') at the start.\n"
+                             f"Address them by name occasionally throughout the conversation.\n"
+                         )
+                     
+                     form_system_instruction += "You have their details, so do NOT ask for Name/Email/Phone."
+                     # Clear tools if we want to prevent form tool usage for returning users?
+                     # Ideally yes, or keep it just in case they want to update? 
+                     # Plan said "No tools needed for returning users" regarding form.
+                     # Let's remove submit_pre_chat_form from tools if present
+                     tools = [t for t in tools if t['function']['name'] != 'submit_pre_chat_form']
 
-                messages = [{"role": "system", "content": system_instruction}]
-                messages.extend(history_messages)
-                
-                # Injection: Prepend strict instruction to the final user prompt
-                final_user_content = prompt
-                if form_system_instruction:
-                    final_user_content = f"{form_system_instruction}\n\nUser says: {prompt}"
-                
-                messages.append({"role": "user", "content": final_user_content})
-                
-                # Debug Print
-                # print(f"DEBUG: Final User Message: {final_user_content}")
-                
-                print(f"DEBUG: Tools Count: {len(tools) if tools else 0}")
-                if tools:
-                    print(f"DEBUG: First Tool: {tools[0]['function']['name']}")
-                    # print(f"DEBUG: System Prompt: {system_instruction}")
+                elif form_config and fields_str:
+                     conversation_turn_count = len(history_messages) // 2  # Count user-bot exchanges
+                     if conversation_turn_count >= 3:
+                          # After 3 turns, start asking for details
+                          form_system_instruction = (
+                             f"\n\n[SYSTEM INTERVENTION - DETECT & COLLECT USER DETAILS]"
+                             f"\nYou have had {conversation_turn_count} conversation turns with the user."
+                             f"\nNow is the time to collect: Name, Email, and Phone Number."
+                             f"\nLOGIC FLOW:"
+                             f"\n1. REVIEW what you have already collected from previous messages."
+                             f"\n2. IF you have AT LEAST ONE NEW PIECE of info (e.g. Name), call 'submit_pre_chat_form' IMMEDIATELY."
+                             f"\n3. IF YOU ARE MISSING ANY, ASK FOR ONE MISSING ITEM ONLY."
+                             f"\n   - If missing Name: 'May I know your name?'"
+                             f"\n   - If missing Email: 'Thanks! What is your email address?'"
+                             f"\n   - If missing Phone: 'And your phone number?'"
+                             f"\n4. Do NOT ask for all three at once."
+                             f"\n5. Do NOT say 'I will save this' or 'details saved'."
+                          )
+                     else:
+                          # Before 4 turns, just answer naturally
+                          form_system_instruction = (
+                             f"\n\n[SYSTEM INTERVENTION - EARLY CONVERSATION]"
+                             f"\nYou are in turn {conversation_turn_count + 1} of the conversation."
+                             f"\nFocus on answering the user's questions helpfully."
+                             f"\nDo NOT ask for name, email, or phone number yet."
+                          )
                 
         except Exception as e:
              logging.error(f"Error in chat setup: {e}")
@@ -363,6 +563,17 @@ class StandardRAGController:
         tool_call_buffer = [] 
         
         try:
+            # Construct Messages for LLM
+            # 1. System
+            full_system_prompt = f"{system_instruction}{form_system_instruction}"
+            messages = [{"role": "system", "content": full_system_prompt}]
+            
+            # 2. History
+            messages.extend(history_messages)
+            
+            # 3. Current User Message
+            messages.append({"role": "user", "content": prompt})
+
             t_llm_start = time.time()
             
             # Prepare args
@@ -416,18 +627,117 @@ class StandardRAGController:
                     print(f"TOOL CALL DETECTED: {tc['name']}")
                     print(f"ARGUMENTS: {tc['arguments']}") 
                     
+                    tool_result = {"status": "error", "message": "Unknown tool"}
+
+                    if tc['name'] == 'handoff_to_support':
+                        try:
+                            # Extract args
+                            args = {}
+                            if tc.get("arguments"):
+                                try:
+                                    args = json.loads(tc["arguments"])
+                                except:
+                                    pass
+                            
+                            email_arg = args.get("email") or user_email
+                            name_arg = args.get("name")
+                            phone_arg = args.get("phone")
+                            urgency_arg = args.get("urgency")
+
+                            if email_arg:
+                                # 1. Update/Save Customer Data
+                                if name_arg or phone_arg:
+                                    c_data = {
+                                        "name": name_arg,
+                                        "phone": phone_arg,
+                                        "source": "chatbot",
+                                        "chatbot_id": chatbot_id
+                                    }
+                                    save_customer(chatbot_id, email_arg, c_data)
+
+                                # 2. Handle Urgency
+                                if urgency_arg == 'immediate':
+                                     from DB.postgresDB import create_notification
+                                     title = f"Urgent Callback: {name_arg or email_arg}"
+                                     message = f"User has requested an immediate callback via standard chat. Phone: {phone_arg or 'N/A'}"
+                                     # Include user_id for generic 'call' targeting (since Messenger registers with it)
+                                     data = {
+                                         "email": email_arg, 
+                                         "phone": phone_arg, 
+                                         "name": name_arg, 
+                                         "chatbot_id": chatbot_id,
+                                         "user_id": user_id 
+                                     }
+                                     create_notification(chatbot_id, "call", title, message, data)
+                                     tool_result = {"status": "success", "message": "Immediate callback requested. Team notified!"}
+                                
+                                else:
+                                    # 3. Move to Pipeline (Schedule/Later)
+                                    with get_db_connection() as conn:
+                                         success = move_customer_to_pipeline(chatbot_id, email_arg, conn)
+                                    
+                                    if success:
+                                         tool_result = {"status": "success", "message": "Handoff complete. Customer moved to priority queue."}
+                                    else:
+                                         tool_result = {"status": "error", "message": "Handoff failed (pipeline not found or user missing)."}
+                            else:
+                                 tool_result = {"status": "error", "message": "Email is required. Please ask the user for their email."}
+                        except Exception as e:
+                            print(f"❌ Handoff Error: {e}")
+                            logging.error(f"Handoff Error: {e}") 
+                            tool_result = {"status": "error", "message": "Server error during handoff."}
+
+                    elif tc['name'] == 'submit_pre_chat_form':
+                        # Save to CRM via rtserver logic
+                        try:
+                            form_data = json.loads(tc['arguments'])
+                            rtserver_url = os.getenv("RTSERVER_URL", "http://localhost:3000")
+                            
+                            # Get chatbot organization_id
+                            conn = postgres_connection()
+                            org_query = "SELECT organization_id FROM chatbots WHERE chatbot_id = %s"
+                            org_result = run_query(conn, org_query, (chatbot_id,))
+                            conn.close()
+                            
+                            if org_result and org_result[0]:
+                                # Construct Save Data
+                                custom_data = {
+                                    "name": form_data.get("name", ""),
+                                    "phone": form_data.get("phone", ""),
+                                    "source": "chatbot",
+                                    "chatbot_id": chatbot_id
+                                }
+                                email_to_save = form_data.get("email", "")
+                                
+                                # Use new DB helper (handles connection internally)
+                                success = save_customer(chatbot_id, email_to_save, custom_data)
+                                
+                                if success:
+                                    # Also update conversation if ID exists
+                                    if conversation_id and email_to_save:
+                                         update_conversation_email(conversation_id, email_to_save)
+                                         
+                                    tool_result = {"status": "success", "message": "Data processed. Continue conversation."}
+                                else:
+                                    tool_result = {"status": "error", "message": "Failed to save data."}
+                            else:
+                                print(f"⚠️ Organization not found for chatbot {chatbot_id}")
+                                tool_result = {"status": "success", "message": "Ack."}
+
+                        except Exception as error:
+                            print(f"❌ Error submitting form: {error}")
+                            tool_result = {"status": "error", "message": "Form submission failed."}
+
+                    
                     # 2. Add Tool Output Message to History
-                    # Simulate successful submission
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc["id"],
-                        "content": json.dumps({"status": "success", "message": "Form details received."})
+                        "content": json.dumps(tool_result)
                     })
                 
-                # 3. Inform User (Optional, but good UX)
-                thank_you_msg = "Thank you for sharing your details! "
-                yield f"data: {json.dumps({'token': thank_you_msg})}\n\n"
-                full_response += thank_you_msg
+                # 3. Don't send "Thank you" message - let the bot respond naturally
+                # The recursive call below will generate the appropriate response
                 
                 # 4. RECURSIVE CALL: Continue checking if there's an answer needed
                 # We remove tools from next call to avoid loops (unless we want multi-step tools)

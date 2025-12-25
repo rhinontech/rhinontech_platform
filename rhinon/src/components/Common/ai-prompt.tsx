@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowRight, Bot, Check, ChevronDown, Paperclip, MessageCircle } from "lucide-react";
+import {
+  ArrowRight,
+  Bot,
+  Check,
+  ChevronDown,
+  Paperclip,
+  MessageCircle,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -17,7 +24,12 @@ type InputProps = {
   onWhatsAppTrigger?: () => void;
 };
 
-export default function AI_Prompt({ onSubmit, isDummyData, conversationEmail, onWhatsAppTrigger }: InputProps) {
+export default function AI_Prompt({
+  onSubmit,
+  isDummyData,
+  conversationEmail,
+  onWhatsAppTrigger,
+}: InputProps) {
   const [value, setValue] = useState("");
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: 72,
@@ -188,7 +200,7 @@ export default function AI_Prompt({ onSubmit, isDummyData, conversationEmail, on
               </label>
 
               {/* WhatsApp Trigger Button */}
-              {/* {conversationEmail && onWhatsAppTrigger && isWhatsAppActive && (
+              {conversationEmail && onWhatsAppTrigger && isWhatsAppActive && (
                 <button
                   type="button"
                   onClick={() => setShowWhatsAppConfirm(true)}
@@ -197,11 +209,10 @@ export default function AI_Prompt({ onSubmit, isDummyData, conversationEmail, on
                     "hover:bg-black/10 dark:hover:bg-white/10"
                   )}
                   aria-label="Send WhatsApp trigger"
-                  title="Send WhatsApp connection to customer"
-                >
+                  title="Send WhatsApp connection to customer">
                   <MessageCircle className="w-4 h-4 text-green-600" />
                 </button>
-              )} */}
+              )}
             </div>
 
             {/* Send Button */}
@@ -229,15 +240,17 @@ export default function AI_Prompt({ onSubmit, isDummyData, conversationEmail, on
       {showWhatsAppConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold mb-2">Send WhatsApp Connection</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              Send WhatsApp Connection
+            </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              This will send a WhatsApp connection request to the customer. They will be able to continue the conversation on WhatsApp.
+              This will send a WhatsApp connection request to the customer. They
+              will be able to continue the conversation on WhatsApp.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowWhatsAppConfirm(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
-              >
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
                 Cancel
               </button>
               <button
@@ -245,8 +258,7 @@ export default function AI_Prompt({ onSubmit, isDummyData, conversationEmail, on
                   setShowWhatsAppConfirm(false);
                   onWhatsAppTrigger?.();
                 }}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg"
-              >
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg">
                 Send WhatsApp Request
               </button>
             </div>

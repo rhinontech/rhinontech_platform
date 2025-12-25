@@ -36,6 +36,14 @@ async def set_user_assistant(request: ChatRequest):
         logging.error(f"Error setting assistant: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Alias for rtserver compatibility
+@router.post("/api/ingest")
+async def ingest_training_data(request: ChatRequest):
+    """
+    Alias for set_user_assistant - used by rtserver automation sync
+    """
+    return await set_user_assistant(request)
+
 @router.post("/standard/chat")
 async def chat_standard(request: ChatRequest):
     """

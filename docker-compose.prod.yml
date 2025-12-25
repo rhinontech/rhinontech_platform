@@ -1,0 +1,101 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - rhinon
+      - rtserver
+    networks:
+      - rhinon-network
+
+  rhinon:
+    build:
+      context: ./rhinon
+      dockerfile: Dockerfile
+    container_name: rhinon
+    restart: always
+    expose:
+      - "4000"
+    env_file:
+      - .env.docker
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.rhinon.tech/api
+      - NEXT_PUBLIC_API_AI_URL=https://api-ai.rhinon.tech
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - rhinon-network
+
+  rtserver:
+    build:
+      context: ./rtserver
+      dockerfile: Dockerfile
+    container_name: rtserver
+    restart: always
+    expose:
+      - "3000"
+    env_file:
+      - .env.docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - backendai
+      - redis
+      - postgres
+    networks:
+      - rhinon-network
+
+  backendai:
+    build:
+      context: ./backendai
+      dockerfile: Dockerfile
+    container_name: backendai
+    restart: always
+    expose:
+      - "5002"
+    env_file:
+      - .env.docker
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+    networks:
+      - rhinon-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    expose:
+      - "6379"
+    networks:
+      - rhinon-network
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: postgres
+    restart: always
+    expose:
+      - "5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rhinontech
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - rhinon-network
+
+networks:
+  rhinon-network:
+    driver: bridge
+
+volumes:
+  postgres_data_prod:

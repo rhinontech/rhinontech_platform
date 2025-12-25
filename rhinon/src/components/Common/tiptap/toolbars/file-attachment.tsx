@@ -49,9 +49,9 @@ export const FileAttachment = Node.create({
             "path",
             {
               d: "M7 7v10M17 7v10M4 17h16M4 7h16",
-              "stroke-linecap": "round",
-              "stroke-linejoin": "round",
-              "stroke-width": 2,
+              "strokeLinecap": "round",
+              "strokeLinejoin": "round",
+              "strokeWidth": 2,
             },
           ],
         ],

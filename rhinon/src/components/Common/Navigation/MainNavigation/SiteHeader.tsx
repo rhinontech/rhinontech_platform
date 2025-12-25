@@ -14,6 +14,7 @@ import { ThemeModeToggle } from "@/components/Common/providers/ThemeModeToggle";
 import WorkTracker from "./WorkTracker";
 import AiHelp from "../../Copilot/AiHelp";
 import TeamChatDrawer from "../../TeamChat/TeamChatDrawer";
+import { NotificationBell } from "./NotificationBell";
 
 import { useBannerStore } from "@/store/useBannerStore";
 import { X } from "lucide-react";
@@ -66,6 +67,7 @@ export function SiteHeader() {
           {isPlanValid && (
             <>
               {/* <WorkTracker /> */}
+              <NotificationBell />
               <TeamChatDrawer />
               <AiHelp />
             </>

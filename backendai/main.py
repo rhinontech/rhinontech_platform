@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import copilot_routes
 import uvicorn
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 
 from routes.rhinon_ai_chatbot import router as rhinon_ai_router 
@@ -31,11 +32,14 @@ async def lifespan(app: FastAPI):
         print(f"MongoDB connection error: {e}")
 
     # Connect to PostgreSQL
-    pg_conn = postgres_connection()
-    if pg_conn:
-        print("PostgreSQL connection successful")
-    else:
-        print("Failed to connect to PostgreSQL")
+    try:
+        pg_conn = postgres_connection()
+        if pg_conn:
+            print("PostgreSQL connection successful")
+        else:
+            print("Failed to connect to PostgreSQL - will retry on demand")
+    except Exception as e:
+        print(f"PostgreSQL connection error: {e} - will retry on demand")
 
     yield 
 
@@ -63,6 +67,38 @@ app.add_middleware(
 @app.get("/hello")
 def read_root():
     return {"message": "Hello, World!"}
+
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint - checks PostgreSQL and OpenAI API availability
+    """
+    from DB.postgresDB import check_db_health
+    import os
+    
+    health_status = {
+        "service": "backendai",
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "checks": {}
+    }
+    
+    # Check PostgreSQL
+    db_health = check_db_health()
+    health_status["checks"]["postgresql"] = db_health
+    
+    # Check OpenAI API Key
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if openai_key and openai_key != "your_openai_api_key_here":
+        health_status["checks"]["openai"] = {"status": "configured"}
+    else:
+        health_status["checks"]["openai"] = {"status": "not_configured"}
+    
+    # Overall status
+    if db_health["status"] != "healthy":
+        health_status["status"] = "degraded"
+    
+    return health_status
 
 # Include your routers
 app.include_router(rhinon_ai_router, prefix="/api", tags=["Assistant for WebApp"])
