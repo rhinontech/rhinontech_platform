@@ -51,3 +51,6 @@ Thumbs.db
 
 # GitHub
 .github/
+
+# /*.pem
+rhinon-prod-key.pem
