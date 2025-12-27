@@ -50,4 +50,7 @@ Thumbs.db
 .terraform.lock.hcl
 
 # GitHub
-.github/
+
+
+# /*.pem
+rhinon-prod-key.pem

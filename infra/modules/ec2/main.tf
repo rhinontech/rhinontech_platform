@@ -6,6 +6,15 @@ resource "aws_instance" "this" {
   vpc_security_group_ids = var.vpc_security_group_ids
   user_data              = var.user_data
 
+  root_block_device {
+    volume_size = var.root_volume_size
+    volume_type = "gp3"
+  }
+
+  credit_specification {
+    cpu_credits = "standard"
+  }
+
   tags = {
     Name        = var.name
     Environment = var.environment

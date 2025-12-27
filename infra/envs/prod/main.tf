@@ -53,6 +53,7 @@ module "prod_server" {
   name                   = "rhinon-platform-prod"
   ami_id                 = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
+  root_volume_size       = 30
   subnet_id              = module.vpc.public_subnet_ids[0]
   key_name               = aws_key_pair.prod_key.key_name # Implicit dependency
   vpc_security_group_ids = [module.security_groups.ec2_sg_id]

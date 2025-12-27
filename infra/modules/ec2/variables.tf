@@ -10,3 +10,7 @@ variable "user_data" {
   type    = string 
   default = "echo 'No user data'"
 }
+variable "root_volume_size" {
+  type    = number
+  default = 8
+}
