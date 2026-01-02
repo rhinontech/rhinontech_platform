@@ -44,7 +44,7 @@ services:
     container_name: rtserver
     restart: always
     expose:
-      - "3000"
+      - "5000"
     env_file:
       - .env
     environment:
