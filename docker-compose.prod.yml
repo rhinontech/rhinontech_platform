@@ -28,7 +28,7 @@ services:
     expose:
       - "4000"
     env_file:
-      - .env.docker
+      - .env.production
     environment:
       - NEXT_PUBLIC_API_URL=https://api.rhinon.tech/api
       - NEXT_PUBLIC_API_AI_URL=https://api-ai.rhinon.tech
@@ -46,13 +46,18 @@ services:
     expose:
       - "3000"
     env_file:
-      - .env.docker
+      - .env.production
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=5432
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
       - backendai
       - redis
-      - postgres
     networks:
       - rhinon-network
 
@@ -65,7 +70,13 @@ services:
     expose:
       - "5002"
     env_file:
-      - .env.docker
+      - .env.production
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=5432
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -82,25 +93,6 @@ services:
     networks:
       - rhinon-network
 
-  postgres:
-    image: pgvector/pgvector:pg15
-    container_name: postgres
-    restart: always
-    expose:
-      - "5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: rhinontech
-    volumes:
-      - postgres_data_prod:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
-    networks:
-      - rhinon-network
-
 networks:
   rhinon-network:
     driver: bridge
-
-volumes:
-  postgres_data_prod:

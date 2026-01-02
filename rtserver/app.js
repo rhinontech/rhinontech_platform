@@ -104,7 +104,7 @@ app.get("/health", async (req, res) => {
   // Check AI Backend
   try {
     const axios = require('axios');
-    const aiUrl = process.env.AI_API_URL || 'http://localhost:5002';
+    const aiUrl = process.env.INTERNAL_AI_API_URL || process.env.AI_API_URL || 'http://localhost:5002';
     await axios.get(`${aiUrl}/health`, { timeout: 3000 });
     healthStatus.checks.backendai = { status: "healthy" };
   } catch (error) {

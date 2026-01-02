@@ -92,7 +92,7 @@ const createOrUpdateAutomation = async (req, res) => {
     // We send the automation data to Python service for ingestion
     try {
       const axios = require("axios");
-      const pythonBackendUrl = process.env.AI_API_URL || "http://localhost:5002";
+      const pythonBackendUrl = process.env.INTERNAL_AI_API_URL || process.env.AI_API_URL || "http://localhost:5002";
       const pythonBackendUrl1 = `${pythonBackendUrl}/api/ingest`;
       // We need to fetch the chatbot_id for this organization to send to Python
       // Assuming 1-to-1 mapping or just taking one.
@@ -108,16 +108,16 @@ const createOrUpdateAutomation = async (req, res) => {
         // WAIT for ingestion to complete (blocking)
         // Increased timeout to 10 minutes for large websites/documents
         console.log(`🔄 Starting AI ingestion for chatbot ${chatbot.chatbot_id}...`);
-        const response = await axios.post(pythonBackendUrl1, payload, { 
+        const response = await axios.post(pythonBackendUrl1, payload, {
           timeout: 600000, // 10 minutes
           maxContentLength: Infinity,
           maxBodyLength: Infinity
         });
         console.log(`✅ AI ingestion completed successfully for chatbot ${chatbot.chatbot_id}`);
         console.log(`Response:`, response.data);
-        
+
         // Emit success event to frontend via WebSocket
-        io.emit("training:completed", { 
+        io.emit("training:completed", {
           organization_id,
           chatbot_id: chatbot.chatbot_id,
           status: "success",
@@ -128,12 +128,12 @@ const createOrUpdateAutomation = async (req, res) => {
       }
     } catch (aiError) {
       console.error("❌ Failed to sync with AI Backend:", aiError.message);
-      
+
       // Emit failure event to frontend via WebSocket
       const { chatbots } = require("../models");
       const chatbot = await chatbots.findOne({ where: { organization_id } });
       if (chatbot) {
-        io.emit("training:failed", { 
+        io.emit("training:failed", {
           organization_id,
           chatbot_id: chatbot.chatbot_id,
           status: "failed",
@@ -141,7 +141,7 @@ const createOrUpdateAutomation = async (req, res) => {
           error: aiError.message
         });
       }
-      
+
       // Fail the request if AI sync fails
       return res.status(500).json({
         message: "Failed to sync knowledge base with AI",

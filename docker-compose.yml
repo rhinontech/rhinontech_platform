@@ -7,9 +7,11 @@ services:
     ports:
       - "4000:4000"
     env_file:
-      - .env.docker
+      - .env.dev
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3000
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
+      - NEXT_PUBLIC_API_AI_URL=http://localhost:5002
+      - NEXT_PUBLIC_SOCKET_URL=http://localhost:3000
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -23,7 +25,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - .env.docker
+      - .env.dev
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -41,7 +43,7 @@ services:
     ports:
       - "5002:5002"
     env_file:
-      - .env.docker
+      - .env.dev
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -63,9 +65,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: healthcare_local
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=rhinontech
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql

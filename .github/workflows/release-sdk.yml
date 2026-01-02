@@ -1,0 +1,41 @@
+name: Release SDK
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install Dependencies
+        working-directory: ./rhinonbot-sdk
+        run: npm ci
+
+      - name: Build SDK
+        working-directory: ./rhinonbot-sdk
+        run: npm run build
+
+      - name: Publish to NPM
+        working-directory: ./rhinonbot-sdk
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_RHINONTECH }}
+          channelId: live
+          projectId: rhinonweb
+        env:
+          FIREBASE_CLI_PREVIEWS: hostingchannels

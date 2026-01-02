@@ -11,10 +11,6 @@ resource "aws_instance" "this" {
     volume_type = "gp3"
   }
 
-  credit_specification {
-    cpu_credits = "standard"
-  }
-
   tags = {
     Name        = var.name
     Environment = var.environment

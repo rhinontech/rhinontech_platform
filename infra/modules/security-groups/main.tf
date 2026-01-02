@@ -9,52 +9,43 @@ resource "aws_security_group" "ec2_sg" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = var.ssh_allowed_ips
-    description = "SSH access"
   }
 
-  # HTTP
+  # HTTP/HTTPS
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTP access"
   }
 
-  # HTTPS
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTPS access"
   }
 
-  # RTSERVER Port
+  # App Ports
   ingress {
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Adjust as needed for internal/external access
-    description = "RTSERVER access"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # BACKENDAI Port
   ingress {
     from_port   = 5002
     to_port     = 5002
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Adjust as needed
-    description = "BACKENDAI access"
+    cidr_blocks = ["0.0.0.0/0"]
   }
-  
-  # Next.js Port (from architecture)
+
   ingress {
     from_port   = 4000
     to_port     = 4000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "Next.js access"
   }
 
   egress {
@@ -80,7 +71,6 @@ resource "aws_security_group" "rds_sg" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.ec2_sg.id]
-    description     = "PostgreSQL from EC2"
   }
 
   tags = {

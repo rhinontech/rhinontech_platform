@@ -38,9 +38,11 @@ Thumbs.db
 *.mov
 *.wmv
 
-# Environment files
-*.env
-*.env.*
+# Sensitive files
+*.pem
+*.key
+id_rsa*
+.env*
 !.env.example
 
 # Terraform
@@ -48,9 +50,7 @@ Thumbs.db
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.json
 
 # GitHub
-
-
-# /*.pem
-rhinon-prod-key.pem
