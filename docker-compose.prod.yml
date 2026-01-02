@@ -28,7 +28,7 @@ services:
     expose:
       - "4000"
     env_file:
-      - .env.production
+      - .env
     environment:
       - NEXT_PUBLIC_API_URL=https://api.rhinon.tech/api
       - NEXT_PUBLIC_API_AI_URL=https://api-ai.rhinon.tech
@@ -46,7 +46,7 @@ services:
     expose:
       - "3000"
     env_file:
-      - .env.production
+      - .env
     environment:
       - DB_HOST=${DB_HOST}
       - DB_USER=${DB_USER}
@@ -70,7 +70,7 @@ services:
     expose:
       - "5002"
     env_file:
-      - .env.production
+      - .env
     environment:
       - DB_HOST=${DB_HOST}
       - DB_USER=${DB_USER}
