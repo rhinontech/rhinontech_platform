@@ -33,14 +33,36 @@ jobs:
           host: ${{ steps.params.outputs.HOST }}
           username: ubuntu
           key: ${{ github.ref_name == 'main' && secrets.SSH_PRIVATE_KEY_PROD || secrets.SSH_PRIVATE_KEY_BETA }}
+          envs: GITHUB_TOKEN,DB_PASSWORD,API_KEY
           script: |
             if [ ! -d "rhinontech_platform" ]; then
-              git clone https://github.com/rhinontech/rhinontech_platform.git
+              git clone https://x-access-token:${GITHUB_TOKEN}@github.com/rhinontech/rhinontech_platform.git
             fi
             cd rhinontech_platform
             git fetch origin
             git checkout ${{ github.ref_name }}
             git pull origin ${{ github.ref_name }}
-            # Copy specific env file to .env as docker-compose.prod.yml might expect it
-            cp ${{ steps.params.outputs.ENV_FILE }} .env
-            docker-compose -f docker-compose.prod.yml up -d --build
+            
+            # Construct .env file from secrets
+            cat > .env <<EOF
+            PORT=5000
+            NODE_ENV=production
+            JWT_SECRET=${{ github.ref_name == 'main' && 'rhinon_prod_jwt_secret' || 'rhinon_beta_jwt_secret' }}
+            AWS_REGION=ap-south-1
+            DB_HOST=${{ github.ref_name == 'main' && 'prod-postgres.c94w8e22yenm.ap-south-1.rds.amazonaws.com' || 'beta-postgres.c94w8e22yenm.ap-south-1.rds.amazonaws.com' }}
+            DB_USERNAME=postgres
+            DB_NAME=rhinontech
+            DB_PASSWORD=$DB_PASSWORD
+            DB_SCHEMA=public 
+            DB_PORT=5432
+            API_KEY=$API_KEY
+            FRONT_END_URL=${{ github.ref_name == 'main' && 'https://app.rhinon.tech' || 'https://beta.rhinon.tech' }}
+            AI_API_URL=${{ github.ref_name == 'main' && 'https://api-ai.rhinon.tech' || 'https://beta-api-ai.rhinon.tech' }}
+            RT_SERVER_URL=${{ github.ref_name == 'main' && 'https://api.rhinon.tech' || 'https://beta-api.rhinon.tech' }}
+            EOF
+
+            sudo docker compose -f docker-compose.prod.yml up -d --build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DB_PASSWORD: ${{ github.ref_name == 'main' && secrets.DB_PASSWORD_PROD || secrets.DB_PASSWORD_BETA }}
+          API_KEY: ${{ github.ref_name == 'main' && secrets.API_KEY_PROD || secrets.API_KEY_BETA }}
