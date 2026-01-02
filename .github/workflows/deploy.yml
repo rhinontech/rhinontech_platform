@@ -49,8 +49,10 @@ jobs:
             NODE_ENV=production
             JWT_SECRET=${{ github.ref_name == 'main' && 'rhinon_prod_jwt_secret' || 'rhinon_beta_jwt_secret' }}
             AWS_REGION=ap-south-1
+            AWS_BUCKET_NAME=${{ github.ref_name == 'main' && 'rhinon-prod-assets-platform-prod' || 'rhinon-beta-assets-v2-beta' }}
+            EMAIL_BUCKET_NAME=${{ github.ref_name == 'main' && 'prod-rhinon-emails-platform-prod' || 'beta-rhinon-emails-v2-beta' }}
             DB_HOST=${{ github.ref_name == 'main' && 'prod-postgres.c94w8e22yenm.ap-south-1.rds.amazonaws.com' || 'beta-postgres.c94w8e22yenm.ap-south-1.rds.amazonaws.com' }}
-            DB_USERNAME=postgres
+            DB_USER=postgres
             DB_NAME=rhinontech
             DB_PASSWORD=$DB_PASSWORD
             DB_SCHEMA=public 
