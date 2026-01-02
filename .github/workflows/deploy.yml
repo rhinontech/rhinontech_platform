@@ -67,6 +67,9 @@ jobs:
             RT_SERVER_URL=${{ github.ref_name == 'main' && 'https://api.rhinon.tech' || 'https://beta-api.rhinon.tech' }}
             EOF
 
+            # Select correct Nginx config
+            cp nginx/${{ github.ref_name == 'main' && 'prod.conf' || 'beta.conf' }} nginx/config.conf
+
             sudo docker compose -f docker-compose.prod.yml up -d --build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
