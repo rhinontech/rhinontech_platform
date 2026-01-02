@@ -32,7 +32,7 @@ jobs:
         with:
           host: ${{ steps.params.outputs.HOST }}
           username: ubuntu
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ github.ref_name == 'main' && secrets.SSH_PRIVATE_KEY_PROD || secrets.SSH_PRIVATE_KEY_BETA }}
           script: |
             if [ ! -d "rhinontech_platform" ]; then
               git clone https://github.com/rhinontech/rhinontech_platform.git
