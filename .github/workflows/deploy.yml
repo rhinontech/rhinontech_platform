@@ -1,0 +1,46 @@
+name: Deploy Application
+
+on:
+  push:
+    branches: [ main, beta ]
+    paths-ignore:
+      - 'infra/**'
+      - '.github/workflows/terraform.yml'
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get Deployment Params
+        id: params
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "HOST=43.205.210.212" >> $GITHUB_OUTPUT
+            echo "ENV_FILE=.env.production" >> $GITHUB_OUTPUT
+          else
+            echo "HOST=13.232.32.90" >> $GITHUB_OUTPUT
+            echo "ENV_FILE=.env.beta" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ steps.params.outputs.HOST }}
+          username: ubuntu
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            if [ ! -d "rhinontech_platform" ]; then
+              git clone https://github.com/rhinontech/rhinontech_platform.git
+            fi
+            cd rhinontech_platform
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
+            # Copy specific env file to .env as docker-compose.prod.yml might expect it
+            cp ${{ steps.params.outputs.ENV_FILE }} .env
+            docker-compose -f docker-compose.prod.yml up -d --build
