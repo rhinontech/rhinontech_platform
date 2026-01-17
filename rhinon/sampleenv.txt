@@ -12,8 +12,8 @@ NEXT_PUBLIC_API_AI_URL=http://localhost:5002
 # NEXT_PUBLIC_API_AI_URL=https://beta-api-ai.rhinontech.com
 
 # google oauth
-NEXT_PUBLIC_GOOGLE_LOGIN_CLIENT_ID="1064865088598-hpkkj0nmen74h46fdo9l4kon8si9fjg4.apps.googleusercontent.com"
-NEXT_PUBLIC_GOOGLE_SECRET_KEY="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"
+NEXT_PUBLIC_GOOGLE_LOGIN_CLIENT_ID="your-google-client-id.apps.googleusercontent.com"
+NEXT_PUBLIC_GOOGLE_SECRET_KEY="your-google-client-secret"
 NEXT_PUBLIC_GOOGLE_SCOPE="https://www.googleapis.com/auth/admin.directory.user.readonly https://www.googleapis.com/auth/gmail.send"
 
 
