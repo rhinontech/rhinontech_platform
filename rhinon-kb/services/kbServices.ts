@@ -3,12 +3,17 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 export const fetchKnowledgeBase = async (identifier: string) => {
   if (!API_URL) throw new Error("API_URL is not defined");
 
-  const res = await fetch(`${API_URL}/kb/${identifier}`, {
+  const url = `${API_URL}/kb/${identifier}`;
+  console.log("Fetching KB from:", url);
+
+  const res = await fetch(url, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      "User-Agent": "RhinonKB/1.0",
     },
-    next: { revalidate: 3600 },
+    cache: "no-store",
+    // next: { revalidate: 3600 },
   });
 
   if (!res.ok) {
@@ -28,8 +33,10 @@ export const getArticle = async (articleId: string) => {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      "User-Agent": "RhinonKB/1.0",
     },
-    next: { revalidate: 3600 },
+    cache: "no-store",
+    // next: { revalidate: 3600 },
   });
 
   if (!res.ok) {
