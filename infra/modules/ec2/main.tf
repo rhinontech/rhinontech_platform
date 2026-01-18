@@ -17,3 +17,20 @@ resource "aws_instance" "this" {
     Service     = var.service_tag
   }
 }
+
+# Elastic IP for the instance
+resource "aws_eip" "this" {
+  domain = "vpc"
+
+  tags = {
+    Name        = "${var.name}-eip"
+    Environment = var.environment
+    Service     = var.service_tag
+  }
+}
+
+# Associate Elastic IP with the instance
+resource "aws_eip_association" "this" {
+  instance_id   = aws_instance.this.id
+  allocation_id = aws_eip.this.id
+}
