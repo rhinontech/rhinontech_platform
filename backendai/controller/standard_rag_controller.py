@@ -691,7 +691,7 @@ class StandardRAGController:
                         # Save to CRM via rtserver logic
                         try:
                             form_data = json.loads(tc['arguments'])
-                            rtserver_url = os.getenv("RTSERVER_URL", "http://localhost:3000")
+                            rtserver_url = os.getenv("RT_SERVER_URL", "http://localhost:3000")
                             
                             # Get chatbot organization_id
                             conn = postgres_connection()

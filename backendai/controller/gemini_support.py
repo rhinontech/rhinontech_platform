@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 from datetime import datetime
 from resources.json_data.faq import faq
-from DB.mongodb import conversations_collection
+# from DB.mongodb import conversations_collection
 
 # Load environment variables from .env file
 load_dotenv()

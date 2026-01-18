@@ -59,20 +59,20 @@ module.exports = {
   },
 
   crmdb: {
-    username: process.env.CRM_DB_USERNAME,
-    password: process.env.CRM_DB_PASSWORD,
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
     database: process.env.CRM_DB_NAME,
-    host: process.env.CRM_DB_HOST,
-    port: process.env.CRM_DB_PORT,
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
     dialect: "postgres",
-    dialectOptions: isLocalDB(process.env.CRM_DB_HOST) ? {} : {
+    dialectOptions: isLocalDB(process.env.DB_HOST) ? {} : {
       ssl: {
         require: true,
         rejectUnauthorized: false,
       },
     },
     define: {
-      schema: process.env.CRM_DB_SCHEMA,
+      schema: process.env.CRM_DB_SCHEMA || process.env.DB_SCHEMA,
     },
   },
 };
