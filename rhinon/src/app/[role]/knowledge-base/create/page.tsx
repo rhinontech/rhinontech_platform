@@ -6,6 +6,7 @@ interface CreateArticlePageProps {
   searchParams: { topicId?: string };
 }
 
-export default function page({ searchParams }: CreateArticlePageProps) {
-  return <ArticleEditor topicId={searchParams.topicId} />;
+export default async function page({ searchParams }: CreateArticlePageProps) {
+  const { topicId } = await searchParams;
+  return <ArticleEditor topicId={topicId} />;
 }

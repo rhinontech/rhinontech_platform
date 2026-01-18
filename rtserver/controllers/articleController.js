@@ -3,7 +3,9 @@ const { logActivity } = require("../utils/activityLogger");
 
 exports.createArticle = async (req, res) => {
   try {
+    console.log("Creating article with body:", req.body);
     const { organization_id, user_id } = req.user;
+    console.log("User:", { organization_id, user_id });
 
     const articleData = {
       ...req.body,

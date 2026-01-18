@@ -566,7 +566,7 @@ export function ArticleEditor({ articleId, topicId }: ArticleEditorProps) {
                   </div> */}
 
                 <div className="flex justify-end gap-2 mt-4">
-                  <Button disabled={saveLoading} onClick={handleSave}>
+                  <Button disabled={saveLoading} onClick={() => handleSave()}>
                     {saveLoading
                       ? articleId
                         ? "Updating..."
