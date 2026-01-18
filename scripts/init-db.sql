@@ -1,2 +1,5 @@
--- Create healthcare_crm_local database
-CREATE DATABASE healthcare_crm_local;
+-- Create main database
+CREATE DATABASE rhinontech_local;
+
+-- Create CRM database
+CREATE DATABASE rhinontech_crm_local;
