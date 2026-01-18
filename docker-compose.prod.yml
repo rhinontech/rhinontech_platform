@@ -7,33 +7,12 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/config.conf:/etc/nginx/nginx.conf
+      - ./nginx/prod.conf:/etc/nginx/nginx.conf
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /var/www/certbot:/var/www/certbot
     depends_on:
-      - rhinon
       - rtserver
-    networks:
-      - rhinon-network
-
-  rhinon:
-    build:
-      context: ./rhinon
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: https://api.rhinon.tech/api
-        NEXT_PUBLIC_API_AI_URL: https://api-ai.rhinon.tech
-    container_name: rhinon
-    restart: always
-    expose:
-      - "4000"
-    env_file:
-      - .env
-    environment:
-      - NEXT_PUBLIC_API_URL=https://api.rhinon.tech/api
-      - NEXT_PUBLIC_API_AI_URL=https://api-ai.rhinon.tech
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - backendai
     networks:
       - rhinon-network
 

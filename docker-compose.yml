@@ -1,22 +1,4 @@
 services:
-  rhinon:
-    build:
-      context: ./rhinon
-      dockerfile: Dockerfile
-    container_name: rhinon
-    ports:
-      - "4000:4000"
-    env_file:
-      - .env.dev
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3000/api
-      - NEXT_PUBLIC_API_AI_URL=http://localhost:5002
-      - NEXT_PUBLIC_SOCKET_URL=http://localhost:3000
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - rhinon-network
-
   rtserver:
     build:
       context: ./rtserver
