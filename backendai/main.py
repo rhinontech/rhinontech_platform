@@ -14,7 +14,7 @@ from routes.linkedin_ai_routes import router as linkedin_ai_route
 from routes.image_generation_routes import router as image_generation_route
 from routes.ollama_routes import router as ollama_route
 
-from DB.mongodb import client as mongo_client
+# from DB.mongodb import client as mongo_client
 from DB.postgresDB import postgres_connection
 
 pg_conn = None 
@@ -23,13 +23,6 @@ pg_conn = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global pg_conn
-
-    # Connect to MongoDB
-    try:
-        mongo_client.admin.command('ismaster')
-        print("MongoDB connection successful")
-    except Exception as e:
-        print(f"MongoDB connection error: {e}")
 
     # Connect to PostgreSQL
     try:
@@ -42,10 +35,6 @@ async def lifespan(app: FastAPI):
         print(f"PostgreSQL connection error: {e} - will retry on demand")
 
     yield 
-
-    # Shutdown logic
-    mongo_client.close()
-    print("MongoDB connection closed")
 
     if pg_conn:
         pg_conn.close()
