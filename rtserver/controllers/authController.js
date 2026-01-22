@@ -227,8 +227,8 @@ const microsoftLogin = async (req, res) => {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: process.env.CLIENT_ID,
-          client_secret: process.env.CLIENT_SECRET,
+          client_id: process.env.MICROSOFT_CLIENT_ID,
+          client_secret: process.env.MICROSOFT_CLIENT_SECRET,
           code,
           redirect_uri: `${process.env.FRONT_END_URL}/auth/login`,
           grant_type: "authorization_code",
