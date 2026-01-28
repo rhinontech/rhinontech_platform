@@ -15,6 +15,7 @@ import WorkTracker from "./WorkTracker";
 import AiHelp from "../../Copilot/AiHelp";
 import TeamChatDrawer from "../../TeamChat/TeamChatDrawer";
 import { NotificationBell } from "./NotificationBell";
+import { SeedDataButton } from "../../SeedData/SeedDataButton";
 
 import { useBannerStore } from "@/store/useBannerStore";
 import { X } from "lucide-react";
@@ -69,6 +70,7 @@ export function SiteHeader() {
               {/* <WorkTracker /> */}
               <NotificationBell />
               <TeamChatDrawer />
+              <SeedDataButton />
               <AiHelp />
             </>
           )}
