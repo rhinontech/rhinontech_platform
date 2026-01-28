@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Database, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/tooltip";
 
 export function SeedDataButton() {
+    const router = useRouter();
     const [hasSeedData, setHasSeedData] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isCheckingStatus, setIsCheckingStatus] = useState(true);
@@ -65,6 +67,7 @@ export function SeedDataButton() {
                     description: "Sample data has been created for all features.",
                 });
                 setHasSeedData(true);
+                router.push("/");
             }
         } catch (error: any) {
             console.error("Error adding seed data:", error);
@@ -89,6 +92,7 @@ export function SeedDataButton() {
                     description: "All sample data has been removed. Your actual data remains intact.",
                 });
                 setHasSeedData(false);
+                router.push("/");
             }
         } catch (error: any) {
             console.error("Error deleting seed data:", error);

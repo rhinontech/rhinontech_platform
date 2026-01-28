@@ -67,10 +67,11 @@ export default function CollapsibleSection({
   // const NAV_OPTIONS = ["Home", "Messages", "Help", "Voice", "News"];
   const currentPlan = useUserStore((state) => state.userData.orgPlan);
 
-  const NAV_OPTIONS =
-    currentPlan === "Free"
-      ? ["Home", "Messages", "Help"] // Voice removed
-      : ["Home", "Messages", "Help", "Voice"];
+  const NAV_OPTIONS = ["Home", "Messages", "Help"]
+  //remove above array and use below array after voice conversation fixed
+    // currentPlan === "Free"
+    //   ? ["Home", "Messages", "Help"] // Voice removed
+    //   : ["Home", "Messages", "Help", "Voice"];
 
   const [uploading, setUploading] = useState(false);
 
