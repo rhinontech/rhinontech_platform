@@ -1,12 +1,17 @@
 name: Release SDK
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - main
+      - beta
 
 jobs:
-  build-and-deploy:
+  build-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -20,22 +25,54 @@ jobs:
         working-directory: ./rhinonbot-sdk
         run: npm ci
 
+      - name: Configure Package and Version
+        working-directory: ./rhinonbot-sdk
+        id: config
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          BRANCH_NAME=${GITHUB_REF##*/}
+          echo "Current branch: $BRANCH_NAME"
+          
+          if [ "$BRANCH_NAME" = "main" ]; then
+            PACKAGE_NAME="@rhinon/botsdk"
+          elif [ "$BRANCH_NAME" = "beta" ]; then
+            PACKAGE_NAME="@rhinon/botsdk-test"
+          else
+            echo "Branch $BRANCH_NAME is not configured for automatic release."
+            exit 1
+          fi
+          
+          echo "Target Package Name: $PACKAGE_NAME"
+          
+          # Check current version on NPM
+          CURRENT_NPM_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+          echo "Current NPM Version: $CURRENT_NPM_VERSION"
+          
+          # Increment version (simple patch increment)
+          NEW_VERSION=$(echo $CURRENT_NPM_VERSION | awk -F. -v OFS=. '{$NF += 1 ; print}')
+          echo "New Version: $NEW_VERSION"
+          
+          # Update package.json
+          # We use jq (or node) to safely update json. Since this is ubuntu-latest, jq is available or we can use node.
+          # Using node for cross-platform reliability snippet
+          node -e "
+            const fs = require('fs');
+            const pkg = require('./package.json');
+            pkg.name = '$PACKAGE_NAME';
+            pkg.version = '$NEW_VERSION';
+            fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2));
+          "
+          
+          echo "Updated package.json:"
+          cat package.json
+
       - name: Build SDK
         working-directory: ./rhinonbot-sdk
         run: npm run build
 
       - name: Publish to NPM
         working-directory: ./rhinonbot-sdk
-        run: npm publish
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_RHINONTECH }}
-          channelId: live
-          projectId: rhinonweb
-        env:
-          FIREBASE_CLI_PREVIEWS: hostingchannels
