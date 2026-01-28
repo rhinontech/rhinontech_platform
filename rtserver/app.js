@@ -61,6 +61,7 @@ const trafficRouter = require("./routes/trafficRoutes.js");
 const knowledgeBaseRoutes = require("./routes/knowledgeBaseRoutes.js");
 const emailRoutes = require("./routes/emailRoutes.js");
 const teamChatRoutes = require("./routes/teamChatRoutes.js");
+const seedDataRoutes = require("./routes/seedDataRoutes.js");
 const route53Routes = require("./config/route53Config");
 
 const crmGroupsRoutes = require("./routes/crmRoutes/groupsRoutes.js");
@@ -173,6 +174,7 @@ app.use("/api/tasks", /** #swagger.tags = ['TASKS'] */ require("./routes/taskRou
 app.use("/api/linkedin", /** #swagger.tags = ['LINKEDIN-AUTH'] */ linkedInAuthRoutes);
 app.use("/api/linkedin-campaigns", /** #swagger.tags = ['LINKEDIN-CAMPAIGNS'] */ linkedInCampaignRoutes);
 app.use("/api/notifications", /** #swagger.tags = ['NOTIFICATIONS'] */ require("./routes/notificationRoutes.js"));
+app.use("/api/seed-data", /** #swagger.tags = ['SEED-DATA'] */ seedDataRoutes);
 
 //swagger
 swaggerDocs(app);
