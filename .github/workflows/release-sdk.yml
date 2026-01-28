@@ -67,6 +67,31 @@ jobs:
           echo "Updated package.json:"
           cat package.json
 
+      - name: Configure Environment
+        working-directory: ./rhinonbot-sdk
+        run: |
+          BRANCH_NAME=${GITHUB_REF##*/}
+          echo "Configuring environment for branch: $BRANCH_NAME"
+          
+          if [ "$BRANCH_NAME" = "main" ]; then
+            echo "Using Production Environment"
+            echo "REACT_APP_NEW_SERVER_API_URL=https://api.rhinon.tech/api" > .env
+            echo "REACT_APP_SOCKET_URL=https://api.rhinon.tech" >> .env
+            echo "REACT_APP_API_URL_AI=https://api-ai.rhinon.tech" >> .env
+            echo "REACT_APP_API_KEY=prod_api_key_xyz" >> .env
+          elif [ "$BRANCH_NAME" = "beta" ]; then
+            echo "Using Beta Environment"
+            echo "REACT_APP_NEW_SERVER_API_URL=https://beta-api.rhinon.tech/api" > .env
+            echo "REACT_APP_SOCKET_URL=https://beta-api.rhinon.tech" >> .env
+            echo "REACT_APP_API_URL_AI=https://beta-api-ai.rhinon.tech" >> .env
+            echo "REACT_APP_API_KEY=dev_api_key_123" >> .env
+          else
+             echo "Using Default/Dev Environment"
+          fi
+          
+          echo "Generated .env content:"
+          cat .env
+
       - name: Build SDK
         working-directory: ./rhinonbot-sdk
         run: npm run build
