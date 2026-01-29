@@ -5,6 +5,5 @@ terraform {
     region         = "ap-south-1"
     dynamodb_table = "terraform-locks"
     encrypt        = true
-    profile        = "rhinon"
   }
 }
