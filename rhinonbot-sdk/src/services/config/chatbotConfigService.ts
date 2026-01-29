@@ -23,7 +23,7 @@ export const getChatbotConfig = async (chatbotId: string): Promise<ChatbotConfig
   // If chatbot not installed, call set-installed route
   if (!config.chatbot_installed) {
     try {
-      await serverApi.post(ENDPOINTS.CHATBOT_SET_INSTALLED, null, {
+      await serverApi.post(ENDPOINTS.CHATBOT_SET_INSTALLED, {}, {
         params: { chatbot_id: chatbotId },
       });
       config.chatbot_installed = true;
