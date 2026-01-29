@@ -18,7 +18,10 @@ export default function BillingLayout({
         : "[--header-height:calc(--spacing(14))]"
     )}>
       <SidebarProvider>
-        <BillingSidebar>{children}</BillingSidebar>
+        {/* <BillingSidebar> */}
+        {children}
+
+        {/* </BillingSidebar> */}
       </SidebarProvider>
     </div>
   );
