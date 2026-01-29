@@ -266,6 +266,7 @@ export const useChatLogic = ({
   // ====== Fetch chat history ======
   const fetchChats = async () => {
     setIsFetching(true);
+    setChatMessages([]);
 
     const requestBody = {
       user_id: userId,

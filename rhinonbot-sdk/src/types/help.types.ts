@@ -9,7 +9,7 @@ export interface Article {
   likes: number;
   dislikes: number;
   createdAt: string;
-  updatedAt: string;
+  updated_at: string;
 }
 
 export interface Folder {

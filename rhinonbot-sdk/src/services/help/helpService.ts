@@ -12,7 +12,7 @@ export const fetchFoldersWithArticles = async (chatbotId: string): Promise<Folde
       params: { chatbot_id: chatbotId },
     });
     // Ensure we return an array
-    return Array.isArray(response.data) ? response.data : [];
+    return Array.isArray(response.data.folders) ? response.data.folders : [];
   } catch (error) {
     console.error('Error fetching folders:', error);
     return [];

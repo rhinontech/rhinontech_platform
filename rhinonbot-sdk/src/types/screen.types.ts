@@ -26,7 +26,7 @@ export interface SelectedHelpArticleProps {
   likes: number;
   dislikes: number;
   createdAt: string;
-  updatedAt: string;
+  updated_at: string;
 }
 
 // ============ Screen Props Types ============
