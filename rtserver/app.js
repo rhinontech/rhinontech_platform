@@ -24,8 +24,8 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Parse JSON and URL-encoded payloads
-app.use(express.json({ limit: "20mb" }));
-app.use(express.urlencoded({ limit: "20mb", extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // ---- Socket.io Setup ----
 const io = new Server(server, {
