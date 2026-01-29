@@ -168,7 +168,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             <div
               className='popup-ticket-header'
               style={{
-                background: 'white',
+                background: "var(--bg-primary)",
                 borderRadius: '16px',
                 padding: '20px',
                 position: 'relative',
@@ -211,7 +211,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                     onClick={() => setTicket(item)}
                     style={{
                       display: 'flex',
-                      background: 'white',
+                      background: 'var(--bg-primary)',
                       borderRadius: '16px',
                       padding: '15px',
                       cursor: 'pointer',
@@ -264,7 +264,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             <div
               className=''
               style={{
-                background: 'white',
+                background: 'var(--bg-primary)',
                 borderRadius: '16px',
                 padding: '15px',
                 position: 'relative',

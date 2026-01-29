@@ -148,10 +148,12 @@ export default function Files() {
       setSelectedFile(null);
       setUploadProgress(null);
     } catch (error) {
+      setUploadProgress(null);
+      clearInterval(progressInterval);
       console.error("Upload failed:", error);
       // message.error("Upload failed. Please try again.");
-      toast.success("Failed to added file.");
-      setUploadProgress(null);
+      toast.error("Failed to added file.");
+
     } finally {
       isLoading(false);
     }

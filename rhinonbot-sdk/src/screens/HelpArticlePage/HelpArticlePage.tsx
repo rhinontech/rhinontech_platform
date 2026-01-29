@@ -92,7 +92,7 @@ const HelpArticlePage: React.FC<HelpArticlePageProps> = ({
           <h3>{selectedHelpArticle.title}</h3>
           <p style={{ fontSize: 'small', color: 'var(--text-secondary)' }}>
             Updated{' '}
-            {new Date(selectedHelpArticle.updatedAt).toLocaleString()}
+            {new Date(selectedHelpArticle.updated_at).toLocaleString()}
           </p>
         </div>
 

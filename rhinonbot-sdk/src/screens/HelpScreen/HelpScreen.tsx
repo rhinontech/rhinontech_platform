@@ -40,6 +40,10 @@ const HelpScreen: React.FC<HelpScreenProps> = ({
     fetchFolders();
   }, [appId]);
 
+  // useEffect(() => {
+  //   console.log(folders)
+  // }, [folders])
+
   // Filter folders and articles by search
   const filteredFolders = folders
     .map((folder) => ({

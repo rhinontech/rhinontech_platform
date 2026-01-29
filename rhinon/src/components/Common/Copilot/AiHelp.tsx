@@ -382,12 +382,12 @@ const AiHelp = () => {
                       }
                     }}
                   />
-                  <Button
+                  {/* <Button
                     variant="ghost"
                     size="icon"
                     className="absolute right-2 top-2 h-8 w-8 rounded-lg">
                     <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  </Button> */}
                 </div>
                 <Button
                   onClick={sendAiMessage}

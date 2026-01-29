@@ -49,7 +49,7 @@ export const CampaignFilters = ({ onAddCampaign, setSearch, search, filter, setF
                         <SelectItem value="draft">Draft</SelectItem>
                     </SelectContent>
                 </Select>
-                <Select defaultValue="all">
+                {/* <Select defaultValue="all">
                     <SelectTrigger className="w-[140px]">
                         <SelectValue placeholder="Type" />
                     </SelectTrigger>
@@ -58,7 +58,7 @@ export const CampaignFilters = ({ onAddCampaign, setSearch, search, filter, setF
                         <SelectItem value="recurring">Recurring</SelectItem>
                         <SelectItem value="one-time">One-time</SelectItem>
                     </SelectContent>
-                </Select>
+                </Select> */}
             </div>
             <Button onClick={onAddCampaign}>
                 <Plus className="mr-2 h-4 w-4" />
