@@ -55,7 +55,7 @@ const kbStorage = multerS3({
 // Middleware for image upload (accepts image/* only)
 const uploadSingleImage = multer({
   storage: s3Storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (req, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
       return cb(new Error("Only image files are allowed"), false);
@@ -67,7 +67,7 @@ const uploadSingleImage = multer({
 // Middleware for PDF/file upload
 const uploadSingleFile = multer({
   storage: s3Storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB max
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB max
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       "application/pdf",
@@ -166,7 +166,7 @@ const conversationStorage = multerS3({
 
 const uploadConversationFile = multer({
   storage: conversationStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
 }).single("file");
 
 // Controller: Handle conversation file upload
