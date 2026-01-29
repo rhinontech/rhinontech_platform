@@ -729,16 +729,17 @@ const completeOnboarding = async (req, res) => {
       );
 
       const defaultPreChatForm = [
-        { id: "email", type: "email", label: "Email Address", required: true },
+        { id: "email", type: "email", label: "Email Address", placeholder: "Enter your email", required: true },
       ];
 
       const defaultTicketForm = [
         ...defaultPreChatForm,
-        { id: "subject", type: "text", label: "Subject", required: true },
+        { id: "subject", type: "text", label: "Subject", placeholder: "Enter your subject", required: true },
         {
           id: "description",
           type: "textarea",
           label: "Description",
+          placeholder: "Enter your description",
           required: true,
         },
       ];
