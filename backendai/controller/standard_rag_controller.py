@@ -59,6 +59,12 @@ class StandardRAGController:
                     return run_query(conn, data_query, (cid,))
 
             result = await asyncio.to_thread(fetch_data_sync, chatbot_id)
+            
+            # Debug Logging for S3 Config
+            import os
+            base_url = os.getenv("S3_BASE_URL", "")
+            folder_name = os.getenv("S3_FOLDER_NAME", "")
+            logging.error(f"DEBUG S3 Config: BASE={base_url}, FOLDER={folder_name}")
 
             if not result:
                 return ""
@@ -102,7 +108,7 @@ class StandardRAGController:
                     for file_item in file_data:
                         s3_name = file_item.get('s3Name')
                         if s3_name:
-                            file_url = f"{S3_BASE_URL}/{S3_FOLDER_NAME}/{s3_name}"
+                            file_url = f"{base_url}/{folder_name}/{s3_name}"
                             _, ext = os.path.splitext(file_url.lower())
                             try:
                                 content = ""
