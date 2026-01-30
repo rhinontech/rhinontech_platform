@@ -440,6 +440,16 @@ export const useChatLogic = ({
       (error) => {
         console.error('Assistant error:', error);
         setLoading(false);
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: 'bot',
+            text: `Error: ${error || 'Something went wrong.'}`,
+            chatbot_id: appId,
+            timestamp: new Date().toISOString(),
+            user_id: requestBody.user_id,
+          },
+        ]);
       },
     );
   };

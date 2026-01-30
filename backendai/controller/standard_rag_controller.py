@@ -262,6 +262,18 @@ class StandardRAGController:
         Manages the chat using Custom RAG (Direct Context + History -> Chat Completion).
         Optimized for Speed: No prompt embedding, uses gpt-4o-mini.
         """
+        # Validation: Check if chatbot exists
+        try:
+            with get_db_connection() as conn:
+                check_query = "SELECT 1 FROM chatbots WHERE chatbot_id = %s"
+                res = run_query(conn, check_query, (chatbot_id,))
+                if not res:
+                    yield f"data: {json.dumps({'error': 'Invalid Chatbot ID'})}\n\n"
+                    return
+        except Exception as e:
+            logging.error(f"Error validating chatbot_id: {e}")
+            yield f"data: {json.dumps({'error': 'Database connection error during validation'})}\n\n"
+            return
 
 
         
