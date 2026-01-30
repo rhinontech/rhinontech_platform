@@ -13,4 +13,4 @@ COPY . .
 EXPOSE 3000
 
 # Start command
-CMD sh -c "npx sequelize-cli --options-path .sequelizerc.main db:migrate && npx sequelize-cli --options-path .sequelizerc.crm db:migrate && node app.js"
+CMD ["sh", "-c", "npx sequelize-cli --options-path .sequelizerc.main db:migrate && npx sequelize-cli --options-path .sequelizerc.crm db:migrate && node app.js"]

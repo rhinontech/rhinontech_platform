@@ -395,7 +395,7 @@ export default function Files() {
         <FileViewerModal
           isOpen={isPreviewOpen}
           onClose={() => setIsPreviewOpen(false)}
-          fileUrl={`https://rhinontech.s3.ap-south-1.amazonaws.com/new-rhinontech/${previewFile.s3Name}`} // adjust path
+          fileUrl={`https://rhinon-beta-assets-v2-beta.s3.ap-south-1.amazonaws.com/platform-uploads/${previewFile.s3Name}`} // adjust path
           fileName={previewFile.originalName}
           fileType={previewFile.originalName.split(".").pop()}
         />
