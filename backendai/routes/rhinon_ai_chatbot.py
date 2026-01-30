@@ -18,6 +18,7 @@ from services.openai_services import client
 load_dotenv()
 
 S3_BASE_URL = os.getenv("S3_BASE_URL")
+S3_FOLDER_NAME = os.getenv("S3_FOLDER_NAME", "")
 RESPONSE_TEMPLATE = {
     "response": "Your response to the user will be here (keep it concise unless more detail is requested)."
 }
@@ -71,7 +72,7 @@ async def extract_instruction_from_data(result):
 
         # File data
         for file_item in file_data:
-            file_url = f"{S3_BASE_URL}/{file_item['s3Name']}"
+            file_url = f"{S3_BASE_URL}/{S3_FOLDER_NAME}/{file_item['s3Name']}"
             _, file_extension = os.path.splitext(file_url.lower())
 
             try:

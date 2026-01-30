@@ -34,6 +34,7 @@ from resources.industry_prompts import INDUSTRY_PROMPTS
 
 # Use the environment variable for S3 Base URL
 S3_BASE_URL = os.getenv("S3_BASE_URL", "")
+S3_FOLDER_NAME = os.getenv("S3_FOLDER_NAME", "")
 
 class StandardRAGController:
     @staticmethod
@@ -96,7 +97,7 @@ class StandardRAGController:
                 for file_item in file_data:
                     s3_name = file_item.get('s3Name')
                     if s3_name:
-                        file_url = f"{S3_BASE_URL}/{s3_name}"
+                        file_url = f"{S3_BASE_URL}/{S3_FOLDER_NAME}/{s3_name}"
                         _, ext = os.path.splitext(file_url.lower())
                         try:
                             content = ""
@@ -262,6 +263,18 @@ class StandardRAGController:
         Manages the chat using Custom RAG (Direct Context + History -> Chat Completion).
         Optimized for Speed: No prompt embedding, uses gpt-4o-mini.
         """
+        # Validation: Check if chatbot exists
+        try:
+            with get_db_connection() as conn:
+                check_query = "SELECT 1 FROM chatbots WHERE chatbot_id = %s"
+                res = run_query(conn, check_query, (chatbot_id,))
+                if not res:
+                    yield f"data: {json.dumps({'error': 'Invalid Chatbot ID'})}\n\n"
+                    return
+        except Exception as e:
+            logging.error(f"Error validating chatbot_id: {e}")
+            yield f"data: {json.dumps({'error': 'Database connection error during validation'})}\n\n"
+            return
 
 
         
