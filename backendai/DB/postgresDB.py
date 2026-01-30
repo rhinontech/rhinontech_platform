@@ -59,7 +59,7 @@ def init_db_pool():
         if CRM_DB_SCHEMA and CRM_DB_SCHEMA != "public":
              db_args["options"] = f"-c search_path={CRM_DB_SCHEMA},public"
 
-        pg_pool = pool.SimpleConnectionPool(1, 20, **db_args)
+        pg_pool = pool.SimpleConnectionPool(1, 50, **db_args)
         if pg_pool:
             print("PostgreSQL Connection Pool created successfully")
     except (Exception, psycopg2.DatabaseError) as error:

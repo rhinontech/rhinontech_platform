@@ -42,108 +42,113 @@ class StandardRAGController:
         """
         Fetches data from 'automations' table and extracts clean text.
         """
-        conn = await asyncio.to_thread(postgres_connection)
-        if not conn:
-            raise Exception("Database connection failed")
+        try:
+            # properly use context manager via helper or direct release
+            # Since this is async/threaded, we can't easily use the context manager inside asyncio.to_thread 
+            # if we pass the context manager itself. 
+            # Better pattern: Function that does the DB work synchronously, called by to_thread.
+            
+            def fetch_data_sync(cid):
+                with get_db_connection() as conn:
+                    data_query = """
+                        SELECT a.training_url, a.training_pdf, a.training_article
+                        FROM automations a
+                        JOIN chatbots c ON a.organization_id = c.organization_id
+                        WHERE c.chatbot_id = %s;
+                    """
+                    return run_query(conn, data_query, (cid,))
 
-        data_query = """
-            SELECT a.training_url, a.training_pdf, a.training_article
-            FROM automations a
-            JOIN chatbots c ON a.organization_id = c.organization_id
-            WHERE c.chatbot_id = %s;
-        """
-        result = await asyncio.to_thread(run_query, conn, data_query, (chatbot_id,))
-        conn.close()
+            result = await asyncio.to_thread(fetch_data_sync, chatbot_id)
 
-        if not result:
-            return ""
+            if not result:
+                return ""
 
-        combined_text = ""
-        for url_data, file_data, article_data in result:
-             # URL data
-            if url_data:
-                for url_item in url_data:
-                    try:
-                        if url_item.get("sitemap"):
-                        # Sitemap-based scraping
-                            sitemap_urls = get_sitemap_urls(url_item["url"])
-
-                            for page_url in sitemap_urls:
-                                try:
-                                    content = get_url_data(page_url)
-                                    if content:
-                                        combined_text += (
-                                            f"\n\n--- Source: {page_url} ---\n{content}"
-                                        )
-                                except Exception as e:
-                                    logging.error(f"Error scraping {page_url}: {e}")
-
-                            else:
-                                # Single-page scraping
-                                try:
-                                    content = get_url_data(url_item["url"])
-                                    if content:
-                                        combined_text += (
-                                            f"\n\n--- Source: {url_item['url']} ---\n{content}"
-                                        )
-                                except Exception as e:
-                                    logging.error(f"Error fetching URL {url_item['url']}: {e}")
-
-                    except Exception as e:
-                        logging.error(f"Error fetching URL {url_item.get('url')}: {e}")
-
-            # File data
-            if file_data:
-                for file_item in file_data:
-                    s3_name = file_item.get('s3Name')
-                    if s3_name:
-                        file_url = f"{S3_BASE_URL}/{S3_FOLDER_NAME}/{s3_name}"
-                        _, ext = os.path.splitext(file_url.lower())
+            combined_text = ""
+            for url_data, file_data, article_data in result:
+                 # URL data
+                if url_data:
+                    for url_item in url_data:
                         try:
-                            content = ""
-                            if ext == '.pdf':
-                                content = pdf_data(file_url)
-                            elif ext in ['.doc', '.docx']:
-                                content = doc_data(file_url)
-                            elif ext == '.txt':
-                                content = txt_data(file_url)
-                            elif ext in ['.ppt', '.pptx']:
-                                content = ppt_data(file_url)
-                            elif ext in ['.jpeg', '.jpg', '.png']:
-                                content = image_data(file_url)
-                            
-                            if content:
-                                combined_text += f"\n\n--- Source: {s3_name} ---\n{content}"
+                            if url_item.get("sitemap"):
+                            # Sitemap-based scraping
+                                sitemap_urls = get_sitemap_urls(url_item["url"])
+
+                                for page_url in sitemap_urls:
+                                    try:
+                                        content = get_url_data(page_url)
+                                        if content:
+                                            combined_text += (
+                                                f"\n\n--- Source: {page_url} ---\n{content}"
+                                            )
+                                    except Exception as e:
+                                        logging.error(f"Error scraping {page_url}: {e}")
+
+                                else:
+                                    # Single-page scraping
+                                    try:
+                                        content = get_url_data(url_item["url"])
+                                        if content:
+                                            combined_text += (
+                                                f"\n\n--- Source: {url_item['url']} ---\n{content}"
+                                            )
+                                    except Exception as e:
+                                        logging.error(f"Error fetching URL {url_item['url']}: {e}")
+
                         except Exception as e:
-                            logging.error(f"Error processing file {file_url}: {e}")
+                            logging.error(f"Error fetching URL {url_item.get('url')}: {e}")
 
-            # Article data
-            if article_data:
-                for article in article_data:
-                    content = article.get('content', '')
-                    if content:
-                        combined_text += f"\n\n--- Source: Article ---\n{content}"
+                # File data
+                if file_data:
+                    for file_item in file_data:
+                        s3_name = file_item.get('s3Name')
+                        if s3_name:
+                            file_url = f"{S3_BASE_URL}/{S3_FOLDER_NAME}/{s3_name}"
+                            _, ext = os.path.splitext(file_url.lower())
+                            try:
+                                content = ""
+                                if ext == '.pdf':
+                                    content = pdf_data(file_url)
+                                elif ext in ['.doc', '.docx']:
+                                    content = doc_data(file_url)
+                                elif ext == '.txt':
+                                    content = txt_data(file_url)
+                                elif ext in ['.ppt', '.pptx']:
+                                    content = ppt_data(file_url)
+                                elif ext in ['.jpeg', '.jpg', '.png']:
+                                    content = image_data(file_url)
+                                
+                                if content:
+                                    combined_text += f"\n\n--- Source: {s3_name} ---\n{content}"
+                            except Exception as e:
+                                logging.error(f"Error processing file {file_url}: {e}")
 
-        return combined_text
+                # Article data
+                if article_data:
+                    for article in article_data:
+                        content = article.get('content', '')
+                        if content:
+                            combined_text += f"\n\n--- Source: Article ---\n{content}"
+
+            return combined_text
+        except Exception as e:
+            logging.error(f"Fetch Prep Data Error: {e}")
+            return ""
 
     @staticmethod
     async def get_stored_knowledge(chatbot_id: str) -> str:
         """
         Retrieves the processed text content straight from the Vector DB (training_chunks).
-        This is used by Realtime API to inject context instantly.
-        Since we now have chunks, we fetch them ordered by index and concatenate.
-        We fetch up to 500 chunks (approx 400k chars ~ 100k tokens) to maximize context 
-        without exceeding the 128k token limit of the model.
         """
-        conn = postgres_connection()
         try:
-            # Fetch chunks ordered by index
-            # Limit 500 chunks * 800 chars = 400,000 chars
-            query = "SELECT content FROM training_chunks WHERE chatbot_id = %s ORDER BY chunk_index ASC LIMIT 500;"
-            result = run_query(conn, query, (chatbot_id,))
+            # Sync function for DB op
+            def get_knowledge_sync(cid):
+                with get_db_connection() as conn:
+                    query = "SELECT content FROM training_chunks WHERE chatbot_id = %s ORDER BY chunk_index ASC LIMIT 500;"
+                    return run_query(conn, query, (cid,))
+
+            result = await asyncio.to_thread(get_knowledge_sync, chatbot_id)
             
             if result:
-                # Concatenate
                 full_text = "\n\n".join([r[0] for r in result])
                 return full_text
                 
@@ -151,8 +156,6 @@ class StandardRAGController:
         except Exception as e:
             logging.error(f"Error getting stored knowledge: {e}")
             return ""
-        finally:
-            conn.close()
 
     @staticmethod
     def chunk_text(text: str, chunk_size: int = 600, overlap: int = 100) -> list[str]:
