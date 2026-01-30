@@ -162,10 +162,9 @@ function summarizeAudits(audits) {
       )
         ? "Pass"
         : "Fail",
-      altText: `${
-        average(audits.map((a) => parseInt(a.accessibility?.altText || "0"))) ||
+      altText: `${average(audits.map((a) => parseInt(a.accessibility?.altText || "0"))) ||
         "N/A"
-      }%`,
+        }%`,
       keyboard: audits.every((a) => a.accessibility?.keyboard === "Pass")
         ? "Pass"
         : "Fail",
@@ -305,7 +304,21 @@ const triggerPerformance = async (req, res) => {
       try {
         browser = await puppeteer.launch({
           headless: "new",
-          args: ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"],
+          executablePath: "/usr/bin/chromium-browser",
+          pipe: true,
+          protocolTimeout: 120000,
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--disable-software-rasterizer",
+            "--disable-accelerated-2d-canvas",
+            "--no-zygote",
+            "--mute-audio",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--disable-blink-features=AutomationControlled",
+          ],
           defaultViewport: null,
         });
 
@@ -313,7 +326,7 @@ const triggerPerformance = async (req, res) => {
         console.log(pageUrls);
 
         const started_at = Date.now();
-        const estimated_time = pageUrls.length * 30;
+        const estimated_time = pageUrls.length * 50;
 
         io.emit(`seo:performance:started:${organization_id}`, {
           message: "Performance audit started",
