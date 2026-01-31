@@ -98,6 +98,17 @@ export const useChatLogic = ({
           },
         ];
       }
+    } else if (!conversationId) {
+      return [
+        {
+          role: 'bot',
+          chatbot_id: appId,
+          timestamp: new Date().toISOString(),
+          user_email: userEmail,
+          user_id: userId,
+          text: 'Hello, how can I help you today?',
+        },
+      ];
     }
     return [];
   });
@@ -145,7 +156,7 @@ export const useChatLogic = ({
     const unlock = () => {
       try {
         speechSynthesis.getVoices();
-        audioRef.current = new Audio('/confident-543.mp3');
+        audioRef.current = new Audio('https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/confident-543-1.mp3');
         audioRef.current.volume = 0.7;
         audioRef.current.load();
 
@@ -266,7 +277,7 @@ export const useChatLogic = ({
   // ====== Fetch chat history ======
   const fetchChats = async () => {
     setIsFetching(true);
-    setChatMessages([]);
+    //setChatMessages([]);
 
     const requestBody = {
       user_id: userId,
@@ -648,6 +659,9 @@ export const useChatLogic = ({
       console.error('Error closing conversation on server', error);
     }
 
+    // Clear conversation state to hide close button
+    setConversation(null);
+
     // Use ref-based check to avoid async state races
     if (
       !isPostChatSubmittedRef.current &&
@@ -782,6 +796,7 @@ export const useChatLogic = ({
   return {
     // State
     conversation,
+    setConversation,
     message,
     setMessage,
     chatMessages,
