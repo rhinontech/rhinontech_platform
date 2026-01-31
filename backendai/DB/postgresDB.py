@@ -14,13 +14,10 @@ DB_NAME = os.getenv("POSTGRES_DB") or os.getenv("DB_NAME")
 DB_HOST = os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("POSTGRES_PORT") or os.getenv("DB_PORT", "5432")
 
-# CRM DB Config (may be same or different)
-CRM_DB_SCHEMA = os.getenv("CRM_DB_SCHEMA", "public")
+
 CRM_DB_NAME = os.getenv("CRM_DB_NAME") or DB_NAME
-CRM_DB_USER = os.getenv("CRM_DB_USER") or DB_USERNAME
-CRM_DB_PASS = os.getenv("CRM_DB_PASSWORD") or DB_PASSWORD
-CRM_DB_HOST = os.getenv("CRM_DB_HOST") or DB_HOST
-CRM_DB_PORT = os.getenv("CRM_DB_PORT") or DB_PORT
+
+
 
 # DB_USERNAME=postgres
 # DB_PASSWORD=Rhinonserver
@@ -56,8 +53,8 @@ def init_db_pool():
         
         # Let's add options to set search_path if CRM_DB_SCHEMA is set and not public
         db_args = DB_CONFIG.copy()
-        if CRM_DB_SCHEMA and CRM_DB_SCHEMA != "public":
-             db_args["options"] = f"-c search_path={CRM_DB_SCHEMA},public"
+        if DB_SCHEMA and DB_SCHEMA != "public":
+             db_args["options"] = f"-c search_path={DB_SCHEMA},public"
 
         pg_pool = pool.SimpleConnectionPool(1, 50, **db_args)
         if pg_pool:
@@ -180,10 +177,10 @@ def get_crm_db_connection():
     try:
         conn = psycopg2.connect(
             dbname=CRM_DB_NAME,
-            user=CRM_DB_USER,
-            password=CRM_DB_PASS,
-            host=CRM_DB_HOST,
-            port=CRM_DB_PORT
+            user=DB_USER,
+            password=DB_PASS,
+            host=DB_HOST,
+            port=DB_PORT
         )
         return conn
     except Exception as e:
@@ -684,18 +681,22 @@ def create_notification(chatbot_id: str, type: str, title: str, message: str, da
             with conn.cursor() as cur:
                 cur.execute("SELECT organization_id FROM chatbots WHERE chatbot_id = %s", (chatbot_id,))
                 res = cur.fetchone()
-                if not res: return False
+                if not res: 
+                    print(f"❌ create_notification: Chatbot {chatbot_id} not found")
+                    return False
                 org_id = res[0]
                 
                 # Insert
                 import json
+                import uuid
+                new_id = str(uuid.uuid4())
                 cur.execute("""
                     INSERT INTO notifications (id, organization_id, type, title, message, data, status, created_at, updated_at)
-                    VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, 'unread', NOW(), NOW())
+                    VALUES (%s, %s, %s, %s, %s, %s, 'unread', NOW(), NOW())
                     RETURNING id
-                """, (org_id, type, title, message, json.dumps(data) if data else '{}'))
+                """, (new_id, org_id, type, title, message, json.dumps(data) if data else '{}'))
                 conn.commit()
-                print(f"✅ Notification created: {title}")
+                print(f"✅ Notification created: {title} (ID: {new_id})")
                 return True
     except Exception as e:
         print(f"Error creating notification: {e}")
