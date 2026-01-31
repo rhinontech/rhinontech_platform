@@ -140,17 +140,28 @@ export default function Timeline() {
     }, [dateRange, zoomLevel]);
 
     // Calculate task position
+    // Calculate task position
     const getTaskPosition = (task: Task) => {
         if (!task.dueDate) return { left: 0, width: 0 };
+
+        const taskDate = new Date(task.dueDate); // Ensure it's a Date object
 
         let position = 0;
         let found = false;
 
         for (let i = 0; i < timelineUnits.length; i++) {
             const unit = timelineUnits[i];
+            const nextUnit = timelineUnits[i + 1];
 
-            if (isSameDay(task.dueDate, unit.date) ||
-                (task.dueDate >= unit.date && (!timelineUnits[i + 1] || task.dueDate < timelineUnits[i + 1].date))) {
+            // Check if task falls within this unit's range
+            // For days: taskDate is same day
+            // For weeks/months: taskDate >= unit.date AND taskDate < nextUnit.date
+
+            const isMatch = zoomLevel === "days"
+                ? isSameDay(taskDate, unit.date)
+                : (taskDate >= unit.date && (!nextUnit || taskDate < nextUnit.date));
+
+            if (isMatch) {
                 position = timelineUnits.slice(0, i).reduce((sum, u) => sum + u.width, 0);
                 found = true;
                 break;

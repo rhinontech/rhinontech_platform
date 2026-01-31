@@ -101,7 +101,17 @@ export function useMessengerState(
   // User State
   const [isEmailAvailable, setIsEmailAvailable] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  // Initialize userId synchronously from localStorage to prevent race condition
+  // Generate a new ID if one doesn't exist
+  const [userId, setUserId] = useState<string | null>(() => {
+    let id = localStorage.getItem('userId');
+    if (!id) {
+      // Generate new userId if it doesn't exist
+      id = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      localStorage.setItem('userId', id);
+    }
+    return id;
+  });
 
   // Content State
   const [selectedNews, setSelectedNews] = useState<SelectedNewsProps | null>(
@@ -210,11 +220,8 @@ export function useMessengerState(
     }
   }, [chatbot_config?.theme]);
 
-  // Resolve saved user info
+  // Resolve saved user email
   useEffect(() => {
-    const savedVisitorId = localStorage.getItem('userId');
-    setUserId(savedVisitorId);
-
     const savedEmail = Cookies.get('userEmail');
     if (savedEmail) {
       setUserEmail(savedEmail);
