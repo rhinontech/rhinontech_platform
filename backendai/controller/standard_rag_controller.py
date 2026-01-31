@@ -27,7 +27,8 @@ from DB.postgresDB import (
     move_customer_to_pipeline,
     save_customer, 
     get_conversation_metadata, 
-    update_conversation_email
+    update_conversation_email,
+    create_notification
 )
 from controller.chatbot_config import get_sitemap_urls, get_url_data, pdf_data, doc_data, txt_data, ppt_data, image_data
 from resources.industry_prompts import INDUSTRY_PROMPTS
@@ -566,7 +567,19 @@ class StandardRAGController:
                              f"\n\n[SYSTEM INTERVENTION - EARLY CONVERSATION]"
                              f"\nYou are in turn {conversation_turn_count + 1} of the conversation."
                              f"\nFocus on answering the user's questions helpfully."
-                             f"\nDo NOT ask for name, email, or phone number yet."
+                             f"\nDo NOT ask for name, email, or phone number yet UNLESS the user expresses 'High Interest' or 'Heavy Intent'."
+                             f"\n\n[HEAVY INTENT TRIGGERS]"
+                             f"\nIf the user says any of the following, you match 'Heavy Intent':"
+                             f"\n1. 'I want to speak to support' or similar."
+                             f"\n2. Asks about PRICING."
+                             f"\n3. Asking for comparisons with COMPETITORS."
+                             f"\n4. Asking specifically 'how to buy' or 'sign up'."
+                             f"\n\n[ACTION ON HEAVY INTENT]"
+                             f"\n- If 'Heavy Intent' is detected, IGNORE the 'wait 3 turns' rule."
+                             f"\n- Immediately say: 'I'd be happy to help with that! First, may I know your name?'"
+                             f"\n- Collect Name, Email, Phone ONE BY ONE."
+                             f"\n- Then call 'submit_pre_chat_form'."
+                             f"\n- Then continue the conversation/answer the question."
                           )
                 
         except Exception as e:
@@ -673,7 +686,12 @@ class StandardRAGController:
 
                                 # 2. Handle Urgency
                                 if urgency_arg == 'immediate':
-                                     from DB.postgresDB import create_notification
+                                      # from DB.postgresDB import create_notification (Removed: Global import used)
+                                     
+                                     # Also add to pipeline for visibility in board
+                                     # with get_db_connection() as conn:
+                                     #    move_customer_to_pipeline(chatbot_id, email_arg, conn)
+
                                      title = f"Urgent Callback: {name_arg or email_arg}"
                                      message = f"User has requested an immediate callback via standard chat. Phone: {phone_arg or 'N/A'}"
                                      # Include user_id for generic 'call' targeting (since Messenger registers with it)
@@ -693,6 +711,13 @@ class StandardRAGController:
                                          success = move_customer_to_pipeline(chatbot_id, email_arg, conn)
                                     
                                     if success:
+                                         create_notification(
+                                             chatbot_id, 
+                                             "call", 
+                                             "Support Request (Pipeline)", 
+                                             f"{name_arg or email_arg} added to support pipeline.",
+                                             {"email": email_arg, "name": name_arg, "phone": phone_arg}
+                                         )
                                          tool_result = {"status": "success", "message": "Handoff complete. Customer moved to priority queue."}
                                     else:
                                          tool_result = {"status": "error", "message": "Handoff failed (pipeline not found or user missing)."}
