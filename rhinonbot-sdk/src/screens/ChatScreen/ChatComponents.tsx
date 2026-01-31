@@ -46,6 +46,7 @@ export const ChatHeader: React.FC<{
   setCloseChatPopup: React.Dispatch<React.SetStateAction<boolean>>;
   handleCloseChat: () => void;
   chatbot_config: any;
+  conversation: any;
 }> = ({
   onBack,
   isFreePlan,
@@ -64,6 +65,7 @@ export const ChatHeader: React.FC<{
   handleCloseChat,
   chatbot_config,
   adminTestingMode,
+  conversation,
 }) => {
     const handleMaxScreen = () => {
       setMaxScreen(true);
@@ -159,7 +161,7 @@ export const ChatHeader: React.FC<{
               <Maximize2 size={18} />
             </button>
           )}
-          {isSpeakingWithRealPerson && isConversationActive && (
+          {isSpeakingWithRealPerson && conversation !== null && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

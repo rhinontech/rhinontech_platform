@@ -249,7 +249,7 @@ async function getRenderedHtmlAndLinks(baseUrl, browser) {
       .waitForFunction(() => document.querySelectorAll("a[href]").length > 0, {
         timeout: 7000,
       })
-      .catch(() => {});
+      .catch(() => { });
 
     const links = await page.evaluate((base) => {
       return Array.from(document.querySelectorAll("a[href]"))
@@ -290,14 +290,14 @@ async function analyzePageSEO(url, browser) {
         },
         { timeout: 7000 }
       )
-      .catch(() => {});
+      .catch(() => { });
 
     // additional safety: wait for links to appear or short timeout
     await page
       .waitForFunction(() => document.querySelectorAll("a[href]").length > 0, {
         timeout: 4000,
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // Evaluate the DOM for SEO checks
     const result = await page.evaluate(() => {
@@ -447,11 +447,21 @@ const triggerSeoCompliance = async (req, res) => {
       try {
         browser = await puppeteer.launch({
           headless: "new",
+          executablePath: "/usr/bin/chromium-browser",
+          dumpio: true,
+          protocolTimeout: 120000,
+          pipe: true,
           args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--disable-software-rasterizer",
+            "--disable-accelerated-2d-canvas",
+            "--no-zygote",
+            "--mute-audio",
+            "--disable-features=IsolateOrigins,site-per-process",
             "--disable-blink-features=AutomationControlled",
-            // you may add "--single-process" or other flags for your environment
           ],
         });
 
@@ -461,7 +471,7 @@ const triggerSeoCompliance = async (req, res) => {
           message: "Compliance audit started",
           organization_id,
           started_at: Date.now(),
-          estimated_time: links.length * 15,
+          estimated_time: links.length * 25,
         });
 
         const audits = (

@@ -93,6 +93,7 @@ export interface ChatScreenProps {
   setShowNotification: React.Dispatch<React.SetStateAction<boolean>>;
   showNotification: boolean;
   mainLoading: boolean;
+  conversation: Conversation | null;
 }
 
 export interface ChatLogicProps {
@@ -120,6 +121,7 @@ export interface ChatLogicProps {
 export interface ChatLogicReturn {
   // State
   conversation: Conversation | null;
+  setConversation: React.Dispatch<React.SetStateAction<Conversation | null>>;
   message: string;
   setMessage: React.Dispatch<React.SetStateAction<string>>;
   chatMessages: Message[];

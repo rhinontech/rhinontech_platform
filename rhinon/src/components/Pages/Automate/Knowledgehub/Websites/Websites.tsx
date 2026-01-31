@@ -280,7 +280,7 @@ export default function Websites() {
                 !canAddUrl && "opacity-50 cursor-not-allowed"
               )}>
               <Plus className="h-4 w-4 mr-2" />
-              Add File
+              Add Website
             </Button>
           </div>
 

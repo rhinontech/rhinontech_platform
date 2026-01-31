@@ -87,6 +87,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     setShowNotification,
     showNotification,
     mainLoading,
+    conversation,
   } = props;
 
   // Custom hook for all business logic
@@ -711,6 +712,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
         handleCloseChat={handleCloseChat}
         chatbot_config={chatbot_config}
         adminTestingMode={adminTestingMode}
+        conversation={conversation}
       />
 
       {/* Messages */}

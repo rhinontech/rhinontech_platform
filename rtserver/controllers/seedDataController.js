@@ -449,48 +449,28 @@ async function createSeedTickets(organizationId, userId, transaction) {
             description: "I'm having trouble logging into my account. Password reset doesn't work.",
             status: "Open",
             priority: "High",
+            conversation: [{ role: "support", text: "I'm looking into your login issue.", timestamp: new Date().toISOString() }]
         },
         {
             title: "Billing inquiry",
             description: "I was charged twice this month. Please help.",
             status: "Pending",
             priority: "Medium",
-        },
-        {
-            title: "Feature request: Dark mode",
-            description: "Would love to see a dark mode option in the app.",
-            status: "Open",
-            priority: "Low",
-        },
-        {
-            title: "Bug: Page not loading",
-            description: "The dashboard page shows a blank screen.",
-            status: "In Progress",
-            priority: "Urgent",
-        },
-        {
-            title: "Help with integration",
-            description: "Need assistance integrating the API with our system.",
-            status: "Open",
-            priority: "Medium",
+            conversation: [{ role: "support", text: "Please provide your transaction ID.", timestamp: new Date().toISOString() }]
         },
         {
             title: "Account upgrade",
             description: "How do I upgrade to the premium plan?",
             status: "Closed",
             priority: "Low",
+            conversation: [{ role: "support", text: "This feature is on our roadmap.", timestamp: new Date().toISOString() }]
         },
         {
             title: "Data export not working",
             description: "Trying to export my data but getting an error.",
             status: "Pending",
             priority: "High",
-        },
-        {
-            title: "Mobile app crashes",
-            description: "The mobile app keeps crashing when I try to upload files.",
-            status: "In Progress",
-            priority: "Urgent",
+            conversation: [{ role: "support", text: "We have reproduced the bug.", timestamp: new Date().toISOString() }]
         },
     ];
 
