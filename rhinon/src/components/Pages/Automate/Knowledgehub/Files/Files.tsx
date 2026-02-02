@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PanelLeft, Upload, FileText, X, Info, Plus, Edit } from "lucide-react";
+import { PanelLeft, Upload, FileText, X, Info, Plus, Edit, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import images from "@/components/Constants/Images";
@@ -20,6 +20,7 @@ import {
   createOrUpdateAutomation,
   getAutomation,
   trainAndSetAssistant,
+  triggerTraining,
 } from "@/services/automations/automationServices";
 import { uploadPdfFile } from "@/services/fileUploadService";
 import { useUserStore } from "@/utils/store";
@@ -52,6 +53,11 @@ export default function Files() {
   const chatbotId = useUserStore((state) => state.userData.chatbotId);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<any>(null);
+  const [isTrained, setIsTrained] = useState(true);
+  const [trainLoading, setTrainLoading] = useState(false);
+  const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
+  const [untrainedFilesCount, setUntrainedFilesCount] = useState(0);
+  const [untrainedArticlesCount, setUntrainedArticlesCount] = useState(0);
 
   const subscriptionLimit = PLAN_LIMITS[orgPlan]?.file || 3;
   const canAddFile = files.length < subscriptionLimit;
@@ -64,6 +70,38 @@ export default function Files() {
       const response = await getAutomation();
       const fetchedFiles = response.training_pdf || [];
       setFiles(fetchedFiles);
+
+      if (response?.training_url.length > 0) {
+        let count = 0;
+        response.training_url.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedWebsitesCount(count);
+      }
+      if (response?.training_pdf.length > 0) {
+        let count = 0;
+        response.training_pdf.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedFilesCount(count);
+      }
+      if (response?.training_article.length > 0) {
+        let count = 0;
+        response.training_article.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedArticlesCount(count);
+      }
+
     } catch (error) {
       console.error("Error getting PDFs:", error);
     } finally {
@@ -137,12 +175,13 @@ export default function Files() {
       setFiles(updatedFiles);
       setIsUploadModalOpen(false);
       toast.success("File added successfully.");
-      try {
-        await trainAndSetAssistant(chatbotId);
-      } catch (trainError) {
-        console.error("Failed to retrain chatbot after upload:", trainError);
-        toast.error("File uploaded, but retraining failed.");
-      }
+      setIsTrained(false);
+      // try {
+      //   await trainAndSetAssistant(chatbotId);
+      // } catch (trainError) {
+      //   console.error("Failed to retrain chatbot after upload:", trainError);
+      //   toast.error("File uploaded, but retraining failed.");
+      // }
       console.log("PDF uploaded successfully");
 
       setSelectedFile(null);
@@ -169,15 +208,15 @@ export default function Files() {
       });
       setFiles(updatedFiles);
       toast.success("File removed successfully.");
-      try {
-        await trainAndSetAssistant(chatbotId);
-      } catch (trainError) {
-        console.error(
-          "Failed to retrain chatbot after file deletion:",
-          trainError
-        );
-        toast.error("File removed, but retraining failed.");
-      }
+      // try {
+      //   await trainAndSetAssistant(chatbotId);
+      // } catch (trainError) {
+      //   console.error(
+      //     "Failed to retrain chatbot after file deletion:",
+      //     trainError
+      //   );
+      //   toast.error("File removed, but retraining failed.");
+      // }
     } catch (error) {
       console.error("Failed to update automation after file deletion", error);
       console.error("Failed to update file list.");
@@ -250,6 +289,26 @@ export default function Files() {
     setUploadProgress(null);
     setIsInternalOnly(false);
   };
+
+
+  const handleTrain = async () => {
+    try {
+      setTrainLoading(true);
+      const chatbot_id = useUserStore.getState().userData?.chatbotId;
+
+      if (!chatbot_id) {
+        throw new Error("Chatbot ID not found");
+      }
+
+      await triggerTraining(chatbot_id);
+      toast.success("Training started successfully!");
+      setIsTrained(true);
+    } catch (error: any) {
+      toast.error(`Training failed: ${error.message}`);
+    } finally {
+      setTrainLoading(false);
+    }
+  }
 
   return (
     <>
@@ -389,6 +448,32 @@ export default function Files() {
             </div>
           </ScrollArea>
         </div>
+        {!isTrained && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+            <div className="bg-foreground/95 backdrop-blur-md text-background px-2 py-2 rounded-full shadow-2xl flex items-center gap-2 pl-6 pr-2 border border-white/10">
+              <span className="text-sm font-medium mr-2">
+                {trainLoading ? "Chatbot is Training" : (
+                  <>
+                    {[
+                      untrainedWebsitesCount > 0 && `${untrainedWebsitesCount} Website${untrainedWebsitesCount > 1 ? 's' : ''}`,
+                      untrainedFilesCount > 0 && `${untrainedFilesCount} File${untrainedFilesCount > 1 ? 's' : ''}`,
+                      untrainedArticlesCount > 0 && `${untrainedArticlesCount} Article${untrainedArticlesCount > 1 ? 's' : ''}`,
+                    ].filter(Boolean).join(", ")} {untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 1 ? 'is' : 'are'} untrained
+                  </>
+                )}
+              </span>
+
+              <Button
+                onClick={handleTrain}
+                size="sm"
+                disabled={trainLoading}
+                className="h-8 rounded-full bg-background text-foreground hover:bg-background/90 font-semibold px-4"
+              >
+                {trainLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Train AI"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {previewFile && (

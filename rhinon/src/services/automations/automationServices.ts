@@ -1,14 +1,14 @@
 import { PrivateAxios } from "@/helpers/PrivateAxios";
 import axios from "axios";
 
-interface TrainingUrl {
+export interface TrainingUrl {
   url: string;
-  sitemap: boolean;
+  sitemap?: boolean;
   updatedAt: string;
   is_trained?: boolean;
 }
 
-interface TrainingPdf {
+export interface TrainingPdf {
   size: number;
   s3Name: string;
   uploadedAt: string;
@@ -16,7 +16,7 @@ interface TrainingPdf {
   is_trained?: boolean;
 }
 
-interface Article {
+export interface Article {
   id: string;
   title: string;
   content: string;

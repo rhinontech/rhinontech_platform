@@ -28,6 +28,7 @@ import {
   Edit,
   PenSquare,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Cookies from "js-cookie";
@@ -38,6 +39,7 @@ import {
   getArticleForAutomation,
   getAutomation,
   trainAndSetAssistant,
+  triggerTraining,
 } from "@/services/automations/automationServices";
 import { useUserStore } from "@/utils/store";
 import Loading from "@/app/loading";
@@ -74,6 +76,11 @@ export default function Articles() {
   const [loading, isLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [showHero, setShowHero] = useState(true);
+  const [isTrained, setIsTrained] = useState(true);
+  const [trainLoading, setTrainLoading] = useState(false);
+  const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
+  const [untrainedFilesCount, setUntrainedFilesCount] = useState(0);
+  const [untrainedArticlesCount, setUntrainedArticlesCount] = useState(0);
   const orgPlan = useUserStore((state) => state.userData.orgPlan);
   const chatbotId = useUserStore((state) => state.userData.chatbotId);
 
@@ -123,6 +130,38 @@ export default function Articles() {
     try {
       const response = await getAutomation();
       const fetchedArticles = response.training_article || [];
+
+
+      if (response?.training_url.length > 0) {
+        let count = 0;
+        response.training_url.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedWebsitesCount(count);
+      }
+      if (response?.training_pdf.length > 0) {
+        let count = 0;
+        response.training_pdf.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedFilesCount(count);
+      }
+      if (response?.training_article.length > 0) {
+        let count = 0;
+        response.training_article.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedArticlesCount(count);
+      }
       setArticles(fetchedArticles);
     } catch (error) {
       console.error("Error getting the URLs:", error);
@@ -130,6 +169,28 @@ export default function Articles() {
       setFetching(false);
     }
   };
+
+  const handleTrain = async () => {
+
+    try {
+      setTrainLoading(true);
+
+
+      const chatbot_id = useUserStore.getState().userData?.chatbotId;
+
+      if (!chatbot_id) {
+        throw new Error("Chatbot ID not found");
+      }
+
+      await triggerTraining(chatbot_id);
+      toast.success("Training started successfully!");
+      setIsTrained(true);
+    } catch (error: any) {
+      toast.error(`Training failed: ${error.message}`);
+    } finally {
+      setTrainLoading(false);
+    }
+  }
 
   const getAvailableArtiles = async () => {
     try {
@@ -168,18 +229,20 @@ export default function Articles() {
       setArticles(updatedArticles);
       handleCloseModal();
       toast.success("Article added successfully.");
-      try {
-        await trainAndSetAssistant(chatbotId);
-      } catch (trainError) {
-        console.error("Failed to retrain chatbot after upload:", trainError);
-        toast.error("Article addedd, but retraining failed.");
-      }
+      setIsTrained(false);
+      // try {
+      //   await trainAndSetAssistant(chatbotId);
+      // } catch (trainError) {
+      //   console.error("Failed to retrain chatbot after upload:", trainError);
+      //   toast.error("Article addedd, but retraining failed.");
+      // }
     } catch (error) {
       console.error("Failed to add article:", error);
       toast.error("Adding article failed");
     } finally {
       isLoading(false);
     }
+
   };
 
   const handleCreateArticle = () => {
@@ -207,15 +270,15 @@ export default function Articles() {
       });
       setArticles(updatedArticles);
       toast.success("Article removed successfully.");
-      try {
-        await trainAndSetAssistant(chatbotId);
-      } catch (trainError) {
-        console.error(
-          "Failed to retrain chatbot after file deletion:",
-          trainError
-        );
-        toast.error("Article removed, but retraining failed.");
-      }
+      // try {
+      //   await trainAndSetAssistant(chatbotId);
+      // } catch (trainError) {
+      //   console.error(
+      //     "Failed to retrain chatbot after file deletion:",
+      //     trainError
+      //   );
+      //   toast.error("Article removed, but retraining failed.");
+      // }
     } catch (error) {
       console.error("Failed to remove article:", error);
       toast.error("Failed to remove article");
@@ -243,6 +306,7 @@ export default function Articles() {
   const handleViewArticle = (articleId: string) => {
     window.open(`/kb/${articleId}`, "_blank");
   };
+
 
   return (
     <>
@@ -429,6 +493,33 @@ export default function Articles() {
             </div>
           </ScrollArea>
         </div>
+
+        {!isTrained && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+            <div className="bg-foreground/95 backdrop-blur-md text-background px-2 py-2 rounded-full shadow-2xl flex items-center gap-2 pl-6 pr-2 border border-white/10">
+              <span className="text-sm font-medium mr-2">
+                {trainLoading ? "Chatbot is Training" : (
+                  <>
+                    {[
+                      untrainedWebsitesCount > 0 && `${untrainedWebsitesCount} Website${untrainedWebsitesCount > 1 ? 's' : ''}`,
+                      untrainedFilesCount > 0 && `${untrainedFilesCount} File${untrainedFilesCount > 1 ? 's' : ''}`,
+                      untrainedArticlesCount > 0 && `${untrainedArticlesCount} Article${untrainedArticlesCount > 1 ? 's' : ''}`,
+                    ].filter(Boolean).join(", ")} {untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 1 ? 'is' : 'are'} untrained
+                  </>
+                )}
+              </span>
+
+              <Button
+                onClick={handleTrain}
+                size="sm"
+                disabled={trainLoading}
+                className="h-8 rounded-full bg-background text-foreground hover:bg-background/90 font-semibold px-4"
+              >
+                {trainLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Train AI"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Article Modal */}
