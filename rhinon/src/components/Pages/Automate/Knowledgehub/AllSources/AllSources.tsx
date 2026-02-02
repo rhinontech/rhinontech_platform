@@ -20,6 +20,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { getAutomation } from "@/services/automations/automationServices";
 import Loading from "@/app/loading";
+import { useUserStore } from "@/utils/store";
 
 export default function AllSources() {
   const { toggleAutomateSidebar } = useSidebar();
@@ -41,11 +42,9 @@ export default function AllSources() {
   const [showArticles, setShowArticles] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  const storedData = localStorage.getItem("user-data");
 
-  const isChatbotInstalled = storedData
-    ? JSON.parse(storedData)?.state?.userData?.onboarding?.chatbot_installed
-    : null;
+
+  const isChatbotInstalled = useUserStore.getState().userData?.onboarding?.chatbot_installed;
 
 
   useEffect(() => {
@@ -76,6 +75,31 @@ export default function AllSources() {
             />
             <h2 className="text-base font-bold">All Sources</h2>
           </div>
+          <Button
+            onClick={async () => {
+              try {
+                setLoading(true);
+                const { triggerTraining } = await import("@/services/automations/automationServices");
+
+                const chatbot_id = useUserStore.getState().userData?.chatbotId;
+
+                if (!chatbot_id) {
+                  throw new Error("Chatbot ID not found");
+                }
+
+                await triggerTraining(chatbot_id);
+                alert("Training started successfully!");
+              } catch (error: any) {
+                alert(`Training failed: ${error.message}`);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2"
+          >
+            {loading ? "Training..." : "Train AI"}
+          </Button>
         </div>
 
         {/* Body */}

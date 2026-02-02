@@ -2,6 +2,17 @@ const { automations, onboardings, articles } = require("../models");
 const axios = require("axios");
 const { logActivity } = require("../utils/activityLogger");
 
+/**
+ * Normalize training items to ensure they have is_trained field
+ */
+function normalizeTrainingItems(items, type) {
+  if (!items || !Array.isArray(items)) return [];
+  return items.map(item => ({
+    ...item,
+    is_trained: item.is_trained !== undefined ? item.is_trained : false
+  }));
+}
+
 const getAllAutomation = async (req, res) => {
   const { organization_id } = req.user;
 
@@ -16,6 +27,17 @@ const getAllAutomation = async (req, res) => {
     });
 
     if (automation) {
+      // Normalize existing data to ensure all items have is_trained field
+      if (automation.training_url) {
+        automation.training_url = normalizeTrainingItems(automation.training_url, 'url');
+      }
+      if (automation.training_pdf) {
+        automation.training_pdf = normalizeTrainingItems(automation.training_pdf, 'pdf');
+      }
+      if (automation.training_article) {
+        automation.training_article = normalizeTrainingItems(automation.training_article, 'article');
+      }
+
       return res.status(200).json(automation);
     } else {
       return res.status(404).json({ error: "Automation not found" });
@@ -76,7 +98,7 @@ const createOrUpdateAutomation = async (req, res) => {
         organization_id,
         installation_guide: { syncWebsite: true },
       });
-      io.emit("onboarding:updated", { organization_id }); // emit WS
+      io.emit("onboarding:updated", { organization_id });
     } else {
       const installationGuide = onboardingRecord.installation_guide || {};
       if (!installationGuide.syncWebsite) {
@@ -84,75 +106,15 @@ const createOrUpdateAutomation = async (req, res) => {
         onboardingRecord.installation_guide = installationGuide;
         onboardingRecord.changed("installation_guide", true);
         await onboardingRecord.save();
-        io.emit("onboarding:updated", { organization_id }); // emit WS
+        io.emit("onboarding:updated", { organization_id });
       }
     }
 
-    // STEP 3: Sync to AI Engine (RAG) - WAIT for completion
-    // We send the automation data to Python service for ingestion
-    try {
-      const axios = require("axios");
-      const pythonBackendUrl = process.env.INTERNAL_AI_API_URL || process.env.AI_API_URL || "http://localhost:5002";
-      const pythonBackendUrl1 = `${pythonBackendUrl}/api/ingest`;
-      // We need to fetch the chatbot_id for this organization to send to Python
-      // Assuming 1-to-1 mapping or just taking one.
-      // Based on old query: JOIN chatbots c ON a.organization_id = c.organization_id
-      const { chatbots } = require("../models");
-      const chatbot = await chatbots.findOne({ where: { organization_id } });
-
-      if (chatbot) {
-        const payload = {
-          chatbot_id: chatbot.chatbot_id,
-        };
-
-        // WAIT for ingestion to complete (blocking)
-        // Increased timeout to 10 minutes for large websites/documents
-        console.log(`🔄 Starting AI ingestion for chatbot ${chatbot.chatbot_id}...`);
-        const response = await axios.post(pythonBackendUrl1, payload, {
-          timeout: 600000, // 10 minutes
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity
-        });
-        console.log(`✅ AI ingestion completed successfully for chatbot ${chatbot.chatbot_id}`);
-        console.log(`Response:`, response.data);
-
-        // Emit success event to frontend via WebSocket
-        io.emit("training:completed", {
-          organization_id,
-          chatbot_id: chatbot.chatbot_id,
-          status: "success",
-          message: "Chatbot training completed successfully"
-        });
-      } else {
-        console.warn("⚠️  No chatbot found for this org, skipped AI sync");
-      }
-    } catch (aiError) {
-      console.error("❌ Failed to sync with AI Backend:", aiError.message);
-
-      // Emit failure event to frontend via WebSocket
-      const { chatbots } = require("../models");
-      const chatbot = await chatbots.findOne({ where: { organization_id } });
-      if (chatbot) {
-        io.emit("training:failed", {
-          organization_id,
-          chatbot_id: chatbot.chatbot_id,
-          status: "failed",
-          message: "Chatbot training failed",
-          error: aiError.message
-        });
-      }
-
-      // Fail the request if AI sync fails
-      return res.status(500).json({
-        message: "Failed to sync knowledge base with AI",
-        error: aiError.message,
-        details: aiError.response?.data || "Training process exceeded timeout or encountered an error"
-      });
-    }
-
-    return res
-      .status(200)
-      .json({ message: "Automation processed successfully", automation });
+    // STEP 4: Return success (training will be triggered separately from frontend)
+    return res.status(200).json({
+      message: "Automation data saved successfully",
+      automation
+    });
   } catch (error) {
     console.error(error);
     return res
