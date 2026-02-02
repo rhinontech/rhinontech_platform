@@ -118,16 +118,18 @@ export function Login({ className, ...props }: React.ComponentProps<"div">) {
         Cookies.set("currentRole", authResponse.Role || "");
         toast.success("Google login successful!");
         router.replace("/");
+        // Keep loading state active during redirect - don't set to false
       } else if (authResponse.Result === "NotVerified") {
         router.push(`/auth/verify?email=${authResponse.Email}`);
         toast.info("Please verify your email first.");
+        setLoading(false);
       } else {
         toast.error(authResponse.Data || "Google login failed.");
+        setLoading(false);
       }
     } catch (error) {
       console.error("Google callback error:", error);
       toast.error("Google login failed");
-    } finally {
       setLoading(false);
     }
   };
@@ -177,18 +179,21 @@ export function Login({ className, ...props }: React.ComponentProps<"div">) {
         Cookies.set("currentRole", authResponse.Role || "");
         toast.success("Microsoft login successful!");
         router.replace("/");
+        // Keep loading state active during redirect - don't set to false
       } else if (authResponse.Result === "NotVerified") {
         router.push(`/auth/verify?email=${authResponse.Email}`);
         toast.info("Please verify your email first.");
+        setLoading(false);
       } else {
         toast.error(authResponse.Data || "Microsoft login failed.");
+        setLoading(false);
       }
     } catch (error) {
       console.error("Microsoft callback error:", error);
       toast.error("Microsoft login failed");
+      setLoading(false);
     } finally {
       sessionStorage.removeItem(PKCE_STORAGE_KEY);
-      setLoading(false);
     }
   };
 
@@ -237,7 +242,7 @@ export function Login({ className, ...props }: React.ComponentProps<"div">) {
     } catch (error: any) {
       toast.error(
         error?.response?.data?.Data ||
-          "Login failed. Please check your credentials."
+        "Login failed. Please check your credentials."
       );
     } finally {
       setTimeout(() => setLoading(false), 3000);

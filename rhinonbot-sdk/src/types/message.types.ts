@@ -8,6 +8,7 @@ export type MessageRole =
   | 'trigger'
   | 'timeout'
   | 'whatsapp_qr'
+  | 'email_request'
   | 'phone_request'
   | 'whatsapp_trigger';
 

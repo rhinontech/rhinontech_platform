@@ -98,6 +98,17 @@ export const useChatLogic = ({
           },
         ];
       }
+    } else if (!conversationId) {
+      return [
+        {
+          role: 'bot',
+          chatbot_id: appId,
+          timestamp: new Date().toISOString(),
+          user_email: userEmail,
+          user_id: userId,
+          text: 'Hello, how can I help you today?',
+        },
+      ];
     }
     return [];
   });
@@ -117,6 +128,7 @@ export const useChatLogic = ({
   const [isListening, setIsListening] = useState(false);
   const [openPostChatForm, setOpenPostChatForm] = useState(false);
   const [isPostChatSubmitted, setIsPostChatSubmitted] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
 
   // REF to hold instant value for time-sensitive checks (avoid async state race)
   const isPostChatSubmittedRef = useRef<boolean>(false);
@@ -145,7 +157,7 @@ export const useChatLogic = ({
     const unlock = () => {
       try {
         speechSynthesis.getVoices();
-        audioRef.current = new Audio('/confident-543.mp3');
+        audioRef.current = new Audio('https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/confident-543-1.mp3');
         audioRef.current.volume = 0.7;
         audioRef.current.load();
 
@@ -266,7 +278,7 @@ export const useChatLogic = ({
   // ====== Fetch chat history ======
   const fetchChats = async () => {
     setIsFetching(true);
-    setChatMessages([]);
+    //setChatMessages([]);
 
     const requestBody = {
       user_id: userId,
@@ -307,7 +319,10 @@ export const useChatLogic = ({
         );
 
         if (resultSocket) {
-          setConversation(resultSocket);
+          if (!resultSocket.is_closed) {
+            setConversation(resultSocket);
+          }
+
 
           if (typeof resultSocket.is_closed !== 'undefined') {
             setIsConversationClosed(resultSocket.is_closed);
@@ -322,6 +337,16 @@ export const useChatLogic = ({
               timestamp: msg.timestamp,
             }),
           );
+
+          // If conversation is closed, append the timeout/closed message so it persists
+          if (resultSocket.is_closed) {
+            const timeoutMessage: Message = {
+              role: 'timeout',
+              text: 'This conversation has been closed due to inactivity or customer closed the conversation. Please start a new conversation if you need further assistance.',
+              timestamp: new Date().toISOString(), // Or use closed_at if available
+            };
+            socketHistory.push(timeoutMessage);
+          }
 
           if (socketHistory.length > 0) {
             setIsSpeakingWithRealPerson(true);
@@ -460,8 +485,45 @@ export const useChatLogic = ({
       return;
     }
 
-    if (!isEmailAvailable && !isSpeakingWithRealPerson) {
-      alert('Please enter your details before sending a message.');
+    if (!isEmailAvailable && !userEmail) {
+      const messageText = text || message;
+      setMessage('');
+      if (messageText.trim() === '') {
+        setLoading(false);
+        return;
+      }
+
+      // Store the message to auto-send later
+      setPendingMessage(messageText);
+
+      // Echo user message locally
+      const newMessage: Message = {
+        user_email: 'Visitor', // Placeholder
+        user_id: userId,
+        chatbot_id: appId,
+        role: 'user',
+        text: messageText,
+        chatbot_history: convoId,
+        timestamp: new Date().toISOString(),
+      };
+      setChatMessages((prev) => [...prev, newMessage]);
+
+      // Helper to append email request
+      setTimeout(() => {
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: 'email_request',
+            text: 'Please provide your email to proceed further.',
+            chatbot_id: appId,
+            timestamp: new Date().toISOString(),
+            user_id: userId,
+            isEmailForm: true,
+          }
+        ]);
+      }, 500);
+
+      setLoading(false);
       return;
     }
 
@@ -560,16 +622,64 @@ export const useChatLogic = ({
 
   // ====== Form Handlers ======
   const handleSaveEmail = async (values: Record<string, string>) => {
+    // Determine email field from PreChatForm config OR check direct 'email' key
     const fields = Array.isArray(preChatForm)
       ? preChatForm
-      : preChatForm.fields || [];
-    const emailField = fields.find((f: any) => f.type === 'email');
-    const emailValue = emailField ? values[emailField.id] : null;
+      : preChatForm?.fields || [];
+
+    let emailValue = values['email']; // Check direct key first (from in-chat form)
+
+    if (!emailValue) {
+      const emailField = fields.find((f: any) => f.type === 'email');
+      emailValue = emailField ? values[emailField.id] : null;
+    }
 
     if (emailValue) {
       setUserEmail(emailValue);
       Cookies.set('userEmail', emailValue, { expires: 30 });
       setIsEmailAvailable(true);
+
+      // If coming from in-chat form (values has 'email' key and no obscure ID keys usually)
+      if (values['email']) {
+        // Auto-send the pending message if it exists
+        if (pendingMessage) {
+          // We need to trigger the send logic directly since we have the new email
+          // and state might not be updated fast enough for a recursive handleSend call
+
+          const messageText = pendingMessage;
+          // Clear pending immediately
+          setPendingMessage(null);
+
+          // Set loading for the AI response
+          setLoading(true);
+
+
+          // AI Bot flow
+          const requestBody: ChatWithAssistantRequest = {
+            user_email: emailValue,
+            user_id: userId,
+            chatbot_id: appId,
+            conversation_id: convoId,
+            prompt: messageText,
+            isFreePlan: chatbot_config.isFreePlan,
+            currentPlan: chatbot_config.currentPlan,
+          };
+          handleSendMessage(requestBody);
+
+        } else {
+          // Fallback if no pending message (shouldn't happen in this flow usually)
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              role: 'bot',
+              text: 'Thank you! Now tell me how can i help you?',
+              chatbot_id: appId,
+              timestamp: new Date().toISOString(),
+              user_id: userId,
+            }
+          ]);
+        }
+      }
     }
 
     const custom_data: Record<string, string> = {};
@@ -586,8 +696,9 @@ export const useChatLogic = ({
       chatbot_id: appId,
     });
 
+    // Remove pre-chat from messages if it was there (legacy) and the new email_request
     setChatMessages((prevConversation) =>
-      prevConversation.filter((m) => !m.isEmailForm),
+      prevConversation.filter((m) => !m.isEmailForm && m.role !== 'email_request'),
     );
 
     resetInactivityTimeout();
@@ -647,6 +758,9 @@ export const useChatLogic = ({
     } catch (error) {
       console.error('Error closing conversation on server', error);
     }
+
+    // Clear conversation state to hide close button
+    setConversation(null);
 
     // Use ref-based check to avoid async state races
     if (
@@ -782,6 +896,7 @@ export const useChatLogic = ({
   return {
     // State
     conversation,
+    setConversation,
     message,
     setMessage,
     chatMessages,

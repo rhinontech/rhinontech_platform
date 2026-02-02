@@ -27,7 +27,8 @@ from DB.postgresDB import (
     move_customer_to_pipeline,
     save_customer, 
     get_conversation_metadata, 
-    update_conversation_email
+    update_conversation_email,
+    create_notification
 )
 from controller.chatbot_config import get_sitemap_urls, get_url_data, pdf_data, doc_data, txt_data, ppt_data, image_data
 from resources.industry_prompts import INDUSTRY_PROMPTS
@@ -74,9 +75,14 @@ class StandardRAGController:
                  # URL data
                 if url_data:
                     for url_item in url_data:
+                        # Skip if already trained (handle missing field by defaulting to False)
+                        if url_item.get('is_trained', False) == True:
+                            logging.info(f"⏭️  Skipping already trained URL: {url_item.get('url')}")
+                            continue
+                            
                         try:
                             if url_item.get("sitemap"):
-                            # Sitemap-based scraping
+                                # Sitemap-based scraping
                                 sitemap_urls = get_sitemap_urls(url_item["url"])
 
                                 for page_url in sitemap_urls:
@@ -89,16 +95,16 @@ class StandardRAGController:
                                     except Exception as e:
                                         logging.error(f"Error scraping {page_url}: {e}")
 
-                                else:
-                                    # Single-page scraping
-                                    try:
-                                        content = get_url_data(url_item["url"])
-                                        if content:
-                                            combined_text += (
-                                                f"\n\n--- Source: {url_item['url']} ---\n{content}"
-                                            )
-                                    except Exception as e:
-                                        logging.error(f"Error fetching URL {url_item['url']}: {e}")
+                            else:
+                                # Single-page scraping
+                                try:
+                                    content = get_url_data(url_item["url"])
+                                    if content:
+                                        combined_text += (
+                                            f"\n\n--- Source: {url_item['url']} ---\n{content}"
+                                        )
+                                except Exception as e:
+                                    logging.error(f"Error fetching URL {url_item['url']}: {e}")
 
                         except Exception as e:
                             logging.error(f"Error fetching URL {url_item.get('url')}: {e}")
@@ -106,6 +112,11 @@ class StandardRAGController:
                 # File data
                 if file_data:
                     for file_item in file_data:
+                        # Skip if already trained (handle missing field by defaulting to False)
+                        if file_item.get('is_trained', False) == True:
+                            logging.info(f"⏭️  Skipping already trained file: {file_item.get('s3Name')}")
+                            continue
+                            
                         s3_name = file_item.get('s3Name')
                         if s3_name:
                             file_url = f"{base_url}/{folder_name}/{s3_name}"
@@ -131,6 +142,11 @@ class StandardRAGController:
                 # Article data
                 if article_data:
                     for article in article_data:
+                        # Skip if already trained (handle missing field by defaulting to False)
+                        if article.get('is_trained', False) == True:
+                            logging.info(f"⏭️  Skipping already trained article: {article.get('id')}")
+                            continue
+                            
                         content = article.get('content', '')
                         if content:
                             combined_text += f"\n\n--- Source: Article ---\n{content}"
@@ -190,23 +206,25 @@ class StandardRAGController:
         2. Chunks Text.
         3. Embeds Chunks (Batch).
         4. Replaces old chunks in training_chunks table.
+        5. Marks items as trained in rtserver.
         """
-        logging.info(f"🔄 Step 1/4: Fetching training data for chatbot {chatbot_id}")
+        logging.info(f"🔄 Step 1/5: Fetching training data for chatbot {chatbot_id}")
         text_data = await StandardRAGController.fetch_and_prepare_data(chatbot_id)
         if not text_data:
-            raise Exception("No training data found for this chatbot.")
+            logging.info(f"ℹ️  No untrained data found for chatbot {chatbot_id}. All items are already trained or no data exists.")
+            return {"status": "success", "message": "No new data to train. All items are already trained."}
         
         logging.info(f"✅ Fetched {len(text_data)} characters of training data")
         
         # 1. Chunking
-        logging.info(f"🔄 Step 2/4: Chunking text data...")
+        logging.info(f"🔄 Step 2/5: Chunking text data...")
         chunks_text = StandardRAGController.chunk_text(text_data)
         logging.info(f"✅ Generated {len(chunks_text)} chunks for chatbot {chatbot_id}")
         
         # 2. Embedding (Batch)
         # We process in small batches of 20 to avoid rate limits if needed, 
         # but OpenAI handles list inputs well.
-        logging.info(f"🔄 Step 3/4: Generating embeddings for {len(chunks_text)} chunks...")
+        logging.info(f"🔄 Step 3/5: Generating embeddings for {len(chunks_text)} chunks...")
         chunks_data = []
         
         # We need a robust embed function. Since embedding_service.embed_text currently takes str, 
@@ -232,7 +250,7 @@ class StandardRAGController:
         logging.info(f"✅ Generated embeddings for {len(chunks_data)} chunks")
         
         # 3. Replace Data
-        logging.info(f"🔄 Step 4/4: Saving embeddings to database...")
+        logging.info(f"🔄 Step 4/5: Saving embeddings to database...")
         # Use Thread for DB Ops
         await asyncio.to_thread(delete_chunks, chatbot_id)
         
@@ -241,7 +259,93 @@ class StandardRAGController:
         
         logging.info(f"✅ Successfully saved {len(chunks_data)} chunks to database for chatbot {chatbot_id}")
         
+        # 4. Mark items as trained in rtserver
+        logging.info(f"🔄 Step 5/5: Marking items as trained in rtserver...")
+        try:
+            await StandardRAGController.mark_items_as_trained(chatbot_id)
+            logging.info(f"✅ Marked all items as trained for chatbot {chatbot_id}")
+        except Exception as e:
+            logging.warning(f"⚠️  Failed to mark items as trained: {e}")
+            # Don't fail the entire ingestion if marking fails
+        
         return True
+
+    @staticmethod
+    async def mark_items_as_trained(chatbot_id: str):
+        """
+        Directly updates the database to mark all untrained items as trained after successful ingestion.
+        """
+        try:
+            # Get organization_id and current training data from chatbot_id
+            def get_and_update_training_status(cid):
+                with get_db_connection() as conn:
+                    # First, fetch current data
+                    query = """
+                        SELECT c.organization_id, a.training_url, a.training_pdf, a.training_article
+                        FROM chatbots c
+                        JOIN automations a ON c.organization_id = a.organization_id
+                        WHERE c.chatbot_id = %s
+                    """
+                    with conn.cursor() as cur:
+                        cur.execute(query, (cid,))
+                        result = cur.fetchone()
+                        
+                        if not result:
+                            return None
+                        
+                        organization_id, training_url, training_pdf, training_article = result
+                        
+                        # Mark all untrained items as trained
+                        if training_url:
+                            for item in training_url:
+                                if item.get('is_trained', False) != True:
+                                    item['is_trained'] = True
+                        
+                        if training_pdf:
+                            for item in training_pdf:
+                                if item.get('is_trained', False) != True:
+                                    item['is_trained'] = True
+                        
+                        if training_article:
+                            for item in training_article:
+                                if item.get('is_trained', False) != True:
+                                    item['is_trained'] = True
+                        
+                        # Update the database with modified data
+                        update_query = """
+                            UPDATE automations
+                            SET training_url = %s, training_pdf = %s, training_article = %s, updated_at = NOW()
+                            WHERE organization_id = %s
+                        """
+                        
+                        import json
+                        # Convert to JSON, but use [] for empty/None arrays to avoid null constraint violation
+                        cur.execute(update_query, (
+                            json.dumps(training_url if training_url else []),
+                            json.dumps(training_pdf if training_pdf else []),
+                            json.dumps(training_article if training_article else []),
+                            organization_id
+                        ))
+                        conn.commit()
+                        
+                        return {
+                            'organization_id': organization_id,
+                            'urls_count': len([i for i in (training_url or []) if i.get('is_trained') == True]),
+                            'pdfs_count': len([i for i in (training_pdf or []) if i.get('is_trained') == True]),
+                            'articles_count': len([i for i in (training_article or []) if i.get('is_trained') == True])
+                        }
+            
+            result = await asyncio.to_thread(get_and_update_training_status, chatbot_id)
+            
+            if not result:
+                logging.warning(f"No automation data found for chatbot {chatbot_id}")
+                return
+            
+            logging.info(f"✅ Successfully marked {result['urls_count']} URLs, {result['pdfs_count']} PDFs, and {result['articles_count']} articles as trained")
+            
+        except Exception as e:
+            logging.error(f"Error marking items as trained: {e}")
+            raise
 
     @staticmethod
     def get_organization_type(chatbot_id: str) -> str:
@@ -572,7 +676,19 @@ class StandardRAGController:
                              f"\n\n[SYSTEM INTERVENTION - EARLY CONVERSATION]"
                              f"\nYou are in turn {conversation_turn_count + 1} of the conversation."
                              f"\nFocus on answering the user's questions helpfully."
-                             f"\nDo NOT ask for name, email, or phone number yet."
+                             f"\nDo NOT ask for name, email, or phone number yet UNLESS the user expresses 'High Interest' or 'Heavy Intent'."
+                             f"\n\n[HEAVY INTENT TRIGGERS]"
+                             f"\nIf the user says any of the following, you match 'Heavy Intent':"
+                             f"\n1. 'I want to speak to support' or similar."
+                             f"\n2. Asks about PRICING."
+                             f"\n3. Asking for comparisons with COMPETITORS."
+                             f"\n4. Asking specifically 'how to buy' or 'sign up'."
+                             f"\n\n[ACTION ON HEAVY INTENT]"
+                             f"\n- If 'Heavy Intent' is detected, IGNORE the 'wait 3 turns' rule."
+                             f"\n- Immediately say: 'I'd be happy to help with that! First, may I know your name?'"
+                             f"\n- Collect Name, Email, Phone ONE BY ONE."
+                             f"\n- Then call 'submit_pre_chat_form'."
+                             f"\n- Then continue the conversation/answer the question."
                           )
                 
         except Exception as e:
@@ -679,7 +795,12 @@ class StandardRAGController:
 
                                 # 2. Handle Urgency
                                 if urgency_arg == 'immediate':
-                                     from DB.postgresDB import create_notification
+                                      # from DB.postgresDB import create_notification (Removed: Global import used)
+                                     
+                                     # Also add to pipeline for visibility in board
+                                     # with get_db_connection() as conn:
+                                     #    move_customer_to_pipeline(chatbot_id, email_arg, conn)
+
                                      title = f"Urgent Callback: {name_arg or email_arg}"
                                      message = f"User has requested an immediate callback via standard chat. Phone: {phone_arg or 'N/A'}"
                                      # Include user_id for generic 'call' targeting (since Messenger registers with it)
@@ -699,6 +820,13 @@ class StandardRAGController:
                                          success = move_customer_to_pipeline(chatbot_id, email_arg, conn)
                                     
                                     if success:
+                                         create_notification(
+                                             chatbot_id, 
+                                             "call", 
+                                             "Support Request (Pipeline)", 
+                                             f"{name_arg or email_arg} added to support pipeline.",
+                                             {"email": email_arg, "name": name_arg, "phone": phone_arg}
+                                         )
                                          tool_result = {"status": "success", "message": "Handoff complete. Customer moved to priority queue."}
                                     else:
                                          tool_result = {"status": "error", "message": "Handoff failed (pipeline not found or user missing)."}

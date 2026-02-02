@@ -87,6 +87,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     setShowNotification,
     showNotification,
     mainLoading,
+    conversation,
   } = props;
 
   // Custom hook for all business logic
@@ -711,6 +712,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
         handleCloseChat={handleCloseChat}
         chatbot_config={chatbot_config}
         adminTestingMode={adminTestingMode}
+        conversation={conversation}
       />
 
       {/* Messages */}
@@ -723,6 +725,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
             supportImage={supportImage}
             chatbot_config={chatbot_config}
             onPhoneSubmitted={handlePhoneSubmitted}
+            onEmailSubmitted={handleSaveEmail}
           />
         ))}
         {showTyping && (
@@ -748,8 +751,8 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
         </div>
       )}
 
-      {/* Pre-Chat Form */}
-      {!isAdmin &&
+      {/* Pre-Chat Form - DISABLED for In-Chat Flow */}
+      {/* {!isAdmin &&
         !isEmailAvailable &&
         !isSpeakingWithRealPerson &&
         preChatForm && (
@@ -759,7 +762,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
             handleSaveEmail={handleSaveEmail}
             chatbot_config={chatbot_config}
           />
-        )}
+        )} */}
 
       {/* Post-Chat Form */}
       {openPostChatForm &&
@@ -799,16 +802,16 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
 
           if (data && data.hasPhone && data.phoneNumber) {
             // Has phone - show WhatsApp QR directly
-            setChatMessages((prev) => [
-              ...prev,
-              {
-                role: 'whatsapp_qr',
-                text: JSON.stringify(whatsappConfig),
-                timestamp: new Date().toISOString(),
-              },
-            ]);
+            const qrMessage = {
+              role: 'whatsapp_qr',
+              text: JSON.stringify(whatsappConfig),
+              timestamp: new Date().toISOString(),
+            };
+            // @ts-ignore
+            setChatMessages((prev) => [...prev, qrMessage]);
           } else {
             // No phone - ask for phone number first
+            // @ts-ignore
             setChatMessages((prev) => [
               ...prev,
               {
@@ -820,6 +823,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
                 role: 'phone_request',
                 text: 'waiting_for_phone',
                 timestamp: new Date().toISOString(),
+                user_email: email,
               },
             ]);
           }
@@ -850,6 +854,14 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
         stopListening={stopListening}
         chatbot_config={chatbot_config}
         showEmojiPicker={showEmojiPicker}
+        whatsappConfig={whatsappConfig}
+        onWhatsAppClick={null}
+        disabled={
+          // Disable input if waiting for email
+          !isAdmin &&
+          !isEmailAvailable &&
+          chatMessages.some((m) => m.role === 'email_request')
+        }
       />
     </div>
   );

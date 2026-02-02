@@ -46,6 +46,7 @@ export const ChatHeader: React.FC<{
   setCloseChatPopup: React.Dispatch<React.SetStateAction<boolean>>;
   handleCloseChat: () => void;
   chatbot_config: any;
+  conversation: any;
 }> = ({
   onBack,
   isFreePlan,
@@ -64,6 +65,7 @@ export const ChatHeader: React.FC<{
   handleCloseChat,
   chatbot_config,
   adminTestingMode,
+  conversation,
 }) => {
     const handleMaxScreen = () => {
       setMaxScreen(true);
@@ -159,7 +161,7 @@ export const ChatHeader: React.FC<{
               <Maximize2 size={18} />
             </button>
           )}
-          {isSpeakingWithRealPerson && isConversationActive && (
+          {isSpeakingWithRealPerson && conversation !== null && !isConversationClosed && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -222,7 +224,8 @@ export const MessageItem: React.FC<{
   supportImage: string | null;
   chatbot_config: any;
   onPhoneSubmitted?: () => void;
-}> = ({ msg, index, supportImage, chatbot_config, onPhoneSubmitted }) => {
+  onEmailSubmitted?: (values: Record<string, string>) => Promise<void>;
+}> = ({ msg, index, supportImage, chatbot_config, onPhoneSubmitted, onEmailSubmitted }) => {
   // Hide trigger and whatsapp_trigger messages
   if (msg.role === 'trigger' || msg.role === 'whatsapp_trigger') {
     return null;
@@ -255,6 +258,128 @@ export const MessageItem: React.FC<{
             style={{ marginRight: '8px', verticalAlign: 'middle' }}
           />
           {msg.text}
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.role === 'email_request') {
+    const [email, setEmail] = React.useState('');
+    const [submitting, setSubmitting] = React.useState(false);
+    const [submitted, setSubmitted] = React.useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!email.trim() || submitting || !onEmailSubmitted) return;
+
+      setSubmitting(true);
+      try {
+        // Construct values object expected by handleSaveEmail
+        // Assuming the preChatForm logic expects an ID for the email field.
+        // We'll pass a generic object, but we need to ensure handleSaveEmail handles it.
+        // Based on analysis, handleSaveEmail looks for a field with type 'email'.
+        // We will pass { email: email } and ensure handleSaveEmail can use it.
+        // Alternatively, we can just pass a mock object that satisfies the expected structure if needed,
+        // but looking at useChatLogic:578 it finds field by type 'email'.
+        // If we can't easily adhere to the dynamic form structure here without more props,
+        // we might need to adjust useChatLogic to handle a direct email string or specific key.
+        // Let's pass a standard key 'email' and ensure we update useChatLogic to look for it.
+
+        await onEmailSubmitted({ email: email.trim() });
+        setSubmitted(true);
+        setSubmitting(false);
+      } catch (error) {
+        console.error('Error saving email:', error);
+        setSubmitting(false);
+      }
+    };
+
+    if (submitted) {
+      return null; // Hide form after submission, or switch to a "Thanks" view if prefered handled by chatMessages update
+    }
+
+    return (
+      <div key={index} className='message bot'>
+        <div className='message-avatar'>
+          {supportImage ? (
+            <img src={supportImage} alt='Support' />
+          ) : (
+            <img
+              src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png'
+              alt='Support img'
+            />
+          )}
+        </div>
+        <div className='message-content'>
+          <div className='message-bubble'>
+            <p
+              style={{
+                margin: '0 0 12px 0',
+                fontSize: '14px',
+                lineHeight: '1.5',
+              }}
+            >
+              Could you please provide your email address to proceed?
+            </p>
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: '8px' }}>
+                <div
+                  style={{ display: 'flex', gap: '8px', alignItems: 'center' }}
+                >
+                  <input
+                    type='email'
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder='name@example.com'
+                    disabled={submitting}
+                    autoFocus
+                    required
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'border-color 0.2s',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor =
+                        chatbot_config.primaryColor || '#3b82f6';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#d1d5db';
+                    }}
+                  />
+                  <button
+                    type='submit'
+                    disabled={!email.trim() || submitting}
+                    style={{
+                      background: chatbot_config.primaryColor || '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '10px 16px',
+                      cursor:
+                        email.trim() && !submitting
+                          ? 'pointer'
+                          : 'not-allowed',
+                      opacity: email.trim() && !submitting ? 1 : 0.5,
+                      fontSize: '16px',
+                      fontWeight: 500,
+                      transition: 'opacity 0.2s',
+                      minWidth: '44px',
+                    }}
+                  >
+                    {submitting ? '...' : '→'}
+                  </button>
+                </div>
+              </div>
+            </form>
+            <p style={{ margin: '8px 0 0 0', fontSize: '11px', opacity: 0.7 }}>
+              Bot · Just now
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -926,6 +1051,7 @@ export const ChatInput: React.FC<{
   adminTestingMode?: boolean;
   whatsappConfig?: any;
   onWhatsAppClick?: () => void;
+  disabled?: boolean;
 }> = ({
   isAdmin,
   isConversationActive,
@@ -948,9 +1074,10 @@ export const ChatInput: React.FC<{
   adminTestingMode,
   whatsappConfig,
   onWhatsAppClick,
+  disabled = false,
 }) => {
     const handleKeyPress = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && isConversationActive && !loading) {
+      if (e.key === 'Enter' && isConversationActive && !loading && !disabled) {
         handleSend();
       }
     };
@@ -986,9 +1113,10 @@ export const ChatInput: React.FC<{
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              disabled={!isConversationActive}
+              disabled={!isConversationActive || disabled}
               style={{
-                opacity: isConversationActive ? 1 : 0.6,
+                opacity: isConversationActive && !disabled ? 1 : 0.6,
+                cursor: disabled ? 'not-allowed' : 'text',
               }}
             />
 
@@ -1003,7 +1131,7 @@ export const ChatInput: React.FC<{
                 <button
                   className='input-btn'
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={!isConversationActive}
+                  disabled={!isConversationActive || disabled}
                 >
                   <Paperclip color='var(--text-primary)' size={20} />
                 </button>
@@ -1018,7 +1146,7 @@ export const ChatInput: React.FC<{
                     e.stopPropagation();
                     setShowEmojiPicker((prev) => !prev);
                   }}
-                  disabled={!isConversationActive}
+                  disabled={!isConversationActive || disabled}
                 >
                   <Smile size={20} color='var(--text-primary)' />
                 </button>
@@ -1042,16 +1170,17 @@ export const ChatInput: React.FC<{
                     startListening();
                   }}
                   className='input-btn'
+                  disabled={disabled}
                 >
                   <Mic color='var(--text-primary)' size={20} />
                 </button>
 
                 <button
                   onClick={() => handleSend()}
-                  className={`send-btn ${(message.length === 0 || !isConversationActive || loading) &&
+                  className={`send-btn ${(message.length === 0 || !isConversationActive || loading || disabled) &&
                     'disabled'
                     }`}
-                  disabled={!isConversationActive || loading}
+                  disabled={!isConversationActive || loading || disabled}
                 >
                   <SendHorizontal size={20} />
                 </button>
