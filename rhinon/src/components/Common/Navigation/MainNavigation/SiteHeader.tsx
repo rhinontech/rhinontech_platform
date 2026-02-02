@@ -69,8 +69,8 @@ export function SiteHeader() {
             <>
               {/* <WorkTracker /> */}
               <NotificationBell />
-              <TeamChatDrawer />
               <SeedDataButton />
+              <TeamChatDrawer />
               <AiHelp />
             </>
           )}

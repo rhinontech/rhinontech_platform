@@ -30,6 +30,8 @@ import {
   createOrUpdateAutomation,
   getAutomation,
   trainAndSetAssistant,
+  triggerTraining,
+  TrainingUrl,
 } from "@/services/automations/automationServices";
 import { useUserStore } from "@/utils/store";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -53,9 +55,7 @@ type AnalysisStatus = "idle" | "analyzing" | "success" | "error";
 export default function Websites() {
   const router = useRouter();
   const { toggleAutomateSidebar } = useSidebar();
-  const [urls, setUrls] = useState<
-    { url: string; updatedAt: string; sitemap?: boolean }[]
-  >([]);
+  const [urls, setUrls] = useState<TrainingUrl[]>([]);
   const [fetching, setFetching] = useState(true);
   const [showHero, setShowHero] = useState(true);
 
@@ -66,8 +66,13 @@ export default function Websites() {
     useState<Partial<Website> | null>(null);
   const [urlError, setUrlError] = useState("");
   const [loading, isLoading] = useState(false);
+  const [trainLoading, setTrainLoading] = useState(false);
+  const [isTrained, setIsTrained] = useState(true);
   const orgPlan = useUserStore((state) => state.userData.orgPlan);
   const chatbotId = useUserStore((state) => state.userData.chatbotId);
+  const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
+  const [untrainedFilesCount, setUntrainedFilesCount] = useState(0);
+  const [untrainedArticlesCount, setUntrainedArticlesCount] = useState(0);
 
   const searchParams = useSearchParams();
 
@@ -104,6 +109,36 @@ export default function Websites() {
       const response = await getAutomation();
       const fetchedUrls = response.training_url || [];
       setUrls(fetchedUrls);
+      if (response?.training_url.length > 0) {
+        let count = 0;
+        response.training_url.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedWebsitesCount(count);
+      }
+      if (response?.training_pdf.length > 0) {
+        let count = 0;
+        response.training_pdf.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedFilesCount(count);
+      }
+      if (response?.training_article.length > 0) {
+        let count = 0;
+        response.training_article.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedArticlesCount(count);
+      }
     } catch (error) {
       console.error("Error getting the URLs:", error);
     } finally {
@@ -222,6 +257,7 @@ export default function Websites() {
       //   console.error("Failed to retrain chatbot after upload:", trainError);
       //   toast.error("Website addedd, but retraining failed.");
       // }
+      setIsTrained(false);
     } catch (error) {
       console.error("Failed to add website:", error);
       toast.error("Failed to add Website.");
@@ -239,20 +275,39 @@ export default function Websites() {
       });
       setUrls(updatedUrls);
       toast.success("Website removed successfully.");
-      try {
-        await trainAndSetAssistant(chatbotId);
-      } catch (trainError) {
-        console.error(
-          "Failed to retrain chatbot after file deletion:",
-          trainError
-        );
-        toast.error("Website removed, but retraining failed.");
-      }
+      // try {
+      //   await trainAndSetAssistant(chatbotId);
+      // } catch (trainError) {
+      //   console.error(
+      //     "Failed to retrain chatbot after file deletion:",
+      //     trainError
+      //   );
+      //   toast.error("Website removed, but retraining failed.");
+      // }
     } catch (err) {
       console.error("Error deleting URL", err);
       toast.error("Failed to deleted website.");
     }
   };
+
+  const handleTrain = async () => {
+    try {
+      setTrainLoading(true);
+      const chatbot_id = useUserStore.getState().userData?.chatbotId;
+
+      if (!chatbot_id) {
+        throw new Error("Chatbot ID not found");
+      }
+
+      await triggerTraining(chatbot_id);
+      toast.success("Training started successfully!");
+      setIsTrained(true)
+    } catch (error: any) {
+      toast.error(`Training failed: ${error.message}`);
+    } finally {
+      setTrainLoading(false);
+    }
+  }
 
   return (
     <>
@@ -416,6 +471,32 @@ export default function Websites() {
             </div>
           </ScrollArea>
         </div>
+        {!isTrained && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+            <div className="bg-foreground/95 backdrop-blur-md text-background px-2 py-2 rounded-full shadow-2xl flex items-center gap-2 pl-6 pr-2 border border-white/10">
+              <span className="text-sm font-medium mr-2">
+                {trainLoading ? "Chatbot is Training" : (
+                  <>
+                    {[
+                      untrainedWebsitesCount > 0 && `${untrainedWebsitesCount} Website${untrainedWebsitesCount > 1 ? 's' : ''}`,
+                      untrainedFilesCount > 0 && `${untrainedFilesCount} File${untrainedFilesCount > 1 ? 's' : ''}`,
+                      untrainedArticlesCount > 0 && `${untrainedArticlesCount} Article${untrainedArticlesCount > 1 ? 's' : ''}`,
+                    ].filter(Boolean).join(", ")} {untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 1 ? 'is' : 'are'} untrained
+                  </>
+                )}
+              </span>
+
+              <Button
+                onClick={handleTrain}
+                size="sm"
+                disabled={trainLoading}
+                className="h-8 rounded-full bg-background text-foreground hover:bg-background/90 font-semibold px-4"
+              >
+                {trainLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Train AI"}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add Website Modal */}
@@ -455,7 +536,7 @@ export default function Websites() {
                   className={cn(
                     "flex-1",
                     urlError &&
-                      "border-destructive focus-visible:ring-destructive"
+                    "border-destructive focus-visible:ring-destructive"
                   )}
                   disabled={analysisStatus === "analyzing"}
                 />
