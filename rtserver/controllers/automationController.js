@@ -213,7 +213,7 @@ const triggerTraining = async (req, res) => {
 
     // Call backendai with webhook URL
     const AI_URL = process.env.INTERNAL_AI_API_URL || "http://backendai:5002";
-    const RTSERVER_URL = process.env.INTERNAL_RTSERVER_URL || "http://rtserver:3000";
+    const RTSERVER_URL = process.env.INTERNAL_RTSERVER_URL || "http://rtserver:5000";
 
     const response = await axios.post(`${AI_URL}/api/ingest`, {
       chatbot_id: chatbot.chatbot_id,
