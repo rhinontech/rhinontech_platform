@@ -15,6 +15,7 @@ import { useBannerStore } from "@/store/useBannerStore";
 import { useTokenManager } from "@/hooks/userTokenManager";
 import { getOnboarding } from "@/services/dashborad/dashboardService";
 import { CopilotProvider } from "@/context/CopilotContext";
+import { getAutomation } from "@/services/automations/automationServices";
 
 import Cookies from "js-cookie";
 import { jwtDecode } from "jwt-decode";
@@ -304,6 +305,47 @@ export default function RootLayout({
       if (data.organization_id !== organizationId) return;
       localStorage.removeItem("seoCompliance");
       toast.error(data.message || "SEO Compliance check failed.");
+    });
+
+    // TRAINING events
+    socket.off(`training:started:${organizationId}`);
+    socket.off(`training:progress:${organizationId}`);
+    socket.off(`training:completed:${organizationId}`);
+    socket.off(`training:error:${organizationId}`);
+
+    socket.on(`training:started:${organizationId}`, (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      toast.info("AI Training started", {
+        description: "Preparing your knowledge base...",
+      });
+    });
+
+    socket.on(`training:progress:${organizationId}`, (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      toast.info(`Training Progress: ${data.progress}%`, {
+        description: data.message,
+      });
+      // Fetch latest automation data to update all components
+      getAutomation().catch(err => console.error('Failed to fetch automation:', err));
+      window.dispatchEvent(new CustomEvent('training-updated'));
+    });
+
+    socket.on(`training:completed:${organizationId}`, (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      toast.success("AI Training completed!", {
+        description: "Your knowledge base is ready.",
+      });
+      playSound();
+      // Fetch latest automation data to update all components
+      getAutomation().catch(err => console.error('Failed to fetch automation:', err));
+      window.dispatchEvent(new CustomEvent('training-updated'));
+    });
+
+    socket.on(`training:error:${organizationId}`, (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      toast.error("Training failed", {
+        description: data.message || data.error,
+      });
     });
 
     socket.on("voice-call-started", () => { });

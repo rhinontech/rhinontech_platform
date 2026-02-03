@@ -40,11 +40,13 @@ import {
   getAutomation,
   trainAndSetAssistant,
   triggerTraining,
+  deleteTrainingSource,
 } from "@/services/automations/automationServices";
 import { useUserStore } from "@/utils/store";
 import Loading from "@/app/loading";
 import { toast } from "sonner";
 import { PLAN_LIMITS } from "@/lib/plans";
+import { getSocket } from "@/services/webSocket";
 
 interface Article {
   id: string;
@@ -81,6 +83,8 @@ export default function Articles() {
   const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
   const [untrainedFilesCount, setUntrainedFilesCount] = useState(0);
   const [untrainedArticlesCount, setUntrainedArticlesCount] = useState(0);
+  const [trainingStatus, setTrainingStatus] = useState<string>("idle");
+  const [trainingProgress, setTrainingProgress] = useState<number>(0);
   const orgPlan = useUserStore((state) => state.userData.orgPlan);
   const chatbotId = useUserStore((state) => state.userData.chatbotId);
 
@@ -125,12 +129,44 @@ export default function Articles() {
     }
   }, [searchParams, articles.length, subscriptionLimit, router, fetching]);
 
+  // Listen for training updates via WebSocket
+  useEffect(() => {
+    const organizationId = useUserStore.getState().userData?.orgId;
+    if (!organizationId) return;
+
+    const socket = getSocket();
+
+    const handleTrainingProgress = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+    };
+
+    const handleTrainingCompleted = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+      setTrainLoading(false);
+      await getArticle(); // Refresh articles
+    };
+
+    socket.on(`training:progress:${organizationId}`, handleTrainingProgress);
+    socket.on(`training:completed:${organizationId}`, handleTrainingCompleted);
+
+    return () => {
+      socket.off(`training:progress:${organizationId}`, handleTrainingProgress);
+      socket.off(`training:completed:${organizationId}`, handleTrainingCompleted);
+    };
+  }, []);
+
   const getArticle = async () => {
     setFetching(true);
     try {
       const response = await getAutomation();
       const fetchedArticles = response.training_article || [];
-
+      setIsTrained(true); // Reset to true before checking
 
       if (response?.training_url.length > 0) {
         let count = 0;
@@ -162,6 +198,8 @@ export default function Articles() {
         });
         setUntrainedArticlesCount(count);
       }
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
       setArticles(fetchedArticles);
     } catch (error) {
       console.error("Error getting the URLs:", error);
@@ -170,11 +208,12 @@ export default function Articles() {
     }
   };
 
+
   const handleTrain = async () => {
 
     try {
       setTrainLoading(true);
-
+      setTrainingStatus("training");
 
       const chatbot_id = useUserStore.getState().userData?.chatbotId;
 
@@ -184,11 +223,10 @@ export default function Articles() {
 
       await triggerTraining(chatbot_id);
       toast.success("Training started successfully!");
-      setIsTrained(true);
     } catch (error: any) {
       toast.error(`Training failed: ${error.message}`);
-    } finally {
       setTrainLoading(false);
+      setTrainingStatus("idle");
     }
   }
 
@@ -229,13 +267,14 @@ export default function Articles() {
       setArticles(updatedArticles);
       handleCloseModal();
       toast.success("Article added successfully.");
-      setIsTrained(false);
       // try {
       //   await trainAndSetAssistant(chatbotId);
       // } catch (trainError) {
       //   console.error("Failed to retrain chatbot after upload:", trainError);
       //   toast.error("Article addedd, but retraining failed.");
       // }
+      setUntrainedArticlesCount((prev) => prev + 1);
+      setIsTrained(false);
     } catch (error) {
       console.error("Failed to add article:", error);
       toast.error("Adding article failed");
@@ -264,11 +303,23 @@ export default function Articles() {
     const updatedArticles = articles.filter((a) => a.id !== articleId);
 
     try {
+      await deleteTrainingSource(articleId, 'article');
+    } catch (e) {
+      console.error("Failed to delete source vectors", e);
+    }
+
+    try {
       await createOrUpdateAutomation({
         training_article: updatedArticles,
         isChatbotTrained: false,
       });
       setArticles(updatedArticles);
+
+      const deletedArticle = articles.find(a => a.id === articleId);
+      if (deletedArticle && (deletedArticle as any).is_trained === false || (deletedArticle as any).is_trained === undefined) {
+        setUntrainedArticlesCount(prev => Math.max(0, prev - 1));
+      }
+
       toast.success("Article removed successfully.");
       // try {
       //   await trainAndSetAssistant(chatbotId);
@@ -494,7 +545,7 @@ export default function Articles() {
           </ScrollArea>
         </div>
 
-        {!isTrained && (
+        {(!isTrained && (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount > 0)) && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
             <div className="bg-foreground/95 backdrop-blur-md text-background px-2 py-2 rounded-full shadow-2xl flex items-center gap-2 pl-6 pr-2 border border-white/10">
               <span className="text-sm font-medium mr-2">
@@ -512,10 +563,17 @@ export default function Articles() {
               <Button
                 onClick={handleTrain}
                 size="sm"
-                disabled={trainLoading}
+                disabled={trainingStatus === 'training' || (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 0)}
                 className="h-8 rounded-full bg-background text-foreground hover:bg-background/90 font-semibold px-4"
               >
-                {trainLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Train AI"}
+                {trainingStatus === 'training' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Training... {trainingProgress}%
+                  </>
+                ) : (
+                  "Train AI"
+                )}
               </Button>
             </div>
           </div>

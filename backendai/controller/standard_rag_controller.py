@@ -39,16 +39,12 @@ S3_FOLDER_NAME = os.getenv("S3_FOLDER_NAME", "")
 
 class StandardRAGController:
     @staticmethod
-    async def fetch_and_prepare_data(chatbot_id: str) -> str:
+    async def fetch_and_prepare_data(chatbot_id: str):
         """
         Fetches data from 'automations' table and extracts clean text.
+        Returns: Tuple(combined_text, processed_items_dict)
         """
         try:
-            # properly use context manager via helper or direct release
-            # Since this is async/threaded, we can't easily use the context manager inside asyncio.to_thread 
-            # if we pass the context manager itself. 
-            # Better pattern: Function that does the DB work synchronously, called by to_thread.
-            
             def fetch_data_sync(cid):
                 with get_db_connection() as conn:
                     data_query = """
@@ -62,14 +58,17 @@ class StandardRAGController:
             result = await asyncio.to_thread(fetch_data_sync, chatbot_id)
 
             if not result:
-                return ""
+                return "", {'urls': [], 'files': [], 'articles': []}
 
-            combined_text = ""
+            # Reformatted to return list of documents (source, content)
+            documents = []
+            processed_items = {'urls': [], 'files': [], 'articles': []}
+            
             for url_data, file_data, article_data in result:
                  # URL data
                 if url_data:
                     for url_item in url_data:
-                        # Skip if already trained (handle missing field by defaulting to False)
+                        # Skip if already trained
                         if url_item.get('is_trained', False) == True:
                             logging.info(f"⏭️  Skipping already trained URL: {url_item.get('url')}")
                             continue
@@ -83,9 +82,14 @@ class StandardRAGController:
                                     try:
                                         content = get_url_data(page_url)
                                         if content:
-                                            combined_text += (
-                                                f"\n\n--- Source: {page_url} ---\n{content}"
-                                            )
+                                            documents.append({
+                                                "source": url_item["url"], # Use main URL as source identifier for group deletion? Or specific page? 
+                                                # If we use specific page, deleting main URL needs to delete all child pages.
+                                                # For now, let's use the main URL as source, or we loop to delete later.
+                                                # Let's use the unique URL.
+                                                # Actually, for deletion, user deletes the MAIN url. So we should probably tag chunks with MAIN url.
+                                                "content": f"\n\n--- Source: {page_url} ---\n{content}"
+                                            })
                                     except Exception as e:
                                         logging.error(f"Error scraping {page_url}: {e}")
 
@@ -94,11 +98,14 @@ class StandardRAGController:
                                 try:
                                     content = get_url_data(url_item["url"])
                                     if content:
-                                        combined_text += (
-                                            f"\n\n--- Source: {url_item['url']} ---\n{content}"
-                                        )
+                                        documents.append({
+                                            "source": url_item["url"],
+                                            "content": f"\n\n--- Source: {url_item['url']} ---\n{content}"
+                                        })
                                 except Exception as e:
                                     logging.error(f"Error fetching URL {url_item['url']}: {e}")
+                            
+                            processed_items['urls'].append(url_item['url'])
 
                         except Exception as e:
                             logging.error(f"Error fetching URL {url_item.get('url')}: {e}")
@@ -106,7 +113,7 @@ class StandardRAGController:
                 # File data
                 if file_data:
                     for file_item in file_data:
-                        # Skip if already trained (handle missing field by defaulting to False)
+                        # Skip if already trained
                         if file_item.get('is_trained', False) == True:
                             logging.info(f"⏭️  Skipping already trained file: {file_item.get('s3Name')}")
                             continue
@@ -129,135 +136,104 @@ class StandardRAGController:
                                     content = image_data(file_url)
                                 
                                 if content:
-                                    combined_text += f"\n\n--- Source: {s3_name} ---\n{content}"
+                                    documents.append({
+                                        "source": s3_name,
+                                        "content": f"\n\n--- Source: {s3_name} ---\n{content}"
+                                    })
+                                
+                                processed_items['files'].append(s3_name)
                             except Exception as e:
                                 logging.error(f"Error processing file {file_url}: {e}")
 
                 # Article data
                 if article_data:
                     for article in article_data:
-                        # Skip if already trained (handle missing field by defaulting to False)
+                        # Skip if already trained
                         if article.get('is_trained', False) == True:
                             logging.info(f"⏭️  Skipping already trained article: {article.get('id')}")
                             continue
                             
                         content = article.get('content', '')
                         if content:
-                            combined_text += f"\n\n--- Source: Article ---\n{content}"
+                            documents.append({
+                                "source": article.get('id'), # Use ID as source for articles
+                                "content": f"\n\n--- Source: Article ---\n{content}"
+                            })
+                            processed_items['articles'].append(article.get('id'))
 
-            return combined_text
+            return documents, processed_items
         except Exception as e:
             logging.error(f"Fetch Prep Data Error: {e}")
-            return ""
-
-    @staticmethod
-    async def get_stored_knowledge(chatbot_id: str) -> str:
-        """
-        Retrieves the processed text content straight from the Vector DB (training_chunks).
-        """
-        try:
-            # Sync function for DB op
-            def get_knowledge_sync(cid):
-                with get_db_connection() as conn:
-                    query = "SELECT content FROM training_chunks WHERE chatbot_id = %s ORDER BY chunk_index ASC LIMIT 500;"
-                    return run_query(conn, query, (cid,))
-
-            result = await asyncio.to_thread(get_knowledge_sync, chatbot_id)
-            
-            if result:
-                full_text = "\n\n".join([r[0] for r in result])
-                return full_text
-                
-            return ""
-        except Exception as e:
-            logging.error(f"Error getting stored knowledge: {e}")
-            return ""
-
-    @staticmethod
-    def chunk_text(text: str, chunk_size: int = 600, overlap: int = 100) -> list[str]:
-        """
-        Splits text into chunks of roughly chunk_size characters with overlap.
-        """
-        if not text:
-            return []
-        
-        chunks = []
-        start = 0
-        text_len = len(text)
-        
-        while start < text_len:
-            end = start + chunk_size
-            chunk = text[start:end]
-            chunks.append(chunk)
-            start += chunk_size - overlap
-            
-        return chunks
+            return [], {'urls': [], 'files': [], 'articles': []}
 
     @staticmethod
     async def ingest_to_vector_db(chatbot_id: str):
         """
-        1. Fetches Text.
-        2. Chunks Text.
+        1. Fetches Text (Documents list).
+        2. Chunks Each Document.
         3. Embeds Chunks (Batch).
-        4. Replaces old chunks in training_chunks table.
+        4. Replaces old chunks for specific source.
         5. Marks items as trained in rtserver.
         """
         logging.info(f"🔄 Step 1/5: Fetching training data for chatbot {chatbot_id}")
-        text_data = await StandardRAGController.fetch_and_prepare_data(chatbot_id)
-        if not text_data:
+        documents, processed_items = await StandardRAGController.fetch_and_prepare_data(chatbot_id)
+        
+        if not documents:
             logging.info(f"ℹ️  No untrained data found for chatbot {chatbot_id}. All items are already trained or no data exists.")
             return {"status": "success", "message": "No new data to train. All items are already trained."}
         
-        logging.info(f"✅ Fetched {len(text_data)} characters of training data")
+        logging.info(f"✅ Fetched {len(documents)} new documents for training")
         
-        # 1. Chunking
-        logging.info(f"🔄 Step 2/5: Chunking text data...")
-        chunks_text = StandardRAGController.chunk_text(text_data)
-        logging.info(f"✅ Generated {len(chunks_text)} chunks for chatbot {chatbot_id}")
+        all_chunks_data = []
         
-        # 2. Embedding (Batch)
-        # We process in small batches of 20 to avoid rate limits if needed, 
-        # but OpenAI handles list inputs well.
-        logging.info(f"🔄 Step 3/5: Generating embeddings for {len(chunks_text)} chunks...")
-        chunks_data = []
+        # Process each document
+        for doc in documents:
+            source = doc['source']
+            content = doc['content']
+            
+            # Chunking
+            chunks_text = StandardRAGController.chunk_text(content)
+            
+            # Embedding
+            for i, chunk in enumerate(chunks_text):
+                vector = embedding_service.embed_text(chunk) 
+                if vector:
+                    all_chunks_data.append({
+                        "index": i,
+                        "content": chunk,
+                        "embedding": vector,
+                        "source": source
+                    })
+
+        logging.info(f"✅ Generated embeddings for {len(all_chunks_data)} chunks total")
         
-        # We need a robust embed function. Since embedding_service.embed_text currently takes str, 
-        # let's map it or update it. For now, calling it in loop or we update service.
-        # Let's call in loop for simplicity first, or update service? 
-        # Updating service is better for performance.
-        # I will assume I updated embedding_service.embed_batch(list) in next step.
-        # But to keep this tool safe, I will stick to single embed in loop for now OR generic list if supported.
-        # Check: embedding_service.embed_text currently only takes string. 
-        # I must fix that first. I will do loop here for specific reliability now.
-        
-        for i, chunk in enumerate(chunks_text):
-            if (i + 1) % 10 == 0:  # Log progress every 10 chunks
-                logging.info(f"   Embedded {i + 1}/{len(chunks_text)} chunks...")
-            vector = embedding_service.embed_text(chunk) 
-            if vector:
-                chunks_data.append({
-                    "index": i,
-                    "content": chunk,
-                    "embedding": vector
-                })
-        
-        logging.info(f"✅ Generated embeddings for {len(chunks_data)} chunks")
-        
-        # 3. Replace Data
+        # DB Operations
         logging.info(f"🔄 Step 4/5: Saving embeddings to database...")
-        # Use Thread for DB Ops
-        await asyncio.to_thread(delete_chunks, chatbot_id)
         
-        if chunks_data:
-            await asyncio.to_thread(insert_chunk_batch, chatbot_id, chunks_data)
+        # For each source in the new batch, clear old chunks (just in case of re-training same source without full wipe)
+        # Note: processed_items has the sources.
         
-        logging.info(f"✅ Successfully saved {len(chunks_data)} chunks to database for chatbot {chatbot_id}")
+        sources_to_clear = set()
+        for doc in documents:
+            sources_to_clear.add(doc['source'])
+            
+        # We can implement a batch delete or loop. Loop is fine for typical counts.
+        for source in sources_to_clear:
+             await asyncio.to_thread(delete_specific_chunks, chatbot_id, source)
+        
+        # Note: We REMOVED the global 'delete_chunks(chatbot_id)' call. 
+        # This enables INCREMENTAL training.
+        
+        if all_chunks_data:
+            await asyncio.to_thread(insert_chunk_batch, chatbot_id, all_chunks_data)
+        
+        logging.info(f"✅ Successfully saved {len(all_chunks_data)} chunks to database for chatbot {chatbot_id}")
         
         # 4. Mark items as trained in rtserver
         logging.info(f"🔄 Step 5/5: Marking items as trained in rtserver...")
         try:
-            await StandardRAGController.mark_items_as_trained(chatbot_id)
-            logging.info(f"✅ Marked all items as trained for chatbot {chatbot_id}")
+            await StandardRAGController.mark_items_as_trained(chatbot_id, processed_items)
+            logging.info(f"✅ Marked processed items as trained for chatbot {chatbot_id}")
         except Exception as e:
             logging.warning(f"⚠️  Failed to mark items as trained: {e}")
             # Don't fail the entire ingestion if marking fails
@@ -265,13 +241,13 @@ class StandardRAGController:
         return True
 
     @staticmethod
-    async def mark_items_as_trained(chatbot_id: str):
+    async def mark_items_as_trained(chatbot_id: str, processed_items: Dict[str, list]):
         """
-        Directly updates the database to mark all untrained items as trained after successful ingestion.
+        Directly updates the database to mark ONLY the items that were actually processed in this run.
         """
         try:
             # Get organization_id and current training data from chatbot_id
-            def get_and_update_training_status(cid):
+            def get_and_update_training_status(cid, items_to_mark):
                 with get_db_connection() as conn:
                     # First, fetch current data
                     query = """
@@ -289,21 +265,31 @@ class StandardRAGController:
                         
                         organization_id, training_url, training_pdf, training_article = result
                         
-                        # Mark all untrained items as trained
+                        # Mark ONLY processed items as trained
+                        marked_urls = 0
+                        marked_pdfs = 0
+                        marked_articles = 0
+
                         if training_url:
                             for item in training_url:
-                                if item.get('is_trained', False) != True:
-                                    item['is_trained'] = True
+                                if item.get('url') in items_to_mark.get('urls', []):
+                                    if item.get('is_trained', False) != True:
+                                        item['is_trained'] = True
+                                        marked_urls += 1
                         
                         if training_pdf:
                             for item in training_pdf:
-                                if item.get('is_trained', False) != True:
-                                    item['is_trained'] = True
+                                if item.get('s3Name') in items_to_mark.get('files', []):
+                                    if item.get('is_trained', False) != True:
+                                        item['is_trained'] = True
+                                        marked_pdfs += 1
                         
                         if training_article:
                             for item in training_article:
-                                if item.get('is_trained', False) != True:
-                                    item['is_trained'] = True
+                                if item.get('id') in items_to_mark.get('articles', []):
+                                    if item.get('is_trained', False) != True:
+                                        item['is_trained'] = True
+                                        marked_articles += 1
                         
                         # Update the database with modified data
                         update_query = """
@@ -324,12 +310,12 @@ class StandardRAGController:
                         
                         return {
                             'organization_id': organization_id,
-                            'urls_count': len([i for i in (training_url or []) if i.get('is_trained') == True]),
-                            'pdfs_count': len([i for i in (training_pdf or []) if i.get('is_trained') == True]),
-                            'articles_count': len([i for i in (training_article or []) if i.get('is_trained') == True])
+                            'urls_count': marked_urls,
+                            'pdfs_count': marked_pdfs,
+                            'articles_count': marked_articles
                         }
             
-            result = await asyncio.to_thread(get_and_update_training_status, chatbot_id)
+            result = await asyncio.to_thread(get_and_update_training_status, chatbot_id, processed_items)
             
             if not result:
                 logging.warning(f"No automation data found for chatbot {chatbot_id}")
@@ -409,17 +395,15 @@ class StandardRAGController:
         
         # Determine Organization Type and get Industry Instruction
         org_type = StandardRAGController.get_organization_type(chatbot_id)
-        # Determine Organization Type and get Industry Instruction
-        org_type = StandardRAGController.get_organization_type(chatbot_id)
-        industry_instruction = INDUSTRY_PROMPTS.get(org_type, INDUSTRY_PROMPTS["Default"])
+        industry_instruction = INDUSTRY_PROMPTS.get(org_type, INDUSTRY_PROMPTS.get("Default", ""))
         
         system_instruction = (
-            f"{industry_instruction}\n\n"
-            "Use the following pieces of retrieved context to answer the user's question.\n"
-            "If the answer is not in the context, say you don't know, but answer politely based on your persona.\n"
-            "Keep answers concise and relevant."
-            "\n"
-            f"Context:\n{context_text}"
+            f"Persona/Industry Context: {industry_instruction}\n\n"
+            "Source Knowledge (Vector DB Context):\n"
+            f"{context_text}\n\n"
+            "Instruction: Answer the user's question using the Source Knowledge provided above. "
+            "If the information is not found in the context, politely state that you do not have that information "
+            "while maintaining your persona. Do not invent facts outside of the provided context."
         )
 
         # 2.5. Check for Pre-Chat Form (Function Calling)
@@ -938,5 +922,18 @@ class StandardRAGController:
                      
         except Exception as e:
             logging.error(f"Error saving history: {e}")
-
+    @staticmethod
+    def chunk_text(text: str, chunk_size=1000, overlap=100) -> list:
+        """
+        Splits text into chunks of specified size and overlap.
+        """
+        if not text:
+            return []
+            
+        chunks = []
+        for i in range(0, len(text), chunk_size - overlap):
+            chunk = text[i:i + chunk_size]
+            chunks.append(chunk)
+            
+        return chunks
 standard_rag_controller = StandardRAGController()

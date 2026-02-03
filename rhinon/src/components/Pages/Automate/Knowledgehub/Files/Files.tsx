@@ -21,6 +21,7 @@ import {
   getAutomation,
   trainAndSetAssistant,
   triggerTraining,
+  deleteTrainingSource,
 } from "@/services/automations/automationServices";
 import { uploadPdfFile } from "@/services/fileUploadService";
 import { useUserStore } from "@/utils/store";
@@ -28,6 +29,7 @@ import Loading from "@/app/loading";
 import { FileViewerModal } from "@/components/Common/FileViewerModal/FileViewerModal";
 import { toast } from "sonner";
 import { PLAN_LIMITS } from "@/lib/plans";
+import { getSocket } from "@/services/webSocket";
 
 interface FileItem {
   s3Name: string;
@@ -58,6 +60,8 @@ export default function Files() {
   const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
   const [untrainedFilesCount, setUntrainedFilesCount] = useState(0);
   const [untrainedArticlesCount, setUntrainedArticlesCount] = useState(0);
+  const [trainingStatus, setTrainingStatus] = useState<string>("idle");
+  const [trainingProgress, setTrainingProgress] = useState<number>(0);
 
   const subscriptionLimit = PLAN_LIMITS[orgPlan]?.file || 3;
   const canAddFile = files.length < subscriptionLimit;
@@ -70,6 +74,7 @@ export default function Files() {
       const response = await getAutomation();
       const fetchedFiles = response.training_pdf || [];
       setFiles(fetchedFiles);
+      setIsTrained(true); // Reset to true before checking
 
       if (response?.training_url.length > 0) {
         let count = 0;
@@ -102,6 +107,8 @@ export default function Files() {
         setUntrainedArticlesCount(count);
       }
 
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
     } catch (error) {
       console.error("Error getting PDFs:", error);
     } finally {
@@ -136,6 +143,38 @@ export default function Files() {
       router.replace(currentUrl);
     }
   }, [searchParams, canAddFile, fetching, router]);
+
+  // Listen for training updates via WebSocket
+  useEffect(() => {
+    const organizationId = useUserStore.getState().userData?.orgId;
+    if (!organizationId) return;
+
+    const socket = getSocket();
+
+    const handleTrainingProgress = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+    };
+
+    const handleTrainingCompleted = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+      setTrainLoading(false);
+      await getFiles(); // Refresh files
+    };
+
+    socket.on(`training:progress:${organizationId}`, handleTrainingProgress);
+    socket.on(`training:completed:${organizationId}`, handleTrainingCompleted);
+
+    return () => {
+      socket.off(`training:progress:${organizationId}`, handleTrainingProgress);
+      socket.off(`training:completed:${organizationId}`, handleTrainingCompleted);
+    };
+  }, []);
 
   const handleConfirmUpload = async () => {
     isLoading(true);
@@ -184,6 +223,8 @@ export default function Files() {
       // }
       console.log("PDF uploaded successfully");
 
+      setUntrainedFilesCount((prev) => prev + 1);
+      setIsTrained(false);
       setSelectedFile(null);
       setUploadProgress(null);
     } catch (error) {
@@ -202,11 +243,37 @@ export default function Files() {
     const updatedFiles = files.filter((file) => file.s3Name !== fileId);
 
     try {
+      await deleteTrainingSource(fileId, 'file');
+    } catch (e) {
+      console.error("Failed to delete source vectors", e);
+    }
+
+
+    try {
       await createOrUpdateAutomation({
         training_pdf: updatedFiles,
         isChatbotTrained: false,
       });
       setFiles(updatedFiles);
+
+      // Check if the deleted file was untrained
+      // Since we don't track which specific file is untrained in the 'files' state perfectly for local additions
+      // without refreshing, we can assume if the user deletes a file and we have an untrained count > 0,
+      // it MIGHT have been that one. But strictly speaking, the backend tells us 'is_trained'.
+      // Local check: if we just added it, we incremented count. If we delete it, we should decrement.
+      // Ideally, the 'files' state should include 'is_trained' property.
+      // Let's assume the 'file' object in 'files' state has the property if it came from DB.
+      // If it came from local add, we didn't add the property explicitly in handleConfirmUpload, let's fix that too.
+      // Use 's3Name' to find the file in the *current* state before deletion to check is_trained status.
+
+      const deletedFile = files.find(f => f.s3Name === fileId);
+      // For locally added files that haven't been re-fetched, they might not have 'is_trained'.
+      // But we treated them as untrained by incrementing the count.
+      // If is_trained is false OR undefined (newly added), decrement.
+      if (deletedFile && (deletedFile as any).is_trained === false || (deletedFile as any).is_trained === undefined) {
+        setUntrainedFilesCount(prev => Math.max(0, prev - 1));
+      }
+
       toast.success("File removed successfully.");
       // try {
       //   await trainAndSetAssistant(chatbotId);
@@ -294,6 +361,7 @@ export default function Files() {
   const handleTrain = async () => {
     try {
       setTrainLoading(true);
+      setTrainingStatus("training"); // Immediate feedback
       const chatbot_id = useUserStore.getState().userData?.chatbotId;
 
       if (!chatbot_id) {
@@ -302,11 +370,10 @@ export default function Files() {
 
       await triggerTraining(chatbot_id);
       toast.success("Training started successfully!");
-      setIsTrained(true);
     } catch (error: any) {
       toast.error(`Training failed: ${error.message}`);
-    } finally {
       setTrainLoading(false);
+      setTrainingStatus("idle"); // Revert status on error
     }
   }
 
@@ -448,7 +515,7 @@ export default function Files() {
             </div>
           </ScrollArea>
         </div>
-        {!isTrained && (
+        {(!isTrained && (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount > 0)) && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
             <div className="bg-foreground/95 backdrop-blur-md text-background px-2 py-2 rounded-full shadow-2xl flex items-center gap-2 pl-6 pr-2 border border-white/10">
               <span className="text-sm font-medium mr-2">
@@ -466,10 +533,17 @@ export default function Files() {
               <Button
                 onClick={handleTrain}
                 size="sm"
-                disabled={trainLoading}
+                disabled={trainingStatus === 'training' || (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 0)}
                 className="h-8 rounded-full bg-background text-foreground hover:bg-background/90 font-semibold px-4"
               >
-                {trainLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Train AI"}
+                {trainingStatus === 'training' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Training... {trainingProgress}%
+                  </>
+                ) : (
+                  "Train AI"
+                )}
               </Button>
             </div>
           </div>
