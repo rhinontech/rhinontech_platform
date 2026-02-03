@@ -36,6 +36,28 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: false,
       },
+      training_status: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        defaultValue: 'idle',
+      },
+      training_progress: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+      },
+      training_job_id: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+      },
+      training_started_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      training_message: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
     },
     {
       timestamps: true,

@@ -189,9 +189,180 @@ const analyzeURL = async (req, res) => {
   }
 };
 
+const triggerTraining = async (req, res) => {
+  const io = req.app.get("io");
+  const { organization_id } = req.user;
+
+  try {
+    // Get chatbot for this organization
+    const { chatbots } = require("../models");
+    const chatbot = await chatbots.findOne({ where: { organization_id } });
+
+    if (!chatbot) {
+      return res.status(404).json({ error: "Chatbot not found" });
+    }
+
+    // Check current status to prevent double-triggering
+    const automation = await automations.findOne({ where: { organization_id } });
+    if (automation && automation.training_status === 'training') {
+      return res.status(200).json({
+        status: 'already_training',
+        message: 'Training already in progress'
+      });
+    }
+
+    // Call backendai with webhook URL
+    const AI_URL = process.env.INTERNAL_AI_API_URL || "http://backendai:5002";
+    const RTSERVER_URL = process.env.INTERNAL_RTSERVER_URL || "http://rtserver:5001";
+
+    const response = await axios.post(`${AI_URL}/api/ingest`, {
+      chatbot_id: chatbot.chatbot_id,
+      webhook_url: `${RTSERVER_URL}/api/automations/training-webhook`
+    });
+
+    // backendai will call webhook which will emit WebSocket events
+    return res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error triggering training:", error);
+
+    // Emit error event
+    io.emit(`training:error:${organization_id}`, {
+      message: "Failed to start training",
+      organization_id,
+      error: error.message
+    });
+
+    return res.status(500).json({
+      error: "Failed to trigger training",
+      message: error.message
+    });
+  }
+};
+
+// Webhook endpoint for backendai to send progress updates
+const trainingWebhook = async (req, res) => {
+  const io = req.app.get("io");
+  const { organization_id, status, progress, message, error } = req.body;
+
+  try {
+    // Update database
+    const automation = await automations.findOne({ where: { organization_id } });
+    if (automation) {
+      automation.training_status = status;
+      automation.training_progress = progress;
+      automation.training_message = message;
+      await automation.save();
+    }
+
+    // Emit WebSocket event based on status
+    if (status === 'training') {
+      io.emit(`training:progress:${organization_id}`, {
+        organization_id,
+        progress,
+        message
+      });
+    } else if (status === 'completed') {
+      io.emit(`training:completed:${organization_id}`, {
+        organization_id,
+        message
+      });
+    } else if (status === 'failed') {
+      io.emit(`training:error:${organization_id}`, {
+        organization_id,
+        message,
+        error
+      });
+    }
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Webhook error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const deleteTrainingSource = async (req, res) => {
+  const { organization_id } = req.user;
+  const { source, type } = req.body;
+
+  if (!source || !type) {
+    return res.status(400).json({ error: "Source and type are required" });
+  }
+
+  try {
+    const { chatbots } = require("../models");
+    const chatbot = await chatbots.findOne({ where: { organization_id } });
+
+    if (!chatbot) {
+      // Should usually exist if they are deleting
+      console.warn(`Chatbot not found for org ${organization_id} during delete`);
+    }
+
+    // 1. Call backendai to delete vectors (idempotent - if not found, ok)
+    if (chatbot) {
+      const AI_URL = process.env.INTERNAL_AI_API_URL || "http://backendai:5002";
+      try {
+        await axios.post(`${AI_URL}/api/delete_source`, {
+          chatbot_id: chatbot.chatbot_id,
+          source: source
+        });
+      } catch (aiError) {
+        console.error("Failed to delete source from AI backend:", aiError.message);
+        // Continue to remove from DB even if vector delete fails (clean up reference)
+      }
+    }
+
+    // 2. Remove from 'automations' list in Postgres (JSONB)
+    // NOTE: The frontend actually sends a full 'createOrUpdateAutomation' call after this
+    // OR the frontend *only* calls this?
+    // User logic: "currently if delete any thing it just remove from the automation table"
+    // The frontend code I saw calls `createOrUpdateAutomation` with the *filtered* list.
+    // So the list update is handled by the frontend calling 'createOrUpdateAutomation'.
+    // BUT we need this NEW endpoint to handle the VECTOR deletion.
+    // So frontend should call:
+    // 1. deleteTrainingSource (to clean vectors)
+    // 2. createOrUpdateAutomation (to clean list) - OR -
+    // BETTER: deleteTrainingSource should do BOTH.
+
+    // For now, I will assume Frontend calls this *in addition* or I update the frontend to call this *instead*.
+    // Updating frontend to call this *instead* is cleaner.
+
+    const automation = await automations.findOne({ where: { organization_id } });
+    if (automation) {
+      let updated = false;
+      if (type === 'url' && automation.training_url) {
+        const initialLen = automation.training_url.length;
+        automation.training_url = automation.training_url.filter(item => item.url !== source);
+        if (automation.training_url.length !== initialLen) updated = true;
+      } else if (type === 'file' && automation.training_pdf) {
+        const initialLen = automation.training_pdf.length;
+        automation.training_pdf = automation.training_pdf.filter(item => item.s3Name !== source);
+        if (automation.training_pdf.length !== initialLen) updated = true;
+      } else if (type === 'article' && automation.training_article) {
+        const initialLen = automation.training_article.length;
+        automation.training_article = automation.training_article.filter(item => item.id !== source);
+        if (automation.training_article.length !== initialLen) updated = true;
+      }
+
+      if (updated) {
+        await automation.save();
+      }
+    }
+
+    return res.status(200).json({ message: "Source deleted successfully" });
+
+  } catch (error) {
+    console.error("Delete source error:", error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   analyzeURL,
   getAllAutomation,
   createOrUpdateAutomation,
   getArticleForAutomation,
+  triggerTraining,
+  trainingWebhook,
+  deleteTrainingSource
 };
