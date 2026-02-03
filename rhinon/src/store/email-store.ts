@@ -6,7 +6,7 @@ interface EmailStore {
     template: EmailTemplate;
     selectedElementId: string | null;
 
-    // Actions
+    // Action
     addElement: (type: ElementType, parentId?: string) => void;
     updateElement: (id: string, updates: Partial<EmailElement>) => void;
     removeElement: (id: string) => void;
