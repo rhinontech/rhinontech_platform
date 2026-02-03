@@ -1,14 +1,14 @@
 import { PrivateAxios } from "@/helpers/PrivateAxios";
 import axios from "axios";
 
-interface TrainingUrl {
+export interface TrainingUrl {
   url: string;
-  sitemap: boolean;
+  sitemap?: boolean;
   updatedAt: string;
   is_trained?: boolean;
 }
 
-interface TrainingPdf {
+export interface TrainingPdf {
   size: number;
   s3Name: string;
   uploadedAt: string;
@@ -16,7 +16,7 @@ interface TrainingPdf {
   is_trained?: boolean;
 }
 
-interface Article {
+export interface Article {
   id: string;
   title: string;
   content: string;
@@ -92,19 +92,29 @@ export const trainAndSetAssistant = async (chatbot_id: string) => {
 };
 
 /**
- * Trigger training directly from rhinon to backendai
- * This allows manual or automatic triggering of training without going through rtserver
+ * Trigger training via rtserver
+ * rtserver proxies to backendai with webhook for progress updates
  */
 export const triggerTraining = async (chatbot_id: string) => {
   try {
-    const response = await axios.post(`${aiApi}/api/ingest`, {
-      chatbot_id,
-    }, {
-      timeout: 600000, // 10 minutes for large training sets
-    });
+    // Call rtserver which proxies to backendai
+    const response = await PrivateAxios.post("/automations/trigger-training");
     return response.data;
   } catch (error) {
     console.error("Failed to trigger training", error);
+    throw error;
+  }
+};
+
+export const deleteTrainingSource = async (source: string, type: 'url' | 'file' | 'article') => {
+  try {
+    const response = await PrivateAxios.post("/automations/delete-source", {
+      source,
+      type
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Failed to delete training source", error);
     throw error;
   }
 };

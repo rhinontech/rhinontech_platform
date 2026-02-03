@@ -12,15 +12,18 @@ import {
   Lock,
   MoreHorizontal,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { useRouter, useParams } from "next/navigation";
 import { source } from "../../../../../../public/index";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { getAutomation } from "@/services/automations/automationServices";
+import { getAutomation, triggerTraining } from "@/services/automations/automationServices";
 import Loading from "@/app/loading";
 import { useUserStore } from "@/utils/store";
+import { toast } from "sonner";
+import { getSocket } from "@/services/webSocket";
 
 export default function AllSources() {
   const { toggleAutomateSidebar } = useSidebar();
@@ -41,6 +44,12 @@ export default function AllSources() {
   const [showFiles, setShowFiles] = useState(true);
   const [showArticles, setShowArticles] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [isTrained, setIsTrained] = useState(true);
+  const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
+  const [untrainedFilesCount, setUntrainedFilesCount] = useState(0);
+  const [untrainedArticlesCount, setUntrainedArticlesCount] = useState(0);
+  const [trainingStatus, setTrainingStatus] = useState<string>("idle");
+  const [trainingProgress, setTrainingProgress] = useState<number>(0);
 
 
 
@@ -54,6 +63,43 @@ export default function AllSources() {
         setWebsites(response.training_url || []);
         setFiles(response.training_pdf || []);
         setArticles(response.training_article || []);
+
+
+        if (response?.training_url.length > 0) {
+          let count = 0;
+          response.training_url.forEach((item: any) => {
+            if (!item.is_trained) {
+              setIsTrained(false);
+              count++;
+            }
+          });
+          setUntrainedWebsitesCount(count);
+        }
+        if (response?.training_pdf.length > 0) {
+          let count = 0;
+          response.training_pdf.forEach((item: any) => {
+            if (!item.is_trained) {
+              setIsTrained(false);
+              count++;
+            }
+          });
+          setUntrainedFilesCount(count);
+        }
+        if (response?.training_article.length > 0) {
+          let count = 0;
+          response.training_article.forEach((item: any) => {
+            if (!item.is_trained) {
+              setIsTrained(false);
+              count++;
+            }
+          });
+          setUntrainedArticlesCount(count);
+        }
+
+        // Set training status
+        setTrainingStatus(response.training_status || "idle");
+        setTrainingProgress(response.training_progress || 0);
+
       } catch (err) {
         // handle error if needed
       } finally {
@@ -61,7 +107,57 @@ export default function AllSources() {
       }
     }
     fetchAll();
+
+    const organizationId = useUserStore.getState().userData?.orgId;
+    if (!organizationId) return;
+
+    const socket = getSocket();
+
+    const handleTrainingProgress = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+    };
+
+    const handleTrainingCompleted = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+      setLoading(false);
+    };
+
+    socket.on(`training:progress:${organizationId}`, handleTrainingProgress);
+    socket.on(`training:completed:${organizationId}`, handleTrainingCompleted);
+
+    return () => {
+      socket.off(`training:progress:${organizationId}`, handleTrainingProgress);
+      socket.off(`training:completed:${organizationId}`, handleTrainingCompleted);
+    };
   }, []);
+
+
+  const handleTrain = async () => {
+    try {
+      setLoading(true);
+      setTrainingStatus("training");
+
+      const chatbot_id = useUserStore.getState().userData?.chatbotId;
+
+      if (!chatbot_id) {
+        throw new Error("Chatbot ID not found");
+      }
+
+      await triggerTraining(chatbot_id);
+      toast.success("Training started successfully!");
+    } catch (error: any) {
+      toast.error(`Training failed: ${error.message}`);
+      setLoading(false);
+      setTrainingStatus("idle");
+    }
+  }
+
 
   return (
     <div className="flex h-full w-full overflow-hidden bg-background text-foreground">
@@ -75,31 +171,13 @@ export default function AllSources() {
             />
             <h2 className="text-base font-bold">All Sources</h2>
           </div>
-          <Button
-            onClick={async () => {
-              try {
-                setLoading(true);
-                const { triggerTraining } = await import("@/services/automations/automationServices");
-
-                const chatbot_id = useUserStore.getState().userData?.chatbotId;
-
-                if (!chatbot_id) {
-                  throw new Error("Chatbot ID not found");
-                }
-
-                await triggerTraining(chatbot_id);
-                alert("Training started successfully!");
-              } catch (error: any) {
-                alert(`Training failed: ${error.message}`);
-              } finally {
-                setLoading(false);
-              }
-            }}
+          {/* <Button
+            onClick={handleTrain}
             disabled={loading}
             className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2"
           >
             {loading ? "Training..." : "Train AI"}
-          </Button>
+          </Button> */}
         </div>
 
         {/* Body */}
@@ -279,6 +357,35 @@ export default function AllSources() {
           </div>
         </ScrollArea>
       </div>
+      {(!isTrained && (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount > 0)) && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="bg-foreground/95 backdrop-blur-md text-background px-2 py-2 rounded-full shadow-2xl flex items-center gap-2 pl-6 pr-2 border border-white/10">
+            <span className="text-sm font-medium mr-2">
+              {[
+                untrainedWebsitesCount > 0 && `${untrainedWebsitesCount} Website${untrainedWebsitesCount > 1 ? 's' : ''}`,
+                untrainedFilesCount > 0 && `${untrainedFilesCount} File${untrainedFilesCount > 1 ? 's' : ''}`,
+                untrainedArticlesCount > 0 && `${untrainedArticlesCount} Article${untrainedArticlesCount > 1 ? 's' : ''}`,
+              ].filter(Boolean).join(", ")} {untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 1 ? 'is' : 'are'} untrained
+            </span>
+
+            <Button
+              onClick={handleTrain}
+              size="sm"
+              disabled={trainingStatus === 'training' || untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 0}
+              className="h-8 rounded-full bg-background text-foreground hover:bg-background/90 font-semibold px-4"
+            >
+              {trainingStatus === 'training' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Training... {trainingProgress}%
+                </>
+              ) : (
+                "Train AI"
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -135,7 +135,7 @@ export function SeedDataButton() {
                             onClick={handleButtonClick}
                             disabled={isLoading}
                             className={cn(
-                                "relative",
+                                "relative rounded-full",
                                 hasSeedData && "hover:bg-destructive/90"
                             )}
                         >

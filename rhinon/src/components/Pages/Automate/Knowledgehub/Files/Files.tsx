@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PanelLeft, Upload, FileText, X, Info, Plus, Edit } from "lucide-react";
+import { PanelLeft, Upload, FileText, X, Info, Plus, Edit, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import images from "@/components/Constants/Images";
@@ -20,6 +20,8 @@ import {
   createOrUpdateAutomation,
   getAutomation,
   trainAndSetAssistant,
+  triggerTraining,
+  deleteTrainingSource,
 } from "@/services/automations/automationServices";
 import { uploadPdfFile } from "@/services/fileUploadService";
 import { useUserStore } from "@/utils/store";
@@ -27,6 +29,7 @@ import Loading from "@/app/loading";
 import { FileViewerModal } from "@/components/Common/FileViewerModal/FileViewerModal";
 import { toast } from "sonner";
 import { PLAN_LIMITS } from "@/lib/plans";
+import { getSocket } from "@/services/webSocket";
 
 interface FileItem {
   s3Name: string;
@@ -52,6 +55,13 @@ export default function Files() {
   const chatbotId = useUserStore((state) => state.userData.chatbotId);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<any>(null);
+  const [isTrained, setIsTrained] = useState(true);
+  const [trainLoading, setTrainLoading] = useState(false);
+  const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
+  const [untrainedFilesCount, setUntrainedFilesCount] = useState(0);
+  const [untrainedArticlesCount, setUntrainedArticlesCount] = useState(0);
+  const [trainingStatus, setTrainingStatus] = useState<string>("idle");
+  const [trainingProgress, setTrainingProgress] = useState<number>(0);
 
   const subscriptionLimit = PLAN_LIMITS[orgPlan]?.file || 3;
   const canAddFile = files.length < subscriptionLimit;
@@ -64,6 +74,41 @@ export default function Files() {
       const response = await getAutomation();
       const fetchedFiles = response.training_pdf || [];
       setFiles(fetchedFiles);
+      setIsTrained(true); // Reset to true before checking
+
+      if (response?.training_url.length > 0) {
+        let count = 0;
+        response.training_url.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedWebsitesCount(count);
+      }
+      if (response?.training_pdf.length > 0) {
+        let count = 0;
+        response.training_pdf.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedFilesCount(count);
+      }
+      if (response?.training_article.length > 0) {
+        let count = 0;
+        response.training_article.forEach((item: any) => {
+          if (!item.is_trained) {
+            setIsTrained(false);
+            count++;
+          }
+        });
+        setUntrainedArticlesCount(count);
+      }
+
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
     } catch (error) {
       console.error("Error getting PDFs:", error);
     } finally {
@@ -98,6 +143,38 @@ export default function Files() {
       router.replace(currentUrl);
     }
   }, [searchParams, canAddFile, fetching, router]);
+
+  // Listen for training updates via WebSocket
+  useEffect(() => {
+    const organizationId = useUserStore.getState().userData?.orgId;
+    if (!organizationId) return;
+
+    const socket = getSocket();
+
+    const handleTrainingProgress = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+    };
+
+    const handleTrainingCompleted = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+      setTrainLoading(false);
+      await getFiles(); // Refresh files
+    };
+
+    socket.on(`training:progress:${organizationId}`, handleTrainingProgress);
+    socket.on(`training:completed:${organizationId}`, handleTrainingCompleted);
+
+    return () => {
+      socket.off(`training:progress:${organizationId}`, handleTrainingProgress);
+      socket.off(`training:completed:${organizationId}`, handleTrainingCompleted);
+    };
+  }, []);
 
   const handleConfirmUpload = async () => {
     isLoading(true);
@@ -137,14 +214,17 @@ export default function Files() {
       setFiles(updatedFiles);
       setIsUploadModalOpen(false);
       toast.success("File added successfully.");
-      try {
-        await trainAndSetAssistant(chatbotId);
-      } catch (trainError) {
-        console.error("Failed to retrain chatbot after upload:", trainError);
-        toast.error("File uploaded, but retraining failed.");
-      }
+      setIsTrained(false);
+      // try {
+      //   await trainAndSetAssistant(chatbotId);
+      // } catch (trainError) {
+      //   console.error("Failed to retrain chatbot after upload:", trainError);
+      //   toast.error("File uploaded, but retraining failed.");
+      // }
       console.log("PDF uploaded successfully");
 
+      setUntrainedFilesCount((prev) => prev + 1);
+      setIsTrained(false);
       setSelectedFile(null);
       setUploadProgress(null);
     } catch (error) {
@@ -163,21 +243,47 @@ export default function Files() {
     const updatedFiles = files.filter((file) => file.s3Name !== fileId);
 
     try {
+      await deleteTrainingSource(fileId, 'file');
+    } catch (e) {
+      console.error("Failed to delete source vectors", e);
+    }
+
+
+    try {
       await createOrUpdateAutomation({
         training_pdf: updatedFiles,
         isChatbotTrained: false,
       });
       setFiles(updatedFiles);
-      toast.success("File removed successfully.");
-      try {
-        await trainAndSetAssistant(chatbotId);
-      } catch (trainError) {
-        console.error(
-          "Failed to retrain chatbot after file deletion:",
-          trainError
-        );
-        toast.error("File removed, but retraining failed.");
+
+      // Check if the deleted file was untrained
+      // Since we don't track which specific file is untrained in the 'files' state perfectly for local additions
+      // without refreshing, we can assume if the user deletes a file and we have an untrained count > 0,
+      // it MIGHT have been that one. But strictly speaking, the backend tells us 'is_trained'.
+      // Local check: if we just added it, we incremented count. If we delete it, we should decrement.
+      // Ideally, the 'files' state should include 'is_trained' property.
+      // Let's assume the 'file' object in 'files' state has the property if it came from DB.
+      // If it came from local add, we didn't add the property explicitly in handleConfirmUpload, let's fix that too.
+      // Use 's3Name' to find the file in the *current* state before deletion to check is_trained status.
+
+      const deletedFile = files.find(f => f.s3Name === fileId);
+      // For locally added files that haven't been re-fetched, they might not have 'is_trained'.
+      // But we treated them as untrained by incrementing the count.
+      // If is_trained is false OR undefined (newly added), decrement.
+      if (deletedFile && (deletedFile as any).is_trained === false || (deletedFile as any).is_trained === undefined) {
+        setUntrainedFilesCount(prev => Math.max(0, prev - 1));
       }
+
+      toast.success("File removed successfully.");
+      // try {
+      //   await trainAndSetAssistant(chatbotId);
+      // } catch (trainError) {
+      //   console.error(
+      //     "Failed to retrain chatbot after file deletion:",
+      //     trainError
+      //   );
+      //   toast.error("File removed, but retraining failed.");
+      // }
     } catch (error) {
       console.error("Failed to update automation after file deletion", error);
       console.error("Failed to update file list.");
@@ -250,6 +356,26 @@ export default function Files() {
     setUploadProgress(null);
     setIsInternalOnly(false);
   };
+
+
+  const handleTrain = async () => {
+    try {
+      setTrainLoading(true);
+      setTrainingStatus("training"); // Immediate feedback
+      const chatbot_id = useUserStore.getState().userData?.chatbotId;
+
+      if (!chatbot_id) {
+        throw new Error("Chatbot ID not found");
+      }
+
+      await triggerTraining(chatbot_id);
+      toast.success("Training started successfully!");
+    } catch (error: any) {
+      toast.error(`Training failed: ${error.message}`);
+      setTrainLoading(false);
+      setTrainingStatus("idle"); // Revert status on error
+    }
+  }
 
   return (
     <>
@@ -389,6 +515,39 @@ export default function Files() {
             </div>
           </ScrollArea>
         </div>
+        {(!isTrained && (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount > 0)) && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+            <div className="bg-foreground/95 backdrop-blur-md text-background px-2 py-2 rounded-full shadow-2xl flex items-center gap-2 pl-6 pr-2 border border-white/10">
+              <span className="text-sm font-medium mr-2">
+                {trainLoading ? "Chatbot is Training" : (
+                  <>
+                    {[
+                      untrainedWebsitesCount > 0 && `${untrainedWebsitesCount} Website${untrainedWebsitesCount > 1 ? 's' : ''}`,
+                      untrainedFilesCount > 0 && `${untrainedFilesCount} File${untrainedFilesCount > 1 ? 's' : ''}`,
+                      untrainedArticlesCount > 0 && `${untrainedArticlesCount} Article${untrainedArticlesCount > 1 ? 's' : ''}`,
+                    ].filter(Boolean).join(", ")} {untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 1 ? 'is' : 'are'} untrained
+                  </>
+                )}
+              </span>
+
+              <Button
+                onClick={handleTrain}
+                size="sm"
+                disabled={trainingStatus === 'training' || (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 0)}
+                className="h-8 rounded-full bg-background text-foreground hover:bg-background/90 font-semibold px-4"
+              >
+                {trainingStatus === 'training' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Training... {trainingProgress}%
+                  </>
+                ) : (
+                  "Train AI"
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {previewFile && (
