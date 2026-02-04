@@ -230,6 +230,7 @@ export default function Articles() {
       handleCloseModal();
       toast.success("Article added successfully.");
       setIsTrained(false);
+      setUntrainedArticlesCount((pre) => pre + 1);
       // try {
       //   await trainAndSetAssistant(chatbotId);
       // } catch (trainError) {
@@ -279,6 +280,12 @@ export default function Articles() {
       //   );
       //   toast.error("Article removed, but retraining failed.");
       // }
+      if (!isTrained) {
+        if (untrainedArticlesCount === 1) {
+          setIsTrained(true);
+        }
+        setUntrainedArticlesCount((pre) => pre - 1);
+      }
     } catch (error) {
       console.error("Failed to remove article:", error);
       toast.error("Failed to remove article");

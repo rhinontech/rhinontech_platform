@@ -175,6 +175,7 @@ export default function Files() {
       setFiles(updatedFiles);
       setIsUploadModalOpen(false);
       toast.success("File added successfully.");
+      setUntrainedFilesCount((pre) => pre + 1);
       setIsTrained(false);
       // try {
       //   await trainAndSetAssistant(chatbotId);
@@ -185,15 +186,16 @@ export default function Files() {
       console.log("PDF uploaded successfully");
 
       setSelectedFile(null);
-      setUploadProgress(null);
+    
     } catch (error) {
-      setUploadProgress(null);
-      clearInterval(progressInterval);
+      
       console.error("Upload failed:", error);
       // message.error("Upload failed. Please try again.");
       toast.error("Failed to added file.");
 
     } finally {
+      setUploadProgress(null);
+      clearInterval(progressInterval);
       isLoading(false);
     }
   };
@@ -208,6 +210,12 @@ export default function Files() {
       });
       setFiles(updatedFiles);
       toast.success("File removed successfully.");
+      if (!isTrained) {
+        if (untrainedFilesCount === 1) {
+          setIsTrained(true);
+        }
+        setUntrainedFilesCount((pre) => pre - 1);
+      }
       // try {
       //   await trainAndSetAssistant(chatbotId);
       // } catch (trainError) {
@@ -411,7 +419,7 @@ export default function Files() {
                           <FileText className="h-5 w-5 text-destructive" />
                         </div>
                         <div>
-                          <h4 className="font-medium text-foreground">
+                          <h4 className="font-medium max-w-sm truncate text-foreground">
                             {file.originalName}
                           </h4>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -534,7 +542,7 @@ export default function Files() {
                       <FileText className="h-5 w-5 text-destructive" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-foreground">
+                      <h4 className="font-medium max-w-sm truncate text-foreground">
                         {selectedFile.name}
                       </h4>
                       <p className="text-sm text-muted-foreground">
