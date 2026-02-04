@@ -275,7 +275,6 @@ export default function Articles() {
       //   console.error("Failed to retrain chatbot after upload:", trainError);
       //   toast.error("Article addedd, but retraining failed.");
       // }
-      setUntrainedArticlesCount((prev) => prev + 1);
       setIsTrained(false);
     } catch (error) {
       console.error("Failed to add article:", error);
@@ -332,12 +331,6 @@ export default function Articles() {
       //   );
       //   toast.error("Article removed, but retraining failed.");
       // }
-      if (!isTrained) {
-        if (untrainedArticlesCount === 1) {
-          setIsTrained(true);
-        }
-        setUntrainedArticlesCount((pre) => pre - 1);
-      }
     } catch (error) {
       console.error("Failed to remove article:", error);
       toast.error("Failed to remove article");

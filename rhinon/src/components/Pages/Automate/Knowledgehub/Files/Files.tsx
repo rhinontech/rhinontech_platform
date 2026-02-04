@@ -214,7 +214,6 @@ export default function Files() {
       setFiles(updatedFiles);
       setIsUploadModalOpen(false);
       toast.success("File added successfully.");
-      setUntrainedFilesCount((pre) => pre + 1);
       setIsTrained(false);
       // try {
       //   await trainAndSetAssistant(chatbotId);
@@ -277,12 +276,7 @@ export default function Files() {
       }
 
       toast.success("File removed successfully.");
-      if (!isTrained) {
-        if (untrainedFilesCount === 1) {
-          setIsTrained(true);
-        }
-        setUntrainedFilesCount((pre) => pre - 1);
-      }
+     
       // try {
       //   await trainAndSetAssistant(chatbotId);
       // } catch (trainError) {

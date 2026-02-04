@@ -299,7 +299,6 @@ export default function Websites() {
       // }
       setUntrainedWebsitesCount((prev) => prev + 1);
       setIsTrained(false);
-      setUntrainedWebsitesCount((pre) => pre + 1);
     } catch (error) {
       console.error("Failed to add website:", error);
       toast.error("Failed to add Website.");
@@ -343,12 +342,6 @@ export default function Websites() {
       //   );
       //   toast.error("Website removed, but retraining failed.");
       // }
-      if (!isTrained) {
-        if (untrainedWebsitesCount === 1) {
-          setIsTrained(true);
-        }
-        setUntrainedWebsitesCount((pre) => pre - 1);
-      }
     } catch (err) {
       console.error("Error deleting URL", err);
       toast.error("Failed to deleted website.");
