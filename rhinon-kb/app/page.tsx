@@ -6,19 +6,27 @@ import { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 async function getKBData() {
+  console.log("-----------------------------------------");
+  console.log("Server Component: getKBData started");
   const headersList = await headers();
   const host = headersList.get("host") || "";
+  console.log("Incoming Host:", host);
 
   const kbId = getKbIdFromHost(host);
+  console.log("Extracted KB ID:", kbId);
 
   if (!kbId) {
+    console.log("No KB ID found from host, returning null");
     return null;
   }
 
   try {
+    console.log(`Calling fetchKnowledgeBase with ID: ${kbId}`);
     const data = await fetchKnowledgeBase(kbId);
+    console.log("fetchKnowledgeBase response received:", data ? "Data Present" : "No Data");
     return { data, kbId };
-  } catch {
+  } catch (error) {
+    console.error("Error fetching knowledge base:", error);
     return { data: null, kbId };
   }
 }
@@ -46,13 +54,17 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
+  console.log("Server Component: Home Page Rendering");
   const result = await getKBData();
+  console.log("Home Page: getKBData result:", result ? "Found Data" : "Result is Null");
 
   if (!result || !result.data) {
+    console.log("Home Page: triggering notFound() because result or result.data is missing");
     notFound();
   }
 
   const { data, kbId } = result;
+  console.log("Home Page: Rendering KB component with ID:", kbId);
 
   return <KB kbId={kbId} initialData={data} />;
 }
