@@ -494,8 +494,19 @@ def init_vector_db():
                         chunk_index INTEGER NOT NULL,
                         content TEXT NOT NULL,
                         embedding VECTOR(1536),
+                        source VARCHAR(512),
                         created_at TIMESTAMPTZ DEFAULT NOW()
                     );
+                """)
+                
+                # Add source column if it doesn't exist (for existing tables)
+                cur.execute("""
+                    DO $$ 
+                    BEGIN 
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='training_chunks' AND column_name='source') THEN 
+                            ALTER TABLE training_chunks ADD COLUMN source VARCHAR(512); 
+                        END IF; 
+                    END $$;
                 """)
                 
                 # Index on training_chunks
@@ -507,6 +518,7 @@ def init_vector_db():
                 """)
                 
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_training_chunks_chatbot_id ON training_chunks(chatbot_id);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_training_chunks_source ON training_chunks(source);")
 
                 conn.commit()
                 print("Vector DB Initialized (training_chunks updated)")
@@ -519,37 +531,39 @@ def delete_chunks(chatbot_id: str):
     """
     try:
         with get_db_connection() as conn:
-            # First check if table exists to be safe during migration
-            # (Though init_vector_db should run on module load)
             run_write_query(conn, "DELETE FROM training_chunks WHERE chatbot_id = %s;", (chatbot_id,))
     except Exception as e:
         print(f"Delete Chunks Error: {e}")
 
+def delete_specific_chunks(chatbot_id: str, source: str):
+    """
+    Deletes chunks for a specific source (URL or File Name).
+    """
+    try:
+        with get_db_connection() as conn:
+            run_write_query(conn, "DELETE FROM training_chunks WHERE chatbot_id = %s AND source = %s;", (chatbot_id, source))
+            print(f"Deleted chunks for source: {source}")
+    except Exception as e:
+        print(f"Delete Specific Chunks Error: {e}")
+
 def insert_chunk_batch(chatbot_id: str, chunks: list):
     """
     Batch inserts chunks.
-    chunks: list of dicts [{'index': int, 'content': str, 'embedding': list}]
+    chunks: list of dicts [{'index': int, 'content': str, 'embedding': list, 'source': str}]
     """
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                args_list = []
-                query = """
-                    INSERT INTO training_chunks (chatbot_id, chunk_index, content, embedding)
-                    VALUES %s
-                """
-                # Prepare data for execute_values or manual batch construction
-                # psycopg2.extras.execute_values is better but we use raw psycopg2 pool here often.
-                # Let's use simple list comprehension and execute_values if we can, or manual.
                 from psycopg2.extras import execute_values
                 
+                # Ensure 'source' is in keys, default to None if missing
                 tuples = [
-                    (chatbot_id, c['index'], c['content'], c['embedding']) 
+                    (chatbot_id, c.get('index'), c.get('content'), c.get('embedding'), c.get('source')) 
                     for c in chunks
                 ]
                 
                 execute_values(cur, """
-                    INSERT INTO training_chunks (chatbot_id, chunk_index, content, embedding)
+                    INSERT INTO training_chunks (chatbot_id, chunk_index, content, embedding, source)
                     VALUES %s
                 """, tuples)
                 
@@ -557,10 +571,9 @@ def insert_chunk_batch(chatbot_id: str, chunks: list):
     except Exception as e:
         print(f"Batch Insert Error: {e}")
 
-def search_vectors(chatbot_id: str, query_vector: list, limit: int = 3):
+def search_vectors(chatbot_id: str, query_vector: list, limit: int = 5):
     """
-    Search using training_chunks table.
-    Returns: [{'content': str, 'similarity': float}]
+    Searches for similar chunks.
     """
     try:
         with get_db_connection() as conn:

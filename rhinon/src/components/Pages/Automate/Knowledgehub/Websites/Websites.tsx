@@ -31,6 +31,7 @@ import {
   getAutomation,
   trainAndSetAssistant,
   triggerTraining,
+  deleteTrainingSource,
   TrainingUrl,
 } from "@/services/automations/automationServices";
 import { useUserStore } from "@/utils/store";
@@ -38,6 +39,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Loading from "@/app/loading";
 import { toast } from "sonner";
 import { PLAN_LIMITS } from "@/lib/plans";
+import { getSocket } from "@/services/webSocket";
 
 interface Website {
   id: string;
@@ -68,6 +70,8 @@ export default function Websites() {
   const [loading, isLoading] = useState(false);
   const [trainLoading, setTrainLoading] = useState(false);
   const [isTrained, setIsTrained] = useState(true);
+  const [trainingStatus, setTrainingStatus] = useState<string>("idle");
+  const [trainingProgress, setTrainingProgress] = useState<number>(0);
   const orgPlan = useUserStore((state) => state.userData.orgPlan);
   const chatbotId = useUserStore((state) => state.userData.chatbotId);
   const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
@@ -109,6 +113,7 @@ export default function Websites() {
       const response = await getAutomation();
       const fetchedUrls = response.training_url || [];
       setUrls(fetchedUrls);
+      setIsTrained(true); // Reset to true before checking
       if (response?.training_url.length > 0) {
         let count = 0;
         response.training_url.forEach((item: any) => {
@@ -139,6 +144,9 @@ export default function Websites() {
         });
         setUntrainedArticlesCount(count);
       }
+
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
     } catch (error) {
       console.error("Error getting the URLs:", error);
     } finally {
@@ -171,6 +179,38 @@ export default function Websites() {
       router.replace(currentUrl);
     }
   }, [searchParams, canAddUrl, fetching, router]);
+
+  // Listen for training updates via WebSocket
+  useEffect(() => {
+    const organizationId = useUserStore.getState().userData?.orgId;
+    if (!organizationId) return;
+
+    const socket = getSocket();
+
+    const handleTrainingProgress = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+    };
+
+    const handleTrainingCompleted = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+      setTrainLoading(false);
+      await getUrls(); // Refresh URLs to update is_trained
+    };
+
+    socket.on(`training:progress:${organizationId}`, handleTrainingProgress);
+    socket.on(`training:completed:${organizationId}`, handleTrainingCompleted);
+
+    return () => {
+      socket.off(`training:progress:${organizationId}`, handleTrainingProgress);
+      socket.off(`training:completed:${organizationId}`, handleTrainingCompleted);
+    };
+  }, []);
 
   const analyzeWebsite = useCallback(
     async (url: string) => {
@@ -257,6 +297,7 @@ export default function Websites() {
       //   console.error("Failed to retrain chatbot after upload:", trainError);
       //   toast.error("Website addedd, but retraining failed.");
       // }
+      setUntrainedWebsitesCount((prev) => prev + 1);
       setIsTrained(false);
       setUntrainedWebsitesCount((pre) => pre + 1);
     } catch (error) {
@@ -268,13 +309,30 @@ export default function Websites() {
   };
 
   const handleDeleteUrl = async (index: number) => {
+    const deletedUrl = urls[index];
     const updatedUrls = urls.filter((_, i) => i !== index);
+
+    if (deletedUrl?.url) {
+      try {
+        await deleteTrainingSource(deletedUrl.url, 'url');
+      } catch (e) {
+        console.error("Failed to delete source vectors", e);
+      }
+    }
+
     try {
       await createOrUpdateAutomation({
         training_url: updatedUrls,
         isChatbotTrained: false,
       });
       setUrls(updatedUrls);
+
+      const deletedUrl = urls[index];
+      // Check if it was untrained (untrained items usually have is_trained: false, or undefined if just added)
+      if (deletedUrl && (deletedUrl as any).is_trained === false || (deletedUrl as any).is_trained === undefined) {
+        setUntrainedWebsitesCount(prev => Math.max(0, prev - 1));
+      }
+
       toast.success("Website removed successfully.");
       // try {
       //   await trainAndSetAssistant(chatbotId);
@@ -300,6 +358,7 @@ export default function Websites() {
   const handleTrain = async () => {
     try {
       setTrainLoading(true);
+      setTrainingStatus("training");
       const chatbot_id = useUserStore.getState().userData?.chatbotId;
 
       if (!chatbot_id) {
@@ -308,11 +367,10 @@ export default function Websites() {
 
       await triggerTraining(chatbot_id);
       toast.success("Training started successfully!");
-      setIsTrained(true)
     } catch (error: any) {
       toast.error(`Training failed: ${error.message}`);
-    } finally {
       setTrainLoading(false);
+      setTrainingStatus("idle");
     }
   }
 
@@ -478,7 +536,7 @@ export default function Websites() {
             </div>
           </ScrollArea>
         </div>
-        {!isTrained && (
+        {(!isTrained && (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount > 0)) && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
             <div className="bg-foreground/95 backdrop-blur-md text-background px-2 py-2 rounded-full shadow-2xl flex items-center gap-2 pl-6 pr-2 border border-white/10">
               <span className="text-sm font-medium mr-2">
@@ -496,10 +554,17 @@ export default function Websites() {
               <Button
                 onClick={handleTrain}
                 size="sm"
-                disabled={trainLoading}
+                disabled={trainingStatus === 'training' || (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 0)}
                 className="h-8 rounded-full bg-background text-foreground hover:bg-background/90 font-semibold px-4"
               >
-                {trainLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Train AI"}
+                {trainingStatus === 'training' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Training... {trainingProgress}%
+                  </>
+                ) : (
+                  "Train AI"
+                )}
               </Button>
             </div>
           </div>

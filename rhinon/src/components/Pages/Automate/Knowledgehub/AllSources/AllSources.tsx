@@ -23,6 +23,7 @@ import { getAutomation, triggerTraining } from "@/services/automations/automatio
 import Loading from "@/app/loading";
 import { useUserStore } from "@/utils/store";
 import { toast } from "sonner";
+import { getSocket } from "@/services/webSocket";
 
 export default function AllSources() {
   const { toggleAutomateSidebar } = useSidebar();
@@ -47,6 +48,8 @@ export default function AllSources() {
   const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
   const [untrainedFilesCount, setUntrainedFilesCount] = useState(0);
   const [untrainedArticlesCount, setUntrainedArticlesCount] = useState(0);
+  const [trainingStatus, setTrainingStatus] = useState<string>("idle");
+  const [trainingProgress, setTrainingProgress] = useState<number>(0);
 
 
 
@@ -93,6 +96,9 @@ export default function AllSources() {
           setUntrainedArticlesCount(count);
         }
 
+        // Set training status
+        setTrainingStatus(response.training_status || "idle");
+        setTrainingProgress(response.training_progress || 0);
 
       } catch (err) {
         // handle error if needed
@@ -101,13 +107,41 @@ export default function AllSources() {
       }
     }
     fetchAll();
+
+    const organizationId = useUserStore.getState().userData?.orgId;
+    if (!organizationId) return;
+
+    const socket = getSocket();
+
+    const handleTrainingProgress = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+    };
+
+    const handleTrainingCompleted = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      const response = await getAutomation();
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+      setLoading(false);
+    };
+
+    socket.on(`training:progress:${organizationId}`, handleTrainingProgress);
+    socket.on(`training:completed:${organizationId}`, handleTrainingCompleted);
+
+    return () => {
+      socket.off(`training:progress:${organizationId}`, handleTrainingProgress);
+      socket.off(`training:completed:${organizationId}`, handleTrainingCompleted);
+    };
   }, []);
 
 
   const handleTrain = async () => {
-
     try {
       setLoading(true);
+      setTrainingStatus("training");
 
       const chatbot_id = useUserStore.getState().userData?.chatbotId;
 
@@ -117,11 +151,10 @@ export default function AllSources() {
 
       await triggerTraining(chatbot_id);
       toast.success("Training started successfully!");
-      setIsTrained(true);
     } catch (error: any) {
       toast.error(`Training failed: ${error.message}`);
-    } finally {
       setLoading(false);
+      setTrainingStatus("idle");
     }
   }
 
@@ -324,7 +357,7 @@ export default function AllSources() {
           </div>
         </ScrollArea>
       </div>
-      {!isTrained && (
+      {(!isTrained && (untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount > 0)) && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
           <div className="bg-foreground/95 backdrop-blur-md text-background px-2 py-2 rounded-full shadow-2xl flex items-center gap-2 pl-6 pr-2 border border-white/10">
             <span className="text-sm font-medium mr-2">
@@ -338,10 +371,17 @@ export default function AllSources() {
             <Button
               onClick={handleTrain}
               size="sm"
-              disabled={loading}
+              disabled={trainingStatus === 'training' || untrainedWebsitesCount + untrainedFilesCount + untrainedArticlesCount === 0}
               className="h-8 rounded-full bg-background text-foreground hover:bg-background/90 font-semibold px-4"
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Train AI"}
+              {trainingStatus === 'training' ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Training... {trainingProgress}%
+                </>
+              ) : (
+                "Train AI"
+              )}
             </Button>
           </div>
         </div>
