@@ -267,13 +267,14 @@ export default function Articles() {
       setArticles(updatedArticles);
       handleCloseModal();
       toast.success("Article added successfully.");
+      setIsTrained(false);
+      setUntrainedArticlesCount((pre) => pre + 1);
       // try {
       //   await trainAndSetAssistant(chatbotId);
       // } catch (trainError) {
       //   console.error("Failed to retrain chatbot after upload:", trainError);
       //   toast.error("Article addedd, but retraining failed.");
       // }
-      setUntrainedArticlesCount((prev) => prev + 1);
       setIsTrained(false);
     } catch (error) {
       console.error("Failed to add article:", error);
