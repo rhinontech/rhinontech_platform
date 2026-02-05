@@ -63,7 +63,7 @@ const initialUserData: UserData = {
   trafficCount: 0,
   newChatCount: 0,
   newTicketCount: 0,
-  isPlanValid: false,
+  isPlanValid: true,
   planExpiryDate: "",
   orgName: "",
   currentRole: "",

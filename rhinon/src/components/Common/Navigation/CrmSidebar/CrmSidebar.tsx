@@ -22,7 +22,7 @@ import { Table, GitBranch } from "lucide-react";
 import Loading from "@/app/loading";
 
 const role = Cookies.get("currentRole");
-const BASE_PATH = `/${role}/crm`;
+const BASE_PATH = `/${role}/leads`;
 
 interface View {
   id: number;
@@ -202,7 +202,7 @@ export function CrmSidebar({ children }: { children: React.ReactNode }) {
       {/* SIDEBAR */}
       <div className="shrink-0 w-60 bg-sidebar flex flex-col h-full min-h-0">
         <div className="h-[60px] px-4 flex items-center font-semibold text-lg">
-          CRM
+          Leads
         </div>
 
         {/* STATIC DASHBOARD - FIXED */}
