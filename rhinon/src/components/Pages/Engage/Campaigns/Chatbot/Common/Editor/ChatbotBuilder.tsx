@@ -281,11 +281,10 @@ export default function ChatbotBuilder({
                     e.stopPropagation();
                     setSelectedElement("image");
                   }}
-                  className={`flex flex-col p-4 pb-0 w-[300px] relative rounded-t-xl cursor-pointer transition-all editable-element group ${
-                    selectedElement === "image"
+                  className={`flex flex-col p-4 pb-0 w-[300px] relative rounded-t-xl cursor-pointer transition-all editable-element group ${selectedElement === "image"
                       ? "bg-blue-900/30 border border-blue-900"
                       : "border border-dashed border-transparent hover:border-gray-500 hover:opacity-70"
-                  }`}>
+                    }`}>
                   {media ? (
                     <>
                       <img
@@ -321,17 +320,15 @@ export default function ChatbotBuilder({
               )}
 
               <div
-                className={`flex flex-col bg-white gap-2 mx-4 shadow-md ${
-                  hasImage ? "rounded-b-lg pt-1" : "rounded-lg pt-3"
-                }`}>
+                className={`flex flex-col bg-white gap-2 mx-4 shadow-md ${hasImage ? "rounded-b-lg pt-1" : "rounded-lg pt-3"
+                  }`}>
                 <div className="flex flex-col">
                   {/* Heading */}
                   <div
-                    className={`px-2 border border-transparent h-full editable-element ${
-                      selectedElement === "heading"
+                    className={`px-2 border border-transparent h-full editable-element ${selectedElement === "heading"
                         ? "border-blue-500 py-1"
                         : "border-dashed hover:border-gray-500 hover:opacity-70"
-                    }`}
+                      }`}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedElement("heading");
@@ -362,13 +359,12 @@ export default function ChatbotBuilder({
                   </div>
 
                   {/* Subheading - Only show if layout includes subheading */}
-                  {(templateLayout.includes("subheading") || subheading) && (
+                  {(templateLayout?.includes("subheading") || subheading) && (
                     <div
-                      className={`px-2 py-1 border border-transparent h-full editable-element ${
-                        selectedElement === "sub-heading"
+                      className={`px-2 py-1 border border-transparent h-full editable-element ${selectedElement === "sub-heading"
                           ? "border-blue-500 py-1"
                           : "border-dashed hover:border-gray-500 hover:opacity-70"
-                      }`}
+                        }`}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedElement("sub-heading");
@@ -411,8 +407,8 @@ export default function ChatbotBuilder({
                           btn.style === "primary"
                             ? "default"
                             : btn.style === "danger"
-                            ? "destructive"
-                            : "secondary"
+                              ? "destructive"
+                              : "secondary"
                         }
                         className="w-full mb-2"
                         onClick={(e) => {
@@ -446,428 +442,424 @@ export default function ChatbotBuilder({
 
               {(selectedElement === "image" ||
                 selectedElement === "button") && (
-                <div className={`flex flex-col w-[300px] absolute left-[285px] ${selectedElement === "button" ? '-top-12 h-[500px]':"-top-8 h-[460px]"} bg-white shadow-xl rounded-2xl  border animate-in fade-in slide-in-from-left-5 z-10 editable-element  overflow-hidden`}>
-                  <ScrollArea className="flex-1 h-0 px-3 pb-5">
-                  <div className="flex items-center pt-5 pb-3 justify-between mb-4 sticky top-0 bg-white z-20">
-                    <h3 className="font-semibold text-black">
-                      {selectedElement === "image"
-                        ? "Edit Image"
-                        : "Edit Button"}
-                    </h3>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => setSelectedElement(null)}>
-                      <X className="h-4 w-4 text-black" />
-                    </Button>
-                  </div>
-
-                  {selectedElement === "image" && (
-                    <div className="space-y-4 px-2">
-                      <div className="flex w-full bg-gray-100 p-1 rounded-lg">
-                        <button
-                          className={`flex-1 py-1 text-sm font-medium rounded-md transition-all ${
-                            activeImageTab === "custom"
-                              ? "bg-white shadow-sm text-black"
-                              : "text-gray-500 hover:text-gray-700"
-                          }`}
-                          onClick={() => setActiveImageTab("custom")}>
-                          Custom
-                        </button>
-                        <button
-                          className={`flex-1 py-1 text-sm font-medium rounded-md transition-all ${
-                            activeImageTab === "library"
-                              ? "bg-white shadow-sm text-black"
-                              : "text-gray-500 hover:text-gray-700"
-                          }`}
-                          onClick={() => setActiveImageTab("library")}>
-                          Library
-                        </button>
+                  <div className={`flex flex-col w-[300px] absolute left-[285px] ${selectedElement === "button" ? '-top-12 h-[500px]' : "-top-8 h-[460px]"} bg-white shadow-xl rounded-2xl  border animate-in fade-in slide-in-from-left-5 z-10 editable-element  overflow-hidden`}>
+                    <ScrollArea className="flex-1 h-0 px-3 pb-5">
+                      <div className="flex items-center pt-5 pb-3 justify-between mb-4 sticky top-0 bg-white z-20">
+                        <h3 className="font-semibold text-black">
+                          {selectedElement === "image"
+                            ? "Edit Image"
+                            : "Edit Button"}
+                        </h3>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => setSelectedElement(null)}>
+                          <X className="h-4 w-4 text-black" />
+                        </Button>
                       </div>
 
-                      {activeImageTab === "custom" ? (
-                        <div className="space-y-4">
-                          <input
-                            type="file"
-                            accept="image/png,image/jpg,image/jpeg,image/gif"
-                            id="image-upload"
-                            className="hidden"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                try {
-                                  setIsUploadingImage(true);
-                                  const response =
-                                    await uploadFileAndGetFullUrl(file);
-                                  updateField("media", {
-                                    type: "image",
-                                    src: response.url,
-                                    alt: imageAlt,
-                                  });
-                                } catch (error) {
-                                  console.error(
-                                    "Error uploading image:",
-                                    error
-                                  );
-                                  alert(
-                                    "Failed to upload image. Please try again."
-                                  );
-                                } finally {
-                                  setIsUploadingImage(false);
-                                }
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor="image-upload"
-                            className={`border-2 border-dashed border-gray-200 rounded-lg p-8 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors ${
-                              isUploadingImage
-                                ? "opacity-50 cursor-wait"
-                                : "cursor-pointer"
-                            }`}>
-                            <div className="bg-blue-600 rounded-full p-2 mb-2">
-                              {isUploadingImage ? (
-                                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Plus className="w-6 h-6 text-white" />
-                              )}
-                            </div>
-                            <p className="text-sm font-medium text-gray-700">
-                              {isUploadingImage
-                                ? "Uploading..."
-                                : "Upload Image"}
-                            </p>
-                          </label>
-                          <p className="text-xs text-gray-500 text-center">
-                            Max. 2300×1500 px | png, jpg, gif, jpeg
-                          </p>
-                        </div>
-                      ) : (
-                        // Replace this section with your GIF links:
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            {
-                              gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-11.gif",
-                              label: "Option 1",
-                            },
-                            {
-                              gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-10.gif",
-                              label: "Option 2",
-                            },
-                            {
-                              gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-13.gif",
-                              label: "Option 3",
-                            },
-                            {
-                              gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-14.gif",
-                              label: "Option 4",
-                            },
-                            {
-                              gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-15.gif",
-                              label: "Option 5",
-                            },
-                            {
-                              gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-16.gif",
-                              label: "Option 6",
-                            },
-                          ].map((item, i) => (
+                      {selectedElement === "image" && (
+                        <div className="space-y-4 px-2">
+                          <div className="flex w-full bg-gray-100 p-1 rounded-lg">
                             <button
-                              key={i}
-                              className="aspect-square flex items-center justify-center bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors overflow-hidden"
-                              onClick={() => {
-                                // <CHANGE> Load GIF directly instead of creating canvas with emoji
-                                updateField("media", {
-                                  type: "image",
-                                  src: item.gif,
-                                  alt: item.label,
-                                });
-                                setImageAlt(item.label);
-                              }}>
-                              {/* <CHANGE> Display GIF as image instead of emoji */}
-                              <img
-                                src={item.gif || "/placeholder.svg"}
-                                alt={item.label}
-                                className="w-full h-full object-cover"
-                              />
+                              className={`flex-1 py-1 text-sm font-medium rounded-md transition-all ${activeImageTab === "custom"
+                                  ? "bg-white shadow-sm text-black"
+                                  : "text-gray-500 hover:text-gray-700"
+                                }`}
+                              onClick={() => setActiveImageTab("custom")}>
+                              Custom
                             </button>
-                          ))}
+                            <button
+                              className={`flex-1 py-1 text-sm font-medium rounded-md transition-all ${activeImageTab === "library"
+                                  ? "bg-white shadow-sm text-black"
+                                  : "text-gray-500 hover:text-gray-700"
+                                }`}
+                              onClick={() => setActiveImageTab("library")}>
+                              Library
+                            </button>
+                          </div>
+
+                          {activeImageTab === "custom" ? (
+                            <div className="space-y-4">
+                              <input
+                                type="file"
+                                accept="image/png,image/jpg,image/jpeg,image/gif"
+                                id="image-upload"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    try {
+                                      setIsUploadingImage(true);
+                                      const response =
+                                        await uploadFileAndGetFullUrl(file);
+                                      updateField("media", {
+                                        type: "image",
+                                        src: response.url,
+                                        alt: imageAlt,
+                                      });
+                                    } catch (error) {
+                                      console.error(
+                                        "Error uploading image:",
+                                        error
+                                      );
+                                      alert(
+                                        "Failed to upload image. Please try again."
+                                      );
+                                    } finally {
+                                      setIsUploadingImage(false);
+                                    }
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor="image-upload"
+                                className={`border-2 border-dashed border-gray-200 rounded-lg p-8 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors ${isUploadingImage
+                                    ? "opacity-50 cursor-wait"
+                                    : "cursor-pointer"
+                                  }`}>
+                                <div className="bg-blue-600 rounded-full p-2 mb-2">
+                                  {isUploadingImage ? (
+                                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <Plus className="w-6 h-6 text-white" />
+                                  )}
+                                </div>
+                                <p className="text-sm font-medium text-gray-700">
+                                  {isUploadingImage
+                                    ? "Uploading..."
+                                    : "Upload Image"}
+                                </p>
+                              </label>
+                              <p className="text-xs text-gray-500 text-center">
+                                Max. 2300×1500 px | png, jpg, gif, jpeg
+                              </p>
+                            </div>
+                          ) : (
+                            // Replace this section with your GIF links:
+                            <div className="grid grid-cols-3 gap-2">
+                              {[
+                                {
+                                  gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-11.gif",
+                                  label: "Option 1",
+                                },
+                                {
+                                  gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-10.gif",
+                                  label: "Option 2",
+                                },
+                                {
+                                  gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-13.gif",
+                                  label: "Option 3",
+                                },
+                                {
+                                  gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-14.gif",
+                                  label: "Option 4",
+                                },
+                                {
+                                  gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-15.gif",
+                                  label: "Option 5",
+                                },
+                                {
+                                  gif: "https://www.krishastudio.com/wp-content/uploads/2024/04/5-16.gif",
+                                  label: "Option 6",
+                                },
+                              ].map((item, i) => (
+                                <button
+                                  key={i}
+                                  className="aspect-square flex items-center justify-center bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors overflow-hidden"
+                                  onClick={() => {
+                                    // <CHANGE> Load GIF directly instead of creating canvas with emoji
+                                    updateField("media", {
+                                      type: "image",
+                                      src: item.gif,
+                                      alt: item.label,
+                                    });
+                                    setImageAlt(item.label);
+                                  }}>
+                                  {/* <CHANGE> Display GIF as image instead of emoji */}
+                                  <img
+                                    src={item.gif || "/placeholder.svg"}
+                                    alt={item.label}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1">
+                              <label className="text-sm font-medium text-black">
+                                Alternative text
+                              </label>
+                              <span className="text-gray-400">ⓘ</span>
+                            </div>
+                            <input
+                              type="text"
+                              value={imageAlt}
+                              onChange={(e) => setImageAlt(e.target.value)}
+                              placeholder="Describe"
+                              className="w-full text-black px-3 py-2 border dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <Button
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={() => {
+                              setSelectedElement(null);
+                            }}>
+                            Save
+                          </Button>
                         </div>
                       )}
 
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-1">
-                          <label className="text-sm font-medium text-black">
-                            Alternative text
-                          </label>
-                          <span className="text-gray-400">ⓘ</span>
-                        </div>
-                        <input
-                          type="text"
-                          value={imageAlt}
-                          onChange={(e) => setImageAlt(e.target.value)}
-                          placeholder="Describe"
-                          className="w-full text-black px-3 py-2 border dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-
-                      <Button
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                        onClick={() => {
-                          setSelectedElement(null);
-                        }}>
-                        Save
-                      </Button>
-                    </div>
-                  )}
-
-                  {selectedElement === "button" && selectedButton && (
-                    <div className="space-y-6 px-2">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-1">
-                          <label className="text-sm text-black font-medium">
-                            Button style
-                          </label>
-                          <span className="text-gray-400">ⓘ</span>
-                        </div>
-                        <div className="relative">
-                          <select
-                            value={selectedButton.style}
-                            onChange={(e) =>
-                              handleUpdateButton(selectedButton.id, {
-                                style: e.target.value as any,
-                              })
-                            }
-                            className="w-full text-black appearance-none px-3 py-2 pl-10 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                            <option value="primary">Primary</option>
-                            <option value="secondary">Default</option>
-                            <option value="danger">Danger</option>
-                          </select>
-                          <div
-                            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm pointer-events-none"
-                            style={{
-                              backgroundColor:
-                                selectedButton.style === "primary"
-                                  ? "#2563eb"
-                                  : selectedButton.style === "danger"
-                                  ? "#dc2626"
-                                  : "#f3f4f6",
-                            }}
-                          />
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm text-black font-medium">Actions</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            {
-                              icon: MessageSquare,
-                              label: "Send message",
-                              value: "send-message",
-                            },
-                            {
-                              icon: Phone,
-                              label: "Phone call",
-                              value: "phone-call",
-                            },
-                            {
-                              icon: Link,
-                              label: "Open URL",
-                              value: "open-url",
-                            },
-                            {
-                              icon: AppWindow,
-                              label: "Open Moment",
-                              value: "open-moment",
-                            },
-                            {
-                              icon: XCircle,
-                              label: "Dismiss",
-                              value: "dismiss",
-                            },
-                            {
-                              icon: Copy,
-                              label: "Copy coupon",
-                              value: "copy-coupon",
-                            },
-                          ].map((action, i) => (
-                            <button
-                              key={i}
-                              type="button"
-                              onClick={() => {
-                                handleUpdateButton(selectedButton.id, {
-                                  actionType: action.value as any,
-                                });
-                              }}
-                              className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all gap-1 h-20 ${
-                                (selectedButton.actionType || "open-url") ===
-                                action.value
-                                  ? "border-blue-500 bg-blue-50 text-blue-700"
-                                  : "border-gray-200 hover:border-gray-300 text-gray-600"
-                              }`}>
-                              <action.icon className="w-5 h-5" />
-                              <span className="text-[10px] text-center leading-tight">
-                                {action.label}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm text-black font-medium">
-                          Button text
-                        </label>
-                        <input
-                          type="text"
-                          value={selectedButton.text}
-                          onChange={(e) =>
-                            handleUpdateButton(selectedButton.id, {
-                              text: e.target.value,
-                            })
-                          }
-                          className="w-full text-black dark:border-gray-500 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-
-                      {/* Dynamic value field based on action type */}
-                      {(() => {
-                        const actionType =
-                          selectedButton.actionType || "open-url";
-
-                        if (actionType === "open-url") {
-                          return (
-                            <div className="space-y-2">
+                      {selectedElement === "button" && selectedButton && (
+                        <div className="space-y-6 px-2">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1">
                               <label className="text-sm text-black font-medium">
-                                Button URL
+                                Button style
                               </label>
-                              <input
-                                type="url"
-                                value={selectedButton.url}
+                              <span className="text-gray-400">ⓘ</span>
+                            </div>
+                            <div className="relative">
+                              <select
+                                value={selectedButton.style}
                                 onChange={(e) =>
                                   handleUpdateButton(selectedButton.id, {
-                                    url: e.target.value,
+                                    style: e.target.value as any,
                                   })
                                 }
-                                placeholder="https://example.com"
-                                className="w-full text-black dark:border-gray-500 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full text-black appearance-none px-3 py-2 pl-10 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                                <option value="primary">Primary</option>
+                                <option value="secondary">Default</option>
+                                <option value="danger">Danger</option>
+                              </select>
+                              <div
+                                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-sm pointer-events-none"
+                                style={{
+                                  backgroundColor:
+                                    selectedButton.style === "primary"
+                                      ? "#2563eb"
+                                      : selectedButton.style === "danger"
+                                        ? "#dc2626"
+                                        : "#f3f4f6",
+                                }}
                               />
-                              <p className="text-xs text-gray-500">
-                                Enter the URL to open when the button is
-                                clicked. If you enter a full URL with
-                                “https://”, it will open in a new tab. If you
-                                enter a relative path like “/help”, it will open
-                                in the same tab.
-                              </p>
+                              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
                             </div>
-                          );
-                        } else if (actionType === "phone-call") {
-                          return (
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">
-                                Phone Number
-                              </label>
-                              <input
-                                type="tel"
-                                value={selectedButton.url}
-                                onChange={(e) =>
-                                  handleUpdateButton(selectedButton.id, {
-                                    url: e.target.value,
-                                  })
-                                }
-                                placeholder="+1 (555) 123-4567"
-                                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                              <p className="text-xs text-gray-500">
-                                Enter the phone number to call
-                              </p>
-                            </div>
-                          );
-                        } else if (actionType === "send-message") {
-                          return (
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">
-                                Message Text
-                              </label>
-                              <textarea
-                                value={selectedButton.url}
-                                onChange={(e) =>
-                                  handleUpdateButton(selectedButton.id, {
-                                    url: e.target.value,
-                                  })
-                                }
-                                placeholder="Enter the message to send..."
-                                rows={3}
-                                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                              <p className="text-xs text-gray-500">
-                                Enter the message to send to the chatbot
-                              </p>
-                            </div>
-                          );
-                        } else if (actionType === "copy-coupon") {
-                          return (
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">
-                                Coupon Code
-                              </label>
-                              <input
-                                type="text"
-                                value={selectedButton.url}
-                                onChange={(e) =>
-                                  handleUpdateButton(selectedButton.id, {
-                                    url: e.target.value,
-                                  })
-                                }
-                                placeholder="SAVE20"
-                                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                              <p className="text-xs text-gray-500">
-                                Enter the coupon code to copy to clipboard
-                              </p>
-                            </div>
-                          );
-                        } else if (actionType === "open-moment") {
-                          return (
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">
-                                Moment ID
-                              </label>
-                              <input
-                                type="text"
-                                value={selectedButton.url}
-                                onChange={(e) =>
-                                  handleUpdateButton(selectedButton.id, {
-                                    url: e.target.value,
-                                  })
-                                }
-                                placeholder="moment-123"
-                                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                              <p className="text-xs text-gray-500">
-                                Enter the moment ID to open
-                              </p>
-                            </div>
-                          );
-                        }
-                        // For "dismiss" action, no value field needed
-                        return null;
-                      })()}
+                          </div>
 
-                      <div className="pt-4">
-                        <Button
-                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={() => setSelectedElement(null)}>
-                          Done
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  </ScrollArea>
-                </div>
-              )}
+                          <div className="space-y-2">
+                            <label className="text-sm text-black font-medium">Actions</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {[
+                                {
+                                  icon: MessageSquare,
+                                  label: "Send message",
+                                  value: "send-message",
+                                },
+                                {
+                                  icon: Phone,
+                                  label: "Phone call",
+                                  value: "phone-call",
+                                },
+                                {
+                                  icon: Link,
+                                  label: "Open URL",
+                                  value: "open-url",
+                                },
+                                {
+                                  icon: AppWindow,
+                                  label: "Open Moment",
+                                  value: "open-moment",
+                                },
+                                {
+                                  icon: XCircle,
+                                  label: "Dismiss",
+                                  value: "dismiss",
+                                },
+                                {
+                                  icon: Copy,
+                                  label: "Copy coupon",
+                                  value: "copy-coupon",
+                                },
+                              ].map((action, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => {
+                                    handleUpdateButton(selectedButton.id, {
+                                      actionType: action.value as any,
+                                    });
+                                  }}
+                                  className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all gap-1 h-20 ${(selectedButton.actionType || "open-url") ===
+                                      action.value
+                                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                                      : "border-gray-200 hover:border-gray-300 text-gray-600"
+                                    }`}>
+                                  <action.icon className="w-5 h-5" />
+                                  <span className="text-[10px] text-center leading-tight">
+                                    {action.label}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-sm text-black font-medium">
+                              Button text
+                            </label>
+                            <input
+                              type="text"
+                              value={selectedButton.text}
+                              onChange={(e) =>
+                                handleUpdateButton(selectedButton.id, {
+                                  text: e.target.value,
+                                })
+                              }
+                              className="w-full text-black dark:border-gray-500 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          {/* Dynamic value field based on action type */}
+                          {(() => {
+                            const actionType =
+                              selectedButton.actionType || "open-url";
+
+                            if (actionType === "open-url") {
+                              return (
+                                <div className="space-y-2">
+                                  <label className="text-sm text-black font-medium">
+                                    Button URL
+                                  </label>
+                                  <input
+                                    type="url"
+                                    value={selectedButton.url}
+                                    onChange={(e) =>
+                                      handleUpdateButton(selectedButton.id, {
+                                        url: e.target.value,
+                                      })
+                                    }
+                                    placeholder="https://example.com"
+                                    className="w-full text-black dark:border-gray-500 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <p className="text-xs text-gray-500">
+                                    Enter the URL to open when the button is
+                                    clicked. If you enter a full URL with
+                                    “https://”, it will open in a new tab. If you
+                                    enter a relative path like “/help”, it will open
+                                    in the same tab.
+                                  </p>
+                                </div>
+                              );
+                            } else if (actionType === "phone-call") {
+                              return (
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">
+                                    Phone Number
+                                  </label>
+                                  <input
+                                    type="tel"
+                                    value={selectedButton.url}
+                                    onChange={(e) =>
+                                      handleUpdateButton(selectedButton.id, {
+                                        url: e.target.value,
+                                      })
+                                    }
+                                    placeholder="+1 (555) 123-4567"
+                                    className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <p className="text-xs text-gray-500">
+                                    Enter the phone number to call
+                                  </p>
+                                </div>
+                              );
+                            } else if (actionType === "send-message") {
+                              return (
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">
+                                    Message Text
+                                  </label>
+                                  <textarea
+                                    value={selectedButton.url}
+                                    onChange={(e) =>
+                                      handleUpdateButton(selectedButton.id, {
+                                        url: e.target.value,
+                                      })
+                                    }
+                                    placeholder="Enter the message to send..."
+                                    rows={3}
+                                    className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <p className="text-xs text-gray-500">
+                                    Enter the message to send to the chatbot
+                                  </p>
+                                </div>
+                              );
+                            } else if (actionType === "copy-coupon") {
+                              return (
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">
+                                    Coupon Code
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={selectedButton.url}
+                                    onChange={(e) =>
+                                      handleUpdateButton(selectedButton.id, {
+                                        url: e.target.value,
+                                      })
+                                    }
+                                    placeholder="SAVE20"
+                                    className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <p className="text-xs text-gray-500">
+                                    Enter the coupon code to copy to clipboard
+                                  </p>
+                                </div>
+                              );
+                            } else if (actionType === "open-moment") {
+                              return (
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">
+                                    Moment ID
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={selectedButton.url}
+                                    onChange={(e) =>
+                                      handleUpdateButton(selectedButton.id, {
+                                        url: e.target.value,
+                                      })
+                                    }
+                                    placeholder="moment-123"
+                                    className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <p className="text-xs text-gray-500">
+                                    Enter the moment ID to open
+                                  </p>
+                                </div>
+                              );
+                            }
+                            // For "dismiss" action, no value field needed
+                            return null;
+                          })()}
+
+                          <div className="pt-4">
+                            <Button
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                              onClick={() => setSelectedElement(null)}>
+                              Done
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
+                )}
             </div>
           </div>
         </div>

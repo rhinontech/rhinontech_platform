@@ -576,9 +576,9 @@ export default function Traffic() {
                                     ? "Go to Chat"
                                     : "Start chat"}
                                 </Button>
-                                <Button variant="ghost" size="sm">
+                                {/* <Button variant="ghost" size="sm">
                                   <Edit className="h-4 w-4" />
-                                </Button>
+                                </Button> */}
                               </div>
                             </TableCell>
                             <TableCell>
