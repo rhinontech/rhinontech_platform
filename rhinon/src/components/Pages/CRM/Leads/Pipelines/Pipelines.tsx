@@ -65,133 +65,179 @@ export default function Pipelines() {
           color: c.stage_color,
           order: c.order,
 
-          leads: c.entities.map((e: any) => {
-            const record = e.data; // ← full entity data
-            const type = pipeline.pipeline_manage_type;
+          leads: c.entities
+            .filter((e: any) => e.data !== null)
+            .map((e: any) => {
+              const record = e.data; // ← full entity data
+              const type = pipeline.pipeline_manage_type;
 
-            const prefix =
-              type === "people"
-                ? "people"
-                : type === "company"
-                  ? "company"
-                  : type === "deal"
-                    ? "deal"
-                    : "default_customers";
+              const prefix =
+                type === "people"
+                  ? "people"
+                  : type === "company"
+                    ? "company"
+                    : type === "deal"
+                      ? "deal"
+                      : "default_customers";
 
-            // ---------------------------
-            // DEFAULT CUSTOMERS
-            // ---------------------------
-            if (type === "default_customers") {
+              // ---------------------------
+              // DEFAULT CUSTOMERS
+              // ---------------------------
+              if (type === "default_customers") {
+                return {
+                  id: `${prefix}-${record.id}`,
+                  name:
+                    record.custom_data?.name ??
+                    record.custom_data?.full_name ??
+                    record.email ??
+                    "Unnamed",
+                  email: record.email ?? "",
+                  phone:
+                    record.custom_data?.phone ??
+                    record.custom_data?.phone_number ??
+                    "",
+                  avatar: "#dbeafe",
+
+                  company: "",
+                  companyId: null,
+
+                  status: c.stage_name,
+                  priority: "Medium",
+                  dealValue: 0,
+                  currency: "USD",
+                  probability: 0,
+
+                  tags: [],
+                  source: "",
+                  channels: [],
+
+                  lastActivityAt: record.updated_at
+                    ? new Date(record.updated_at)
+                    : new Date(),
+                  nextFollowupAt: new Date(),
+                  createdAt: new Date(record.created_at),
+                  // keep raw customer data handy if needed
+                  custom_data: record.custom_data ?? {},
+                };
+              }
+
+              // ---------------------------
+              // COMPANY PIPELINE
+              // ---------------------------
+              const companyObj = record.company || null;
+              const contactObj = record.contact || null;
+
+              if (type === "company") {
+                return {
+                  id: `${prefix}-${record.id}`,
+                  name: record.name,
+                  firstName: "",
+                  lastName: "",
+                  avatar: record.custom_fields?.avatar ?? "#dbeafe",
+                  custom_fields: record.custom_fields ?? {},
+                  email: "",
+                  phone: "",
+                  linkedinUrl: "",
+                  jobTitle: "",
+
+                  companyId: record.id,
+                  company: record.name,
+                  companySize: record.size ?? "",
+                  industry: record.industry ?? "",
+                  companyLocation: record.location ?? "",
+                  domain: record.domain ?? "",
+                  website: record.website ?? "",
+
+                  contactId: null,
+                  status: c.stage_name,
+                  priority: "Medium",
+                  dealValue: 0,
+                  currency: "USD",
+                  probability: 0,
+
+                  tags: record.tags ?? [],
+                  source: record.custom_fields?.source ?? "",
+                  channels: record.custom_fields?.channels ?? [],
+                  leadScore: 0,
+                  pipeline: "company",
+
+                  lastActivityAt: new Date(record.updated_at),
+                  nextFollowupAt: new Date(),
+                  createdAt: new Date(record.created_at),
+                };
+              }
+
+              // ---------------------------
+              // PEOPLE PIPELINE
+              // ---------------------------
+              if (type === "people") {
+                let first = "";
+                let last = "";
+                if (record.full_name) {
+                  const parts = record.full_name.split(" ");
+                  first = parts[0] ?? "";
+                  last = parts.slice(1).join(" ");
+                }
+
+                return {
+                  id: `${prefix}-${record.id}`,
+                  name: record.full_name,
+                  firstName: first,
+                  lastName: last,
+
+                  email: record.emails?.[0] ?? "",
+                  phone: record.phones?.[0] ?? "",
+                  linkedinUrl: record.custom_fields?.linkedinUrl ?? "",
+                  jobTitle: record.job_title ?? "",
+
+                  avatar: record.custom_fields?.avatar ?? "#dbeafe",
+                  custom_fields: record.custom_fields ?? {}, // ← ADD THIS
+
+                  companyId: companyObj?.id ?? null,
+                  company: companyObj?.name ?? "",
+                  companySize: companyObj?.size ?? "",
+                  industry: companyObj?.industry ?? "",
+                  companyLocation: companyObj?.location ?? "",
+                  domain: companyObj?.domain ?? "",
+                  website: companyObj?.website ?? "",
+
+                  contactId: null,
+                  status: c.stage_name,
+
+                  priority: record.custom_fields?.priority ?? "Medium",
+                  dealValue: record.custom_fields?.dealValue ?? 0,
+                  currency: record.custom_fields?.currency ?? "USD",
+                  probability: record.custom_fields?.probability ?? 0,
+
+                  tags: record.tags ?? [],
+                  source: record.custom_fields?.source ?? "",
+                  channels: record.custom_fields?.channels ?? [],
+                  leadScore: 0,
+                  pipeline: "people",
+
+                  lastActivityAt: new Date(record.updated_at),
+                  nextFollowupAt: new Date(),
+                  createdAt: new Date(record.created_at),
+                };
+              }
+
+              // ---------------------------
+              // DEAL PIPELINE
+              // ---------------------------
               return {
                 id: `${prefix}-${record.id}`,
-                name:
-                  record.custom_data?.name ??
-                  record.custom_data?.full_name ??
-                  record.email ??
-                  "Unnamed",
-                email: record.email ?? "",
-                phone:
-                  record.custom_data?.phone ??
-                  record.custom_data?.phone_number ??
-                  "",
-                avatar: "#dbeafe",
+                name: record.title,
 
-                company: "",
-                companyId: null,
-
-                status: c.stage_name,
-                priority: "Medium",
-                dealValue: 0,
-                currency: "USD",
-                probability: 0,
-
-                tags: [],
-                source: "",
-                channels: [],
-
-                lastActivityAt: record.updated_at
-                  ? new Date(record.updated_at)
-                  : new Date(),
-                nextFollowupAt: new Date(),
-                createdAt: new Date(record.created_at),
-                // keep raw customer data handy if needed
-                custom_data: record.custom_data ?? {},
-              };
-            }
-
-            // ---------------------------
-            // COMPANY PIPELINE
-            // ---------------------------
-            const companyObj = record.company || null;
-            const contactObj = record.contact || null;
-
-            if (type === "company") {
-              return {
-                id: `${prefix}-${record.id}`,
-                name: record.name,
-                firstName: "",
-                lastName: "",
                 avatar: record.custom_fields?.avatar ?? "#dbeafe",
-                custom_fields: record.custom_fields ?? {},
                 email: "",
                 phone: "",
                 linkedinUrl: "",
                 jobTitle: "",
-
-                companyId: record.id,
-                company: record.name,
-                companySize: record.size ?? "",
-                industry: record.industry ?? "",
-                companyLocation: record.location ?? "",
-                domain: record.domain ?? "",
-                website: record.website ?? "",
-
-                contactId: null,
-                status: c.stage_name,
-                priority: "Medium",
-                dealValue: 0,
-                currency: "USD",
-                probability: 0,
-
-                tags: record.tags ?? [],
-                source: record.custom_fields?.source ?? "",
-                channels: record.custom_fields?.channels ?? [],
-                leadScore: 0,
-                pipeline: "company",
-
-                lastActivityAt: new Date(record.updated_at),
-                nextFollowupAt: new Date(),
-                createdAt: new Date(record.created_at),
-              };
-            }
-
-            // ---------------------------
-            // PEOPLE PIPELINE
-            // ---------------------------
-            if (type === "people") {
-              let first = "";
-              let last = "";
-              if (record.full_name) {
-                const parts = record.full_name.split(" ");
-                first = parts[0] ?? "";
-                last = parts.slice(1).join(" ");
-              }
-
-              return {
-                id: `${prefix}-${record.id}`,
-                name: record.full_name,
-                firstName: first,
-                lastName: last,
-
-                email: record.emails?.[0] ?? "",
-                phone: record.phones?.[0] ?? "",
-                linkedinUrl: record.custom_fields?.linkedinUrl ?? "",
-                jobTitle: record.job_title ?? "",
-
-                avatar: record.custom_fields?.avatar ?? "#dbeafe",
                 custom_fields: record.custom_fields ?? {}, // ← ADD THIS
 
+                contactId: contactObj?.id ?? null,
                 companyId: companyObj?.id ?? null,
+
                 company: companyObj?.name ?? "",
                 companySize: companyObj?.size ?? "",
                 industry: companyObj?.industry ?? "",
@@ -199,9 +245,7 @@ export default function Pipelines() {
                 domain: companyObj?.domain ?? "",
                 website: companyObj?.website ?? "",
 
-                contactId: null,
-                status: c.stage_name,
-
+                status: record.status ?? c.stage_name,
                 priority: record.custom_fields?.priority ?? "Medium",
                 dealValue: record.custom_fields?.dealValue ?? 0,
                 currency: record.custom_fields?.currency ?? "USD",
@@ -211,55 +255,13 @@ export default function Pipelines() {
                 source: record.custom_fields?.source ?? "",
                 channels: record.custom_fields?.channels ?? [],
                 leadScore: 0,
-                pipeline: "people",
+                pipeline: "deal",
 
                 lastActivityAt: new Date(record.updated_at),
                 nextFollowupAt: new Date(),
                 createdAt: new Date(record.created_at),
               };
-            }
-
-            // ---------------------------
-            // DEAL PIPELINE
-            // ---------------------------
-            return {
-              id: `${prefix}-${record.id}`,
-              name: record.title,
-
-              avatar: record.custom_fields?.avatar ?? "#dbeafe",
-              email: "",
-              phone: "",
-              linkedinUrl: "",
-              jobTitle: "",
-              custom_fields: record.custom_fields ?? {}, // ← ADD THIS
-
-              contactId: contactObj?.id ?? null,
-              companyId: companyObj?.id ?? null,
-
-              company: companyObj?.name ?? "",
-              companySize: companyObj?.size ?? "",
-              industry: companyObj?.industry ?? "",
-              companyLocation: companyObj?.location ?? "",
-              domain: companyObj?.domain ?? "",
-              website: companyObj?.website ?? "",
-
-              status: record.status ?? c.stage_name,
-              priority: record.custom_fields?.priority ?? "Medium",
-              dealValue: record.custom_fields?.dealValue ?? 0,
-              currency: record.custom_fields?.currency ?? "USD",
-              probability: record.custom_fields?.probability ?? 0,
-
-              tags: record.tags ?? [],
-              source: record.custom_fields?.source ?? "",
-              channels: record.custom_fields?.channels ?? [],
-              leadScore: 0,
-              pipeline: "deal",
-
-              lastActivityAt: new Date(record.updated_at),
-              nextFollowupAt: new Date(),
-              createdAt: new Date(record.created_at),
-            };
-          }),
+            }),
         }));
 
         setColumns(formatted);
@@ -284,110 +286,146 @@ export default function Pipelines() {
         title: c.stage_name,
         color: c.stage_color,
         order: c.order,
-        leads: c.entities.map((e: any) => {
-          const record = e.data;
-          const type = pipelineType;
-          const prefix =
-            type === "people"
-              ? "people"
-              : type === "company"
-                ? "company"
-                : type === "deal"
-                  ? "deal"
-                  : "default_customers";
+        leads: c.entities
+          .filter((e: any) => e.data !== null)
+          .map((e: any) => {
+            const record = e.data;
+            const type = pipelineType;
+            const prefix =
+              type === "people"
+                ? "people"
+                : type === "company"
+                  ? "company"
+                  : type === "deal"
+                    ? "deal"
+                    : "default_customers";
 
-          if (type === "default_customers") {
-            return {
-              id: `${prefix}-${record.id}`,
-              name:
-                record.custom_data?.name ??
-                record.custom_data?.full_name ??
-                record.email ??
-                "Unnamed",
-              email: record.email ?? "",
-              phone:
-                record.custom_data?.phone ??
-                record.custom_data?.phone_number ??
-                "",
-              avatar: "#dbeafe",
-              company: "",
-              companyId: null,
-              status: c.stage_name,
-              priority: "Medium",
-              dealValue: 0,
-              currency: "USD",
-              probability: 0,
-              tags: [],
-              source: "",
-              channels: [],
-              lastActivityAt: record.updated_at
-                ? new Date(record.updated_at)
-                : new Date(),
-              nextFollowupAt: new Date(),
-              createdAt: new Date(record.created_at),
-              custom_data: record.custom_data ?? {},
-            };
-          }
+            if (type === "default_customers") {
+              return {
+                id: `${prefix}-${record.id}`,
+                name:
+                  record.custom_data?.name ??
+                  record.custom_data?.full_name ??
+                  record.email ??
+                  "Unnamed",
+                email: record.email ?? "",
+                phone:
+                  record.custom_data?.phone ??
+                  record.custom_data?.phone_number ??
+                  "",
+                avatar: "#dbeafe",
+                company: "",
+                companyId: null,
+                status: c.stage_name,
+                priority: "Medium",
+                dealValue: 0,
+                currency: "USD",
+                probability: 0,
+                tags: [],
+                source: "",
+                channels: [],
+                lastActivityAt: record.updated_at
+                  ? new Date(record.updated_at)
+                  : new Date(),
+                nextFollowupAt: new Date(),
+                createdAt: new Date(record.created_at),
+                custom_data: record.custom_data ?? {},
+              };
+            }
 
-          const companyObj = record.company || null;
-          const contactObj = record.contact || null;
+            const companyObj = record.company || null;
+            const contactObj = record.contact || null;
 
-          if (type === "company") {
-            return {
-              id: `${prefix}-${record.id}`,
-              name: record.name,
-              firstName: "",
-              lastName: "",
-              avatar: record.custom_fields?.avatar ?? "#dbeafe",
-              custom_fields: record.custom_fields ?? {},
-              email: "",
-              phone: "",
-              linkedinUrl: "",
-              jobTitle: "",
-              companyId: record.id,
-              company: record.name,
-              companySize: record.size ?? "",
-              industry: record.industry ?? "",
-              companyLocation: record.location ?? "",
-              domain: record.domain ?? "",
-              website: record.website ?? "",
-              contactId: null,
-              status: c.stage_name,
-              priority: "Medium",
-              dealValue: 0,
-              currency: "USD",
-              probability: 0,
-              tags: record.tags ?? [],
-              source: record.custom_fields?.source ?? "",
-              channels: record.custom_fields?.channels ?? [],
-              leadScore: 0,
-              pipeline: "company",
-              lastActivityAt: new Date(record.updated_at),
-              nextFollowupAt: new Date(),
-              createdAt: new Date(record.created_at),
-            };
-          }
+            if (type === "company") {
+              return {
+                id: `${prefix}-${record.id}`,
+                name: record.name,
+                firstName: "",
+                lastName: "",
+                avatar: record.custom_fields?.avatar ?? "#dbeafe",
+                custom_fields: record.custom_fields ?? {},
+                email: "",
+                phone: "",
+                linkedinUrl: "",
+                jobTitle: "",
+                companyId: record.id,
+                company: record.name,
+                companySize: record.size ?? "",
+                industry: record.industry ?? "",
+                companyLocation: record.location ?? "",
+                domain: record.domain ?? "",
+                website: record.website ?? "",
+                contactId: null,
+                status: c.stage_name,
+                priority: "Medium",
+                dealValue: 0,
+                currency: "USD",
+                probability: 0,
+                tags: record.tags ?? [],
+                source: record.custom_fields?.source ?? "",
+                channels: record.custom_fields?.channels ?? [],
+                leadScore: 0,
+                pipeline: "company",
+                lastActivityAt: new Date(record.updated_at),
+                nextFollowupAt: new Date(),
+                createdAt: new Date(record.created_at),
+              };
+            }
 
-          if (type === "people") {
-            let first = "";
-            let last = "";
-            if (record.full_name) {
-              const parts = record.full_name.split(" ");
-              first = parts[0] ?? "";
-              last = parts.slice(1).join(" ");
+            if (type === "people") {
+              let first = "";
+              let last = "";
+              if (record.full_name) {
+                const parts = record.full_name.split(" ");
+                first = parts[0] ?? "";
+                last = parts.slice(1).join(" ");
+              }
+
+              return {
+                id: `${prefix}-${record.id}`,
+                name: record.full_name,
+                firstName: first,
+                lastName: last,
+                email: record.emails?.[0] ?? "",
+                phone: record.phones?.[0] ?? "",
+                linkedinUrl: record.custom_fields?.linkedinUrl ?? "",
+                jobTitle: record.job_title ?? "",
+                avatar: record.custom_fields?.avatar ?? "#dbeafe",
+                custom_fields: record.custom_fields ?? {},
+                companyId: companyObj?.id ?? null,
+                company: companyObj?.name ?? "",
+                companySize: companyObj?.size ?? "",
+                industry: companyObj?.industry ?? "",
+                companyLocation: companyObj?.location ?? "",
+                domain: companyObj?.domain ?? "",
+                website: companyObj?.website ?? "",
+                contactId: null,
+                status: c.stage_name,
+                priority: record.custom_fields?.priority ?? "Medium",
+                dealValue: record.custom_fields?.dealValue ?? 0,
+                currency: record.custom_fields?.currency ?? "USD",
+                probability: record.custom_fields?.probability ?? 0,
+                tags: record.tags ?? [],
+                source: record.custom_fields?.source ?? "",
+                channels: record.custom_fields?.channels ?? [],
+                leadScore: 0,
+                pipeline: "people",
+                lastActivityAt: new Date(record.updated_at),
+                nextFollowupAt: new Date(),
+                createdAt: new Date(record.created_at),
+              };
             }
 
             return {
               id: `${prefix}-${record.id}`,
-              name: record.full_name,
-              firstName: first,
-              lastName: last,
-              email: record.emails?.[0] ?? "",
-              phone: record.phones?.[0] ?? "",
-              linkedinUrl: record.custom_fields?.linkedinUrl ?? "",
-              jobTitle: record.job_title ?? "",
+              name: record.title,
               avatar: record.custom_fields?.avatar ?? "#dbeafe",
+              email: "",
+              phone: "",
+              linkedinUrl: "",
+              jobTitle: "",
               custom_fields: record.custom_fields ?? {},
+              contactId: contactObj?.id ?? null,
               companyId: companyObj?.id ?? null,
               company: companyObj?.name ?? "",
               companySize: companyObj?.size ?? "",
@@ -395,8 +433,7 @@ export default function Pipelines() {
               companyLocation: companyObj?.location ?? "",
               domain: companyObj?.domain ?? "",
               website: companyObj?.website ?? "",
-              contactId: null,
-              status: c.stage_name,
+              status: record.status ?? c.stage_name,
               priority: record.custom_fields?.priority ?? "Medium",
               dealValue: record.custom_fields?.dealValue ?? 0,
               currency: record.custom_fields?.currency ?? "USD",
@@ -405,45 +442,12 @@ export default function Pipelines() {
               source: record.custom_fields?.source ?? "",
               channels: record.custom_fields?.channels ?? [],
               leadScore: 0,
-              pipeline: "people",
+              pipeline: "deal",
               lastActivityAt: new Date(record.updated_at),
               nextFollowupAt: new Date(),
               createdAt: new Date(record.created_at),
             };
-          }
-
-          return {
-            id: `${prefix}-${record.id}`,
-            name: record.title,
-            avatar: record.custom_fields?.avatar ?? "#dbeafe",
-            email: "",
-            phone: "",
-            linkedinUrl: "",
-            jobTitle: "",
-            custom_fields: record.custom_fields ?? {},
-            contactId: contactObj?.id ?? null,
-            companyId: companyObj?.id ?? null,
-            company: companyObj?.name ?? "",
-            companySize: companyObj?.size ?? "",
-            industry: companyObj?.industry ?? "",
-            companyLocation: companyObj?.location ?? "",
-            domain: companyObj?.domain ?? "",
-            website: companyObj?.website ?? "",
-            status: record.status ?? c.stage_name,
-            priority: record.custom_fields?.priority ?? "Medium",
-            dealValue: record.custom_fields?.dealValue ?? 0,
-            currency: record.custom_fields?.currency ?? "USD",
-            probability: record.custom_fields?.probability ?? 0,
-            tags: record.tags ?? [],
-            source: record.custom_fields?.source ?? "",
-            channels: record.custom_fields?.channels ?? [],
-            leadScore: 0,
-            pipeline: "deal",
-            lastActivityAt: new Date(record.updated_at),
-            nextFollowupAt: new Date(),
-            createdAt: new Date(record.created_at),
-          };
-        }),
+          }),
       }));
 
       setColumns(formatted);

@@ -73,8 +73,8 @@ const allNavItems = {
     },
     {
       id: "manage_crm",
-      title: "CRM",
-      path: "crm",
+      title: "Leads",
+      path: "leads",
       icon: CrmIcon,
       isExternal: false,
     },

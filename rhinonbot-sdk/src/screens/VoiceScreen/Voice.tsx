@@ -18,12 +18,10 @@ import {
 
 // Helper to get user email
 const getUserEmail = (): string | undefined => {
-  // 1. URL Params
   const urlParams = new URLSearchParams(window.location.search);
   const emailFromUrl = urlParams.get('email');
   if (emailFromUrl) return emailFromUrl;
 
-  // 2. Local Storage
   const emailFromStorage = localStorage.getItem('user_email');
   if (emailFromStorage) return emailFromStorage;
 
@@ -37,17 +35,44 @@ const getUserId = (): string | undefined => {
   return undefined;
 };
 
+// Audio Utilities
+const floatTo16BitPCM = (float32Array: Float32Array) => {
+  const buffer = new ArrayBuffer(float32Array.length * 2);
+  const view = new DataView(buffer);
+  let offset = 0;
+  for (let i = 0; i < float32Array.length; i++, offset += 2) {
+    let s = Math.max(-1, Math.min(1, float32Array[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return buffer;
+};
+
+const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+};
+
 const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin, userEmail }) => {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
-  const [loading, setLoading] = useState(false);
-
+  const [loading, setLoading] = useState(false); // Used for visualizer/listening state
   const [isMuted, setIsMuted] = useState(false);
 
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const dataChannelRef = useRef<RTCDataChannel | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement | null>(null)
+  // Gemini / WebSocket Refs
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+
+  const nextPlayTimeRef = useRef(0);
+  const activeSources = useRef<AudioBufferSourceNode[]>([]); // Track active audio sources
+
   const initializedRef = useRef(false);
+  const mountedRef = useRef(true);
 
   const baseStyle: React.CSSProperties = {
     display: 'flex',
@@ -85,6 +110,11 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin, user
       text: 'Connecting...',
       style: { backgroundColor: '#FFF8E1', color: '#FF8F00' },
     },
+    Disconnected: {
+      icon: <WifiOff size={16} color='#9E9E9E' />,
+      text: 'Disconnected',
+      style: { backgroundColor: '#F5F5F5', color: '#757575' },
+    },
     default: {
       icon: <Loader2 size={16} color='#FFC107' className='spin' />,
       text: 'Connecting...',
@@ -92,30 +122,23 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin, user
     },
   };
 
-  const mountedRef = useRef(true); // Track mount status
-
-  //Cleanup function (safe to call multiple times)
   const cleanup = () => {
     try {
-      if (pcRef.current) {
-        pcRef.current.close();
-        pcRef.current = null;
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
       }
-      if (dataChannelRef.current) {
-        dataChannelRef.current.close();
-        dataChannelRef.current = null;
+      if (scriptProcessorRef.current) {
+        scriptProcessorRef.current.disconnect();
+        scriptProcessorRef.current = null;
       }
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((track) => track.stop());
-        localStreamRef.current = null;
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
       }
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.pause();
-        remoteAudioRef.current.srcObject = null;
-        if (remoteAudioRef.current.parentNode) {
-          remoteAudioRef.current.parentNode.removeChild(remoteAudioRef.current);
-        }
-        remoteAudioRef.current = null;
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
       }
       setConnectionStatus('Disconnected');
       setLoading(false);
@@ -124,7 +147,20 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin, user
     }
   };
 
-  //Initialize once
+  const stopAudioPlayback = () => {
+    activeSources.current.forEach(source => {
+      try {
+        source.stop();
+      } catch (e) {
+        // ignore errors if already stopped
+      }
+    });
+    activeSources.current = [];
+    if (audioContextRef.current) {
+      nextPlayTimeRef.current = audioContextRef.current.currentTime;
+    }
+  };
+
   useEffect(() => {
     mountedRef.current = true;
     if (!initializedRef.current) {
@@ -138,303 +174,252 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin, user
     };
   }, []);
 
-  // ... (Other useEffects remain same) ...
-
-  // Initialize WebRTC real-time session
   const initRealTimeSession = async () => {
     if (isAdmin) return;
     try {
-      cleanup(); // close any old connection
+      cleanup();
 
       const emailToUse = userEmail || getUserEmail();
-      const { client_secret } = await getVoiceSessionToken(appId, emailToUse);
+      // Expect GCS-compatible response with api_key, websocket_url, config
+      const sessionData = await getVoiceSessionToken(appId, emailToUse);
 
-      // Check if unmounted during await
-      if (!mountedRef.current) return;
-
-      const pc = new RTCPeerConnection();
-      pcRef.current = pc;
-
-      // Local mic stream
-      const localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
-
-      // Check if unmounted during await
-      if (!mountedRef.current) {
-        localStream.getTracks().forEach(track => track.stop());
-        pc.close();
-        return;
+      if (!sessionData.websocket_url || !sessionData.api_key) {
+        throw new Error("Invalid GCS session config");
       }
 
-      localStreamRef.current = localStream;
-      localStream
-        .getTracks()
-        .forEach((track) => pc.addTrack(track, localStream));
+      if (!mountedRef.current) return;
 
-      // Remote audio
-      const audioEl = document.createElement('audio');
-      audioEl.autoplay = true;
-      document.body.appendChild(audioEl); // 🔥 Attach to maximize compatibility
-      remoteAudioRef.current = audioEl;
-      pc.ontrack = (e) => {
-        audioEl.srcObject = e.streams[0];
-        audioEl.play().catch((e) => console.error('Autoplay failed:', e));
-        setLoading(false);
-      };
+      const url = `${sessionData.websocket_url}?key=${sessionData.api_key}`;
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
 
-      // Data channel
-      const dataChannel = pc.createDataChannel('oai-events');
-      dataChannelRef.current = dataChannel;
-
-      dataChannel.onopen = () => {
+      ws.onopen = async () => {
         if (!mountedRef.current) return;
         setConnectionStatus('Connected');
-        // Trigger AI to speak first
-        const responseCreate = {
-          type: "response.create",
-          response: {
-            modalities: ["text", "audio"],
-            instructions: "Greet the user warmly based on the instructions.",
+
+        // Send Setup
+        const setupMsg = { setup: sessionData.config };
+        ws.send(JSON.stringify(setupMsg));
+
+        // Init Audio Context & Mic
+        await startAudioCapture();
+
+        // Trigger Initial Greeting
+        ws.send(JSON.stringify({
+          client_content: {
+            turns: [
+              {
+                role: "user",
+                parts: [{ text: "Hello! Please greet me." }]
+              }
+            ],
+            turn_complete: true
           }
-        };
-        dataChannel.send(JSON.stringify(responseCreate));
+        }));
       };
-      dataChannel.onclose = () => setConnectionStatus('Disconnected');
-      dataChannel.onerror = (err) => console.error('DataChannel Error:', err);
 
-      dataChannel.onmessage = async (event) => {
+      ws.onclose = () => {
+        if (mountedRef.current) setConnectionStatus('Disconnected');
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebSocket Error", err);
+        if (mountedRef.current) setConnectionStatus('Connection failed');
+      };
+
+      ws.onmessage = async (event) => {
         try {
-          const payload = JSON.parse(event.data);
-
-          // Debugging
-          console.log("Realtime Event:", payload.type, payload);
-
-          if (
-            payload.type.includes('input_audio_buffer') ||
-            payload.type.includes('output_audio_buffer.stopped')
-          ) {
-            setLoading(true);
-          } else if (payload.type.includes('output_audio_buffer.started')) {
-            setLoading(false);
+          let msg;
+          if (event.data instanceof Blob) {
+            msg = JSON.parse(await event.data.text());
+          } else {
+            msg = JSON.parse(event.data);
           }
 
-          // Handle Function Calls (Tools)
-          if (payload.type === 'response.function_call_arguments.done') {
-            const functionName = payload.name;
-            const callId = payload.call_id;
-            const argsString = payload.arguments;
-
-            if (functionName === 'submit_pre_chat_form') {
-              console.log("📝 Tool Triggered: submit_pre_chat_form", argsString);
-
-              try {
-                const args = JSON.parse(argsString);
-
-                // 1. Call Backend to Save Lead
-                const result = await submitVoiceLead({
-                  chatbot_id: appId,
-                  email: args.email,
-                  name: args.name,
-                  phone: args.phone
-                });
-
-                // Save email to local storage for future sessions
-                if (args.email) {
-                  localStorage.setItem('user_email', args.email);
+          if (msg.toolCall) {
+            handleToolCall(msg.toolCall, ws);
+          }
+          else if (msg.serverContent) {
+            if (msg.serverContent.interrupted) {
+              console.log("Interruption detected! Stopping playback.");
+              stopAudioPlayback();
+            }
+            if (msg.serverContent.modelTurn) {
+              const parts = msg.serverContent.modelTurn.parts;
+              parts?.forEach((part: any) => {
+                if (part.inlineData) {
+                  playAudioChunk(part.inlineData.data);
                 }
-
-                console.log("✅ Lead Saved:", result);
-
-                // 2. Send Tool Output back to OpenAI (Required to continue flow)
-                const toolOutput = {
-                  type: "conversation.item.create",
-                  item: {
-                    type: "function_call_output",
-                    call_id: callId,
-                    output: JSON.stringify(result) // Return success message
-                  }
-                };
-                dataChannel.send(JSON.stringify(toolOutput));
-
-                // 3. Trigger Bot Response (to say "Thanks!")
-                const responseCreate = {
-                  type: "response.create"
-                };
-                dataChannel.send(JSON.stringify(responseCreate));
-
-              } catch (e) {
-                console.error("Error processing tool call:", e);
-              }
-            } else if (functionName === 'search_knowledge_base') {
-              console.log("🔍 Tool Triggered: search_knowledge_base", argsString);
-
-              try {
-                const args = JSON.parse(argsString);
-
-                // 1. Call Backend to Search
-                const result = await searchVoiceKnowledge({
-                  chatbot_id: appId,
-                  query: args.query
-                });
-
-                console.log("✅ Knowledge Found:", result);
-
-                // 2. Send Tool Output back
-                const toolOutput = {
-                  type: "conversation.item.create",
-                  item: {
-                    type: "function_call_output",
-                    call_id: callId,
-                    output: JSON.stringify(result) // Return chunks
-                  }
-                };
-                dataChannel.send(JSON.stringify(toolOutput));
-
-                // 3. Trigger Bot Response
-                const responseCreate = {
-                  type: "response.create"
-                };
-                dataChannel.send(JSON.stringify(responseCreate));
-
-              } catch (e) {
-                console.error("Error processing search tool:", e);
-              }
-            } else if (functionName === 'handoff_to_support') {
-              console.log("🤝 Tool Triggered: handoff_to_support", argsString);
-
-              try {
-                const args = JSON.parse(argsString);
-
-                // Prioritize email from tool args, fallback to storage
-                const emailToUse = args.email || getUserEmail();
-
-                let result: any = { result: "Handoff initiated." };
-
-                if (emailToUse) {
-                  const handoffRes = await handoffSupport({
-                    chatbot_id: appId,
-                    email: emailToUse,
-                    name: args.name,
-                    phone: args.phone,
-                    urgency: args.urgency,
-                    user_id: getUserId()
-                  });
-                  console.log("✅ Handoff Result:", handoffRes);
-                  result = handoffRes;
-                } else {
-                  console.warn("⚠️ No email found for handoff.");
-                  result = { error: "Email missing. Please provide email." };
-                }
-
-                // 2. Send Tool Output back
-                const toolOutput = {
-                  type: "conversation.item.create",
-                  item: {
-                    type: "function_call_output",
-                    call_id: callId,
-                    output: JSON.stringify(result)
-                  }
-                };
-                dataChannel.send(JSON.stringify(toolOutput));
-
-                // 3. Trigger Bot Response
-                const responseCreate = {
-                  type: "response.create"
-                };
-                dataChannel.send(JSON.stringify(responseCreate));
-
-              } catch (e) {
-                console.error("Error processing handoff tool:", e);
-              }
+              });
             }
           }
-
-        } catch (err) {
-          console.error('Message parsing error:', err);
+        } catch (e) {
+          console.error(e);
         }
-      };
+      }
 
-      // Offer/Answer
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      // Connect to OpenAI Realtime API using the session token from backend
-      // IMPORTANT: No model parameter - this tells OpenAI to use the existing session
-      // that was created by the backend (which has tools and instructions configured)
-      const response = await fetch(
-        `https://api.openai.com/v1/realtime`,
-        {
-          method: 'POST',
-          body: offer.sdp,
-          headers: {
-            Authorization: `Bearer ${client_secret.value}`,
-            'Content-Type': 'application/sdp',
-          },
-        },
-      );
-
-      const answerSDP = await response.text();
-      await pc.setRemoteDescription({ type: 'answer', sdp: answerSDP });
-
-      setConnectionStatus('Connected');
     } catch (err) {
       console.error('Voice session failed:', err);
       cleanup();
       setConnectionStatus('Connection failed');
     }
   };
+
+  const startAudioCapture = async () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass({ sampleRate: 16000 });
+      audioContextRef.current = audioCtx;
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          autoGainControl: true,
+          noiseSuppression: true
+        }
+      });
+      mediaStreamRef.current = stream;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      scriptProcessorRef.current = processor;
+
+      source.connect(processor);
+      processor.connect(audioCtx.destination);
+
+      processor.onaudioprocess = (e: any) => {
+        if (isMuted || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+        const inputData = e.inputBuffer.getChannelData(0);
+        // Basic VAD / Volume check for visualizer
+        let sum = 0;
+        for (let i = 0; i < inputData.length; i++) sum += Math.abs(inputData[i]);
+        const avg = sum / inputData.length;
+        if (avg > 0.01) setLoading(true); else setLoading(false);
+
+        const pcm16 = floatTo16BitPCM(inputData);
+        const base64 = arrayBufferToBase64(pcm16);
+
+        wsRef.current.send(JSON.stringify({
+          realtime_input: {
+            media_chunks: [{
+              mime_type: "audio/pcm",
+              data: base64
+            }]
+          }
+        }));
+      };
+
+    } catch (e) {
+      console.error("Audio Capture Error", e);
+    }
+  };
+
+  const playAudioChunk = (base64Data: string) => {
+    if (!audioContextRef.current) return;
+    const ctx = audioContextRef.current; // This is input ctx (16k)
+    // We might need a separate ctx for output if rate differs, but browser handles resampling.
+    // Gemini usually sends 24k.
+
+    try {
+      const binaryString = window.atob(base64Data);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const int16 = new Int16Array(bytes.buffer);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32768.0;
+      }
+
+      const buffer = ctx.createBuffer(1, float32.length, 24000); // 24kHz
+      buffer.getChannelData(0).set(float32);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.onended = () => {
+        activeSources.current = activeSources.current.filter(s => s !== source);
+      };
+      activeSources.current.push(source);
+
+      const currentTime = ctx.currentTime;
+      if (nextPlayTimeRef.current < currentTime) {
+        nextPlayTimeRef.current = currentTime;
+      }
+      source.start(nextPlayTimeRef.current);
+      nextPlayTimeRef.current += buffer.duration;
+
+    } catch (e) {
+      console.error("Audio playback error", e);
+    }
+  };
+
+  const handleToolCall = async (toolCall: any, ws: WebSocket) => {
+    const functionCalls = toolCall.functionCalls;
+    const functionResponses = [];
+
+    for (const call of functionCalls) {
+      const { name, args, id } = call;
+      let result = {};
+
+      try {
+        if (name === 'search_knowledge_base') {
+          const res = await searchVoiceKnowledge({ chatbot_id: appId, query: args.query });
+          result = res;
+        } else if (name === 'submit_pre_chat_form') {
+          const res = await submitVoiceLead({ chatbot_id: appId, ...args });
+          if (args.email) localStorage.setItem('user_email', args.email);
+          result = res;
+        } else if (name === 'handoff_to_support') {
+          const emailToUse = args.email || getUserEmail();
+          if (emailToUse) {
+            const res = await handoffSupport({
+              chatbot_id: appId,
+              email: emailToUse,
+              ...args,
+              user_id: getUserId()
+            });
+            result = res;
+          } else {
+            result = { error: "Email missing" };
+          }
+        }
+      } catch (e) {
+        result = { error: String(e) };
+      }
+
+      functionResponses.push({
+        id: id,
+        name: name,
+        response: { result: result }
+      });
+    }
+
+    ws.send(JSON.stringify({
+      toolResponse: {
+        functionResponses: functionResponses
+      }
+    }));
+  };
+
   const handleClose = () => {
     cleanup();
     onButtonClick();
   };
+
   const handleToggleMute = () => {
-    if (localStreamRef.current) {
-      setIsMuted((prevMuted) => {
-        const newMuted = !prevMuted;
-        localStreamRef.current?.getAudioTracks().forEach((track) => {
-          track.enabled = !newMuted; // disable mic if muted
-        });
-        return newMuted;
-      });
-    }
+    setIsMuted(prev => !prev);
   };
-  const { icon, text, style } =
-    statusConfig[connectionStatus] || statusConfig.default;
+
+  const { icon, text, style } = statusConfig[connectionStatus] || statusConfig.default;
 
   return (
     <div className='voice-container'>
-      {/* <h3
-        className='voice-status'
-        style={{
-          width: '100%',
-          fontSize: 14,
-          fontWeight: 500,
-          color: connectionStatus === 'Connected' ? '#4CAF50' : '#FF5722',
-          background: '#f1f1f1',
-          padding: '10px 20px',
-          margin: 0,
-        }}
-      >
-        Status: {connectionStatus}
-      </h3> */}
-      {/* <h3
-        style={{
-          textAlign: 'center',
-          fontSize: 42,
-          margin: '40px 0 20px 0',
-          display:'flex',
-          gap:"10px"
-        }}
-      >
-        Talk to 
-        <img
-          src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot2.png'
-          alt='artical-img'
-          width={50}
-          style={{ borderRadius: '8px', marginTop:'-10px'  }}
-        />
-      </h3> */}
       <div style={baseStyle}>
         <div style={{ ...badgeBase, ...style }}>
           {icon}
@@ -474,21 +459,14 @@ const Voice: React.FC<VoiceScreenProps> = ({ appId, onButtonClick, isAdmin, user
         <button
           onClick={handleClose}
           className='voice-btn'
-          disabled={
-            connectionStatus !== 'Connected' &&
-            connectionStatus !== 'Connection failed'
-          }
+          disabled={connectionStatus !== 'Connected' && connectionStatus !== 'Connection failed'}
         >
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background:
-                connectionStatus !== 'Connected' &&
-                  connectionStatus !== 'Connection failed'
-                  ? '#ae2525'
-                  : '#e02f2f',
+              background: connectionStatus !== 'Connected' && connectionStatus !== 'Connection failed' ? '#ae2525' : '#e02f2f',
               color: 'white',
               border: 'none',
               padding: '12px',

@@ -7,7 +7,7 @@ import { useEffect } from "react";
 export default function Page() {
   const router = useRouter();
   useEffect(() => {
-    router.push("crm/dashboard");
+    router.push("leads/dashboard");
   }, []);
   return <Loading areaOnly />;
 }

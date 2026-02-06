@@ -358,10 +358,10 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
     }
   }, [isSpeakingWithRealPerson, userId, config?.app_id, convoId, isConversationActive]);
 
-  useEffect(() => {
-    console.log("selectedChatId", selectedChatId)
+  // useEffect(() => {
+  //   console.log("selectedChatId", selectedChatId)
 
-  }, [selectedChatId])
+  // }, [selectedChatId])
 
   // ======= calling logic =======
   useEffect(() => {
@@ -559,6 +559,29 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
     }
     return () => clearInterval(interval);
   }, [isInCall, callStartTime]);
+
+  // Lock body scroll when chat is open on mobile
+  useEffect(() => {
+    const handleScrollLock = () => {
+      const isMobile = window.innerWidth <= 480;
+      if (isOpen && isMobile) {
+        document.body.style.overflow = 'hidden';
+        document.body.style.touchAction = 'none'; // Prevent touch scrolling on body
+      } else {
+        document.body.style.overflow = '';
+        document.body.style.touchAction = '';
+      }
+    };
+
+    handleScrollLock(); // Initial check
+    window.addEventListener('resize', handleScrollLock);
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.touchAction = '';
+      window.removeEventListener('resize', handleScrollLock);
+    };
+  }, [isOpen]);
 
 
 

@@ -104,6 +104,12 @@ from routes.realtime_rag_routes import router as realtime_rag_route
 app.include_router(standard_rag_route, tags=["Standard RAG (OpenAI)"])
 app.include_router(realtime_rag_route, tags=["Realtime API"])
 
+# GCS Routes (Google Cloud Services - for Free Trial Users)
+from routes.gcs_standard_rag_routes import router as gcs_standard_rag_route
+from routes.gcs_realtime_routes import router as gcs_realtime_route
+app.include_router(gcs_standard_rag_route, tags=["GCS Standard RAG (Gemini)"])
+app.include_router(gcs_realtime_route, tags=["GCS Realtime API (Gemini Live)"])
+
 
 # Run with: python main.py
 if __name__ == "__main__":

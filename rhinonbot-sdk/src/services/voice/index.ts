@@ -12,6 +12,9 @@ export interface VoiceClientSecret {
 export interface VoiceSessionResponse {
   client_secret: VoiceClientSecret;
   session_id?: string;
+  api_key?: string;
+  websocket_url?: string;
+  config?: any;
 }
 
 /**
@@ -44,7 +47,7 @@ export interface RealtimeHandoffRequest {
  */
 export const getVoiceSessionToken = async (chatbot_id: string, user_email?: string): Promise<VoiceSessionResponse> => {
   try {
-    const response = await fetch(`${getAiApiUrl()}/realtime/session`, {
+    const response = await fetch(`${getAiApiUrl()}/gcs/realtime/session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -71,7 +74,7 @@ export const getVoiceSessionToken = async (chatbot_id: string, user_email?: stri
  */
 export const searchVoiceKnowledge = async (data: RealtimeSearchRequest): Promise<any> => {
   try {
-    const response = await fetch(`${getAiApiUrl()}/realtime/search_knowledge`, {
+    const response = await fetch(`${getAiApiUrl()}/gcs/realtime/search_knowledge`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -96,7 +99,7 @@ export const searchVoiceKnowledge = async (data: RealtimeSearchRequest): Promise
  */
 export const submitVoiceLead = async (data: RealtimeLeadRequest): Promise<any> => {
   try {
-    const response = await fetch(`${getAiApiUrl()}/realtime/submit_lead`, {
+    const response = await fetch(`${getAiApiUrl()}/gcs/realtime/submit_lead`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -121,7 +124,7 @@ export const submitVoiceLead = async (data: RealtimeLeadRequest): Promise<any> =
  */
 export const handoffSupport = async (data: RealtimeHandoffRequest): Promise<any> => {
   try {
-    const response = await fetch(`${getAiApiUrl()}/realtime/handoff_support`, {
+    const response = await fetch(`${getAiApiUrl()}/gcs/realtime/handoff_support`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

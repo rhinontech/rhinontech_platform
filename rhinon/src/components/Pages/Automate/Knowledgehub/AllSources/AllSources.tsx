@@ -56,57 +56,62 @@ export default function AllSources() {
   const isChatbotInstalled = useUserStore.getState().userData?.onboarding?.chatbot_installed;
 
 
-  useEffect(() => {
-    async function fetchAll() {
-      try {
-        const response = await getAutomation();
-        setWebsites(response.training_url || []);
-        setFiles(response.training_pdf || []);
-        setArticles(response.training_article || []);
+  const fetchData = async () => {
+    try {
+      const response = await getAutomation();
+      setWebsites(response.training_url || []);
+      setFiles(response.training_pdf || []);
+      setArticles(response.training_article || []);
 
+      let websitesCount = 0;
+      let filesCount = 0;
+      let articlesCount = 0;
+      let trained = true;
 
-        if (response?.training_url.length > 0) {
-          let count = 0;
-          response.training_url.forEach((item: any) => {
-            if (!item.is_trained) {
-              setIsTrained(false);
-              count++;
-            }
-          });
-          setUntrainedWebsitesCount(count);
-        }
-        if (response?.training_pdf.length > 0) {
-          let count = 0;
-          response.training_pdf.forEach((item: any) => {
-            if (!item.is_trained) {
-              setIsTrained(false);
-              count++;
-            }
-          });
-          setUntrainedFilesCount(count);
-        }
-        if (response?.training_article.length > 0) {
-          let count = 0;
-          response.training_article.forEach((item: any) => {
-            if (!item.is_trained) {
-              setIsTrained(false);
-              count++;
-            }
-          });
-          setUntrainedArticlesCount(count);
-        }
-
-        // Set training status
-        setTrainingStatus(response.training_status || "idle");
-        setTrainingProgress(response.training_progress || 0);
-
-      } catch (err) {
-        // handle error if needed
-      } finally {
-        setLoading(false);
+      if (response?.training_url?.length > 0) {
+        response.training_url.forEach((item: any) => {
+          if (!item.is_trained) {
+            trained = false;
+            websitesCount++;
+          }
+        });
       }
+      if (response?.training_pdf?.length > 0) {
+        response.training_pdf.forEach((item: any) => {
+          if (!item.is_trained) {
+            trained = false;
+            filesCount++;
+          }
+        });
+      }
+      if (response?.training_article?.length > 0) {
+        response.training_article.forEach((item: any) => {
+          if (!item.is_trained) {
+            trained = false;
+            articlesCount++;
+          }
+        });
+      }
+
+      setUntrainedWebsitesCount(websitesCount);
+      setUntrainedFilesCount(filesCount);
+      setUntrainedArticlesCount(articlesCount);
+      setIsTrained(trained);
+
+      // Set training status
+      setTrainingStatus(response.training_status || "idle");
+      setTrainingProgress(response.training_progress || 0);
+
+      return response;
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    fetchAll();
+  };
+
+  useEffect(() => {
+    fetchData();
 
     const organizationId = useUserStore.getState().userData?.orgId;
     if (!organizationId) return;
@@ -115,6 +120,8 @@ export default function AllSources() {
 
     const handleTrainingProgress = async (data: any) => {
       if (data.organization_id !== organizationId) return;
+      // We could just update status/progress here without full fetch if partial
+      // But full fetch ensures consistency
       const response = await getAutomation();
       setTrainingStatus(response.training_status || "idle");
       setTrainingProgress(response.training_progress || 0);
@@ -122,25 +129,31 @@ export default function AllSources() {
 
     const handleTrainingCompleted = async (data: any) => {
       if (data.organization_id !== organizationId) return;
-      const response = await getAutomation();
-      setTrainingStatus(response.training_status || "idle");
-      setTrainingProgress(response.training_progress || 0);
-      setLoading(false);
+      await fetchData(); // Refresh all data and counts
+      toast.success("Training completed successfully!");
+    };
+
+    const handleTrainingError = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      await fetchData(); // Refresh data to see if anything partially succeeded or to reset UI
+      setTrainingStatus("failed"); // Or "idle" if you want to allow retry immediately without "failed" state blocking
+      toast.error(`Training failed: ${data.message || "Unknown error"}`);
     };
 
     socket.on(`training:progress:${organizationId}`, handleTrainingProgress);
     socket.on(`training:completed:${organizationId}`, handleTrainingCompleted);
+    socket.on(`training:error:${organizationId}`, handleTrainingError);
 
     return () => {
       socket.off(`training:progress:${organizationId}`, handleTrainingProgress);
       socket.off(`training:completed:${organizationId}`, handleTrainingCompleted);
+      socket.off(`training:error:${organizationId}`, handleTrainingError);
     };
   }, []);
 
 
   const handleTrain = async () => {
     try {
-      setLoading(true);
       setTrainingStatus("training");
 
       const chatbot_id = useUserStore.getState().userData?.chatbotId;

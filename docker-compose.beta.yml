@@ -1,0 +1,77 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/beta.conf:/etc/nginx/conf.d/default.conf
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot
+    depends_on:
+      - rtserver
+      - backendai
+    networks:
+      - rhinon-network
+
+  rtserver:
+    build:
+      context: ./rtserver
+      dockerfile: Dockerfile
+    container_name: rtserver
+    restart: always
+    expose:
+      - "5000"
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=5432
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - backendai
+      - redis
+    networks:
+      - rhinon-network
+
+  backendai:
+    build:
+      context: ./backendai
+      dockerfile: Dockerfile
+    container_name: backendai
+    restart: always
+    expose:
+      - "5002"
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=5432
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+    networks:
+      - rhinon-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    expose:
+      - "6379"
+    networks:
+      - rhinon-network
+
+networks:
+  rhinon-network:
+    driver: bridge
