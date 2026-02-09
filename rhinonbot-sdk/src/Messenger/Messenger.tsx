@@ -107,6 +107,9 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
     mainLoading,
   } = state;
 
+  // Shared state for external trigger detection
+  const [isExternalTrigger, setIsExternalTrigger] = useState(false);
+
   // Use screen navigation hook
   const {
     toggleChat,
@@ -121,6 +124,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
       setActiveScreen,
       setSelectedChatId,
       setIsSpeakingWithRealPerson,
+      setIsExternalTrigger,
     },
   });
 
@@ -155,6 +159,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
     adminTestingMode: config?.adminTestingMode,
     activeScreen,
     setShowNotification,
+    isExternalTrigger,
   });
 
   const {
@@ -206,48 +211,9 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
       selectedChatId &&
       lastFetchedConversationIdRef.current !== selectedChatId
     ) {
-      // Case 1: Transitioning from 'NEW_CHAT' to a real ID (new conversation getting assigned an ID)
-      // Don't fetch - we already have the messages in state
-      if (lastFetchedConversationIdRef.current === 'NEW_CHAT' && selectedChatId !== 'NEW_CHAT') {
-        console.log('New conversation assigned ID, skipping fetch:', selectedChatId);
-        lastFetchedConversationIdRef.current = selectedChatId;
-        return;
-      }
 
-      // Case 2: Switching to an existing conversation (not from 'NEW_CHAT')
-      // Do fetch - we need to load the conversation history
-      if (lastFetchedConversationIdRef.current && lastFetchedConversationIdRef.current !== 'NEW_CHAT') {
-        console.log('Switching to existing conversation, fetching:', selectedChatId);
-        lastFetchedConversationIdRef.current = selectedChatId;
-        fetchChats();
-        return;
-      }
-
-      // Case 3: Ref is null/undefined and selectedChatId is not 'NEW_CHAT'
-      // This could be either:
-      // - Initial load with existing conversation (need to fetch)
-      // - New conversation getting first ID (don't fetch - messages already in state)
-      // Use chatMessages length to determine: if messages exist, it's a new conversation getting ID
-      if (!lastFetchedConversationIdRef.current && selectedChatId !== 'NEW_CHAT') {
-        // If we have messages (more than just the initial greeting), this is a new conversation getting ID
-        // Don't fetch - we already have the conversation in state
-        if (chatMessages.length > 1) {
-          console.log('New conversation getting first ID (ref was null), skipping fetch:', selectedChatId);
-          lastFetchedConversationIdRef.current = selectedChatId;
-          return;
-        }
-
-        // If we have no messages or just initial greeting, this is loading an existing conversation
-        // Do fetch - we need to load the conversation history
-        console.log('Initial load with existing conversation, fetching:', selectedChatId);
-        lastFetchedConversationIdRef.current = selectedChatId;
-        fetchChats();
-        return;
-      }
-
-      // Case 4: Other transitions (e.g., initial load with 'NEW_CHAT')
-      // Update ref without fetching
       lastFetchedConversationIdRef.current = selectedChatId;
+      fetchChats();
     }
   }, [selectedChatId]);
 

@@ -667,20 +667,20 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
     setShowNotification(false);
   }, [showNotification]);
 
-  if (isfetching || mainLoading) {
-    return (
-      <div
-        style={{
-          height: '100%',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <Loader />
-      </div>
-    );
-  }
+  // if (isfetching || mainLoading) {
+  //   return (
+  //     <div
+  //       style={{
+  //         height: '100%',
+  //         display: 'flex',
+  //         justifyContent: 'center',
+  //         alignItems: 'center',
+  //       }}
+  //     >
+  //       <Loader />
+  //     </div>
+  //   );
+  // }
 
   return (
     <div

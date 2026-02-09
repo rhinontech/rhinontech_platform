@@ -114,7 +114,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
     } else {
       setLoading(false);
     }
-  }, [userId, appId]);
+  }, [userId, appId, showNotification]);
 
   const handleSendMessage = (conversationId?: string) => {
     onNavigate('chats');

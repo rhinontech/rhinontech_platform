@@ -9,11 +9,13 @@ interface UseScreenNavigationProps {
     | 'setActiveScreen'
     | 'setSelectedChatId'
     | 'setIsSpeakingWithRealPerson'
-  >;
+  > & {
+    setIsExternalTrigger?: React.Dispatch<React.SetStateAction<boolean>>;
+  };
 }
 
 export function useScreenNavigation({ state }: UseScreenNavigationProps) {
-  const { setIsOpen, setActiveScreen, setSelectedChatId, setIsSpeakingWithRealPerson } = state;
+  const { setIsOpen, setActiveScreen, setSelectedChatId, setIsSpeakingWithRealPerson, setIsExternalTrigger } = state;
 
   // Toggle chat open/closed
   const toggleChat = useCallback(() => {
