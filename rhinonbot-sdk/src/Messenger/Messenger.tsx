@@ -40,6 +40,7 @@ import { themeVars } from '@/utils/theme';
 import useTracking from '@/utils/useTracking';
 import { useChatLogic } from '@src/screens/ChatScreen/useChatLogic';
 import { getSocketConversationsByUserId } from '@/services/chat/socketService';
+import { ChatHistoryScreen } from '@src/screens';
 
 interface MessengerProps {
   config?: RhinontechConfig | null;
@@ -125,6 +126,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
       setSelectedChatId,
       setIsSpeakingWithRealPerson,
       setIsExternalTrigger,
+      isChatHistory: chatbot_config?.isChatHistory,
     },
   });
 
@@ -564,7 +566,7 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
 
   // Check if bottom nav should be hidden
   const shouldHideBottomNav = (
-    (activeScreen === 'chats') ||
+    (activeScreen === 'chats' && selectedChatId) ||
     (activeScreen === 'news' && selectedNews) ||
     activeScreen === 'raiseTicket' ||
     (activeScreen === 'help' && selectedHelpArticle) ||
@@ -594,6 +596,20 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
       case 'chats':
         // Always show unified ChatScreen directly (like WhatsApp)
         // Use 'NEW_CHAT' if no conversation selected
+        if (!selectedChatId) {
+          return (
+            <ChatHistoryScreen
+              isFreePlan={freePlan}
+              onChatSelect={handleChatSelect}
+              setIsSpeakingWithRealPerson={setIsSpeakingWithRealPerson}
+              userId={userId}
+              appId={config?.app_id || ''}
+              chatbot_config={chatbot_config}
+              isAdmin={config?.admin}
+
+            />
+          )
+        }
         return (
           <ChatScreen
             isAdmin={config?.admin}

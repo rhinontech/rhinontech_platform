@@ -37,6 +37,7 @@ interface ThemeSettings {
   secondaryLogo: string;
   selectedPage: string;
   theme: 'light' | 'dark' | 'system';
+  isChatHistory: boolean;
 }
 
 export default function Theme() {
@@ -57,6 +58,7 @@ export default function Theme() {
       "https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png",
     selectedPage: "Home",
     theme: "system",
+    isChatHistory: true,
   });
   const [originalSettings, setOriginalSettings] = useState<ThemeSettings | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -92,6 +94,7 @@ export default function Theme() {
           "https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png",
         selectedPage: "Home",
         theme: config.theme ?? "system",
+        isChatHistory: config.isChatHistory ?? true,
       };
 
       setThemeSettings(settings);
