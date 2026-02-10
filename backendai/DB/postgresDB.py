@@ -177,8 +177,8 @@ def get_crm_db_connection():
     try:
         conn = psycopg2.connect(
             dbname=CRM_DB_NAME,
-            user=DB_USER,
-            password=DB_PASS,
+            user=DB_USERNAME,
+            password=DB_PASSWORD,
             host=DB_HOST,
             port=DB_PORT
         )

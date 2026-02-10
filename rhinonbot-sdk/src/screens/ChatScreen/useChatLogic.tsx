@@ -46,72 +46,7 @@ export const useChatLogic = ({
 }: any) => {
   const [conversation, setConversation] = useState<any>(null);
   const [message, setMessage] = useState('');
-  const [chatMessages, setChatMessages] = useState<Message[]>(() => {
-    if (conversationId === 'NEW_CHAT') {
-      if (isAdmin && adminTestingMode) {
-        return [
-          {
-            role: 'bot',
-            chatbot_id: appId,
-            timestamp: new Date().toISOString(),
-            user_email: userEmail,
-            user_id: userId,
-            text: 'Hello, how can I help you today?',
-          },
-        ];
-      } else if (isAdmin) {
-        return [
-          {
-            role: 'bot',
-            chatbot_id: appId,
-            timestamp: new Date().toISOString(),
-            user_email: userEmail,
-            user_id: userId,
-            text: 'Hello, how can I help you today?',
-          },
-          {
-            role: 'user',
-            chatbot_id: appId,
-            timestamp: new Date().toISOString(),
-            user_email: userEmail,
-            user_id: userId,
-            text: 'Hi, I just wanted to check if my recent order has been shipped.',
-          },
-          {
-            role: 'bot',
-            chatbot_id: appId,
-            timestamp: new Date().toISOString(),
-            user_email: userEmail,
-            user_id: userId,
-            text: 'Sure! Could you please share your order ID so I can look it up?',
-          },
-        ];
-      } else {
-        return [
-          {
-            role: 'bot',
-            chatbot_id: appId,
-            timestamp: new Date().toISOString(),
-            user_email: userEmail,
-            user_id: userId,
-            text: 'Hello, how can I help you today?',
-          },
-        ];
-      }
-    } else if (!conversationId) {
-      return [
-        {
-          role: 'bot',
-          chatbot_id: appId,
-          timestamp: new Date().toISOString(),
-          user_email: userEmail,
-          user_id: userId,
-          text: 'Hello, how can I help you today?',
-        },
-      ];
-    }
-    return [];
-  });
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [convoId, setConvoId] = useState(conversationId);
@@ -152,6 +87,8 @@ export const useChatLogic = ({
   useEffect(() => {
     setConvoId(conversationId);
   }, [conversationId]);
+
+
 
   useEffect(() => {
     const unlock = () => {
@@ -278,6 +215,10 @@ export const useChatLogic = ({
   // ====== Fetch chat history ======
   const fetchChats = async () => {
     setIsFetching(true);
+    setIsConversationClosed(false);
+    setIsConversationActive(true);
+    setIsSpeakingWithRealPerson(false);
+    console.log("fetchChats")
     //setChatMessages([]);
 
     const requestBody = {
@@ -374,7 +315,85 @@ export const useChatLogic = ({
           ]
           : chatHistory;
 
-      setChatMessages((prev) => [...prev, ...combinedHistory]);
+      // If we have socket history (real support), filter out the default greeting
+      if (socketHistory.length > 0) {
+        setChatMessages([...combinedHistory]);
+      } else {
+        // Determine initial messages based on conversation state
+        let initialMessages: Message[] = [];
+
+        if (conversationId === 'NEW_CHAT') {
+          if (isAdmin && adminTestingMode) {
+            initialMessages = [
+              {
+                role: 'bot',
+                chatbot_id: appId,
+                timestamp: new Date().toISOString(),
+                user_email: userEmail,
+                user_id: userId,
+                text: 'Hello, how can I help you today?',
+              },
+            ];
+          } else if (isAdmin) {
+            initialMessages = [
+              {
+                role: 'bot',
+                chatbot_id: appId,
+                timestamp: new Date().toISOString(),
+                user_email: userEmail,
+                user_id: userId,
+                text: 'Hello, how can I help you today?',
+              },
+              {
+                role: 'user',
+                chatbot_id: appId,
+                timestamp: new Date().toISOString(),
+                user_email: userEmail,
+                user_id: userId,
+                text: 'Hi, I just wanted to check if my recent order has been shipped.',
+              },
+              {
+                role: 'bot',
+                chatbot_id: appId,
+                timestamp: new Date().toISOString(),
+                user_email: userEmail,
+                user_id: userId,
+                text: 'Sure! Could you please share your order ID so I can look it up?',
+              },
+            ];
+          } else {
+            initialMessages = [
+              {
+                role: 'bot',
+                chatbot_id: appId,
+                timestamp: new Date().toISOString(),
+                user_email: userEmail,
+                user_id: userId,
+                text: 'Hello, how can I help you today?',
+              },
+            ];
+          }
+        } else {
+          initialMessages = [
+            {
+              role: 'bot',
+              chatbot_id: appId,
+              timestamp: new Date().toISOString(),
+              user_email: userEmail,
+              user_id: userId,
+              text: 'Hello, how can I help you today?',
+            },
+          ];
+        }
+
+        if (!(chatHistory.length > 0) && conversationId !== 'NEW_CHAT') {
+          setChatMessages((prev) => [...prev, ...combinedHistory])
+        } else {
+          setChatMessages([...initialMessages, ...combinedHistory]);
+        }
+
+
+      }
 
       if (combinedHistory.length > 0) {
         const lastMessage = combinedHistory[combinedHistory.length - 1];
@@ -410,8 +429,7 @@ export const useChatLogic = ({
         if (!firstTokenReceived) {
           setLoading(false); // Stop spinner immediately on first token
           playSound();
-          setShowNotification(true);
-
+          setIsConversationClosed(false);
           firstTokenReceived = true;
         }
         assistantResponse += token;
@@ -451,6 +469,7 @@ export const useChatLogic = ({
         // Mark loading complete on end event
         if (data?.event === 'end') {
           setLoading(false);
+          setShowNotification(true);
 
           // Force re-render with flag to trigger markdown parsing
           setChatMessages((prev) => {
@@ -753,7 +772,16 @@ export const useChatLogic = ({
 
     try {
       if (conversation?.id) {
+        if (socketRef.current) {
+          socketRef.current.emit('conversation:closed', {
+            chatbot_history: conversation.id,
+          });
+        }
+
         await closeSocketConversation(conversation.id);
+
+
+        setSupportName(chatbot_config.chatbotName);
       }
     } catch (error) {
       console.error('Error closing conversation on server', error);

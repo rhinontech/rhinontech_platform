@@ -250,6 +250,25 @@ module.exports = (io) => {
       }
     });
 
+    // Conversation Close Handler
+    socket.on("conversation:closed", async (data) => {
+      console.log("🔒 Conversation closed:", data);
+      const { chatbot_history, conversation_id } = data;
+
+      try {
+        
+        // Broadcast to all connected clients (including admin dashboard)
+        io.emit("conversation:closed", {
+          ...data,
+          chatbot_history: chatbot_history || conversation_id,
+        });
+
+        console.log("✅ Conversation close event broadcasted");
+      } catch (error) {
+        console.error("❌ Error handling conversation close:", error);
+      }
+    });
+
     // VOICE CALL HANDLER
 
     socket.on("register_manual", ({ callId, username }) => {

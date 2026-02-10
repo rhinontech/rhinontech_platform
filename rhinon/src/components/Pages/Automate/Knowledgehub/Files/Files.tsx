@@ -165,14 +165,25 @@ export default function Files() {
       setTrainingProgress(response.training_progress || 0);
       setTrainLoading(false);
       await getFiles(); // Refresh files
+      toast.success("Training completed successfully!");
+    };
+
+    const handleTrainingError = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      await getFiles(); // Refresh data to see if anything partially succeeded or to reset UI
+      setTrainingStatus("failed"); // Or "idle"
+      setTrainLoading(false);
+      toast.error(`Training failed: ${data.message || "Unknown error"}`);
     };
 
     socket.on(`training:progress:${organizationId}`, handleTrainingProgress);
     socket.on(`training:completed:${organizationId}`, handleTrainingCompleted);
+    socket.on(`training:error:${organizationId}`, handleTrainingError);
 
     return () => {
       socket.off(`training:progress:${organizationId}`, handleTrainingProgress);
       socket.off(`training:completed:${organizationId}`, handleTrainingCompleted);
+      socket.off(`training:error:${organizationId}`, handleTrainingError);
     };
   }, []);
 
@@ -226,15 +237,16 @@ export default function Files() {
       setUntrainedFilesCount((prev) => prev + 1);
       setIsTrained(false);
       setSelectedFile(null);
-      setUploadProgress(null);
+
     } catch (error) {
-      setUploadProgress(null);
-      clearInterval(progressInterval);
+
       console.error("Upload failed:", error);
       // message.error("Upload failed. Please try again.");
       toast.error("Failed to added file.");
 
     } finally {
+      setUploadProgress(null);
+      clearInterval(progressInterval);
       isLoading(false);
     }
   };
@@ -275,6 +287,7 @@ export default function Files() {
       }
 
       toast.success("File removed successfully.");
+
       // try {
       //   await trainAndSetAssistant(chatbotId);
       // } catch (trainError) {
@@ -478,7 +491,7 @@ export default function Files() {
                           <FileText className="h-5 w-5 text-destructive" />
                         </div>
                         <div>
-                          <h4 className="font-medium text-foreground">
+                          <h4 className="font-medium max-w-sm truncate text-foreground">
                             {file.originalName}
                           </h4>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -608,7 +621,7 @@ export default function Files() {
                       <FileText className="h-5 w-5 text-destructive" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-foreground">
+                      <h4 className="font-medium max-w-sm truncate text-foreground">
                         {selectedFile.name}
                       </h4>
                       <p className="text-sm text-muted-foreground">

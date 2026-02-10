@@ -34,7 +34,10 @@ const {
     groups,
     views,
     pipeline_stage_histories,
+    sequelize: crmSequelize, // Destructure the sequelize instance from crmdb
+    ...crmModels // Capture other models if needed, or just relying on direct imports
 } = require("../models/crm_models/crmdb");
+const crmdb = require("../models/crm_models/crmdb"); // Access full object for checks if needed
 const { Op } = require("sequelize");
 
 /**
@@ -78,6 +81,7 @@ exports.getStatus = async (req, res) => {
  */
 exports.addSeedData = async (req, res) => {
     const transaction = await sequelize.transaction();
+    const crmTransaction = await crmdb.sequelize.transaction();
 
     try {
         const organizationId = req.user.organization_id;
@@ -85,6 +89,7 @@ exports.addSeedData = async (req, res) => {
 
         if (!organizationId) {
             await transaction.rollback();
+            await crmTransaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: "Organization ID not found",
@@ -99,6 +104,7 @@ exports.addSeedData = async (req, res) => {
 
         if (existingCount > 0) {
             await transaction.rollback();
+            await crmTransaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: "Seed data already exists for this organization",
@@ -109,9 +115,9 @@ exports.addSeedData = async (req, res) => {
 
         // Create seed data for each feature
         summary.seo = await createSeedSEO(organizationId, transaction);
-        // summary.crm = await createSeedCRM(organizationId, userId, transaction);
+        summary.crm = await createSeedCRM(organizationId, userId, transaction, crmTransaction);
         summary.customers = await createSeedCustomers(organizationId, transaction);
-        // summary.customerPipeline = await createSeedCustomerPipeline(organizationId, userId, transaction);
+        summary.customerPipeline = await createSeedCustomerPipeline(organizationId, userId, transaction, crmTransaction);
         summary.tickets = await createSeedTickets(organizationId, userId, transaction);
         summary.chatbots = await createSeedChatbots(organizationId, transaction);
         summary.chatbotCampaigns = await createSeedChatbotCampaigns(organizationId, transaction);
@@ -130,6 +136,7 @@ exports.addSeedData = async (req, res) => {
         summary.notifications = await createSeedNotifications(organizationId, userId, transaction);
 
         await transaction.commit();
+        await crmTransaction.commit();
 
         return res.status(201).json({
             success: true,
@@ -138,6 +145,7 @@ exports.addSeedData = async (req, res) => {
         });
     } catch (error) {
         await transaction.rollback();
+        await crmTransaction.rollback();
         console.error("Error adding seed data:", error);
         return res.status(500).json({
             success: false,
@@ -153,12 +161,14 @@ exports.addSeedData = async (req, res) => {
  */
 exports.deleteSeedData = async (req, res) => {
     const transaction = await sequelize.transaction();
+    const crmTransaction = await crmdb.sequelize.transaction();
 
     try {
         const organizationId = req.user.organization_id;
 
         if (!organizationId) {
             await transaction.rollback();
+            await crmTransaction.rollback();
             return res.status(400).json({
                 success: false,
                 message: "Organization ID not found",
@@ -173,6 +183,7 @@ exports.deleteSeedData = async (req, res) => {
 
         if (seedRecords.length === 0) {
             await transaction.rollback();
+            await crmTransaction.rollback();
             return res.status(404).json({
                 success: false,
                 message: "No seed data found for this organization",
@@ -228,9 +239,16 @@ exports.deleteSeedData = async (req, res) => {
             if (recordsByTable[tableName]) {
                 const model = tableModelMap[tableName];
                 if (model) {
+                    // Determine which transaction to use
+                    // Check if model belongs to CRM DB
+                    // We can check if the model name is in known CRM models list or check model.sequelize
+                    const isCrmModel = [
+                        "companies", "peoples", "deals", "pipelines", "groups", "views", "pipeline_stage_histories"
+                    ].includes(tableName) || (model.options && model.options.sequelize === crmdb.sequelize);
+
                     await model.destroy({
                         where: { id: recordsByTable[tableName] },
-                        transaction
+                        transaction: isCrmModel ? crmTransaction : transaction
                     });
                     delete recordsByTable[tableName]; // Remove processed
                 }
@@ -241,9 +259,13 @@ exports.deleteSeedData = async (req, res) => {
         for (const [tableName, recordIds] of Object.entries(recordsByTable)) {
             const model = tableModelMap[tableName];
             if (model) {
+                const isCrmModel = [
+                    "companies", "peoples", "deals", "pipelines", "groups", "views", "pipeline_stage_histories"
+                ].includes(tableName);
+
                 await model.destroy({
                     where: { id: recordIds },
-                    transaction,
+                    transaction: isCrmModel ? crmTransaction : transaction,
                 });
             }
         }
@@ -255,6 +277,7 @@ exports.deleteSeedData = async (req, res) => {
         });
 
         await transaction.commit();
+        await crmTransaction.commit();
 
         return res.status(200).json({
             success: true,
@@ -264,6 +287,7 @@ exports.deleteSeedData = async (req, res) => {
         });
     } catch (error) {
         await transaction.rollback();
+        await crmTransaction.rollback();
         console.error("Error deleting seed data:", error);
         return res.status(500).json({
             success: false,
@@ -324,7 +348,7 @@ async function createSeedCustomers(organizationId, transaction) {
 /**
  * Create seed customer pipeline (Groups, Views, Pipelines, History)
  */
-async function createSeedCustomerPipeline(organizationId, userId, transaction) {
+async function createSeedCustomerPipeline(organizationId, userId, transaction, crmTransaction) {
     // 1. Fetch Customers
     const existingCustomers = await customers.findAll({
         where: { organization_id: organizationId },
@@ -332,6 +356,8 @@ async function createSeedCustomerPipeline(organizationId, userId, transaction) {
     });
 
     if (!existingCustomers.length) return {};
+    console.log('1');
+    console.log(existingCustomers[0]?.id);
 
     // 2. CHECK for EXISTING Pipeline (Default Customers) or Create New
     let pipeline = await pipelines.findOne({
@@ -339,24 +365,73 @@ async function createSeedCustomerPipeline(organizationId, userId, transaction) {
             organization_id: organizationId,
             pipeline_manage_type: "default_customers"
         },
-        transaction
+        transaction: crmTransaction
     });
+    console.log('2');
 
     let view, group;
 
     if (pipeline) {
         // Use existing pipeline steps
+
+        console.log('3');
         console.log("Found existing pipeline:", pipeline.id);
+
+        if (pipeline.stages && pipeline.stages.length > 0) {
+            let updatedStages = JSON.parse(JSON.stringify(pipeline.stages));
+
+            // Track used customer IDs to ensure uniqueness (though we iterate the list once)
+            // We'll distribute ALL existing customers
+
+            for (const customer of existingCustomers) {
+                const customerId = customer.id;
+
+                // Pick a random stage
+                const randomStageIndex = Math.floor(Math.random() * updatedStages.length);
+                const stage = updatedStages[randomStageIndex];
+
+                if (!stage.entities) {
+                    stage.entities = [];
+                }
+
+                // Check if already present (sanity check, though we are iterating distinct customers)
+                const alreadyExists = stage.entities.some(e => e.entity_id === customerId && e.entity_type === "default_customers");
+
+                if (!alreadyExists) {
+                    stage.entities.push({
+                        entity_id: customerId,
+                        entity_type: "default_customers",
+                        sort: 0 // You might want to increment this
+                    });
+                }
+            }
+
+            // Update the pipeline with new stages data
+            await pipelines.update({
+                stages: updatedStages
+            }, {
+                where: { id: pipeline.id },
+                transaction: crmTransaction
+            });
+
+            // Update the local pipeline object so downstream logic works with latest data if needed
+            pipeline.stages = updatedStages;
+            console.log("Updated pipeline stages with seeded customers");
+        }
     } else {
         // Create Group
+        console.log('4');
+
         group = await groups.create({
             organization_id: organizationId,
             created_by: userId,
             group_name: "Customer Pipeline Group",
             manage_type: "default_customers",
-        }, { transaction });
+        }, { transaction: crmTransaction });
+        console.log('5');
         await registerSeedData("groups", group.id, organizationId, transaction);
 
+        console.log('6');
         // Create View
         view = await views.create({
             organization_id: organizationId,
@@ -365,8 +440,12 @@ async function createSeedCustomerPipeline(organizationId, userId, transaction) {
             view_name: "Customer Pipeline",
             view_manage_type: "default_customers",
             view_type: "pipeline",
-        }, { transaction });
+        }, { transaction: crmTransaction });
+
+        console.log('7')
         await registerSeedData("views", view.id, organizationId, transaction);
+
+        console.log('8');
 
         // Create Pipeline
         pipeline = await pipelines.create({
@@ -381,8 +460,10 @@ async function createSeedCustomerPipeline(organizationId, userId, transaction) {
                 { id: 4, name: "Active", color: "#10B981" },
                 { id: 5, name: "Churned", color: "#EF4444" }
             ]
-        }, { transaction });
+        }, { transaction: crmTransaction });
+        console.log('9');
         await registerSeedData("pipelines", pipeline.id, organizationId, transaction);
+        console.log('10');
     }
 
     // 3. Add Histories
@@ -417,8 +498,10 @@ async function createSeedCustomerPipeline(organizationId, userId, transaction) {
             moved_by: userId,
             moved_at: new Date(),
             duration_in_stage: 0
-        }, { transaction });
+        }, { transaction: crmTransaction });
+        console.log('11');
         await registerSeedData("pipeline_stage_histories", history.id, organizationId, transaction);
+        console.log('12');
         historiesCreated++;
     }
 
@@ -449,28 +532,41 @@ async function createSeedTickets(organizationId, userId, transaction) {
             description: "I'm having trouble logging into my account. Password reset doesn't work.",
             status: "Open",
             priority: "High",
-            conversation: [{ role: "support", text: "I'm looking into your login issue.", timestamp: new Date().toISOString() }]
+            conversations: [{ role: "support", text: "I'm looking into your login issue.", timestamp: new Date().toISOString() }]
         },
         {
             title: "Billing inquiry",
             description: "I was charged twice this month. Please help.",
             status: "Pending",
             priority: "Medium",
-            conversation: [{ role: "support", text: "Please provide your transaction ID.", timestamp: new Date().toISOString() }]
+            conversations: [{ role: "support", text: "Please provide your transaction ID.", timestamp: new Date().toISOString() }]
         },
         {
             title: "Account upgrade",
             description: "How do I upgrade to the premium plan?",
             status: "Closed",
             priority: "Low",
-            conversation: [{ role: "support", text: "This feature is on our roadmap.", timestamp: new Date().toISOString() }]
+            conversations: [{ role: "support", text: "This feature is on our roadmap.", timestamp: new Date().toISOString() }]
         },
         {
             title: "Data export not working",
             description: "Trying to export my data but getting an error.",
             status: "Pending",
             priority: "High",
-            conversation: [{ role: "support", text: "We have reproduced the bug.", timestamp: new Date().toISOString() }]
+            conversations: [{ role: "support", text: "We have reproduced the bug.", timestamp: new Date().toISOString() }]
+        },
+        {
+            title: "Unable to reset password",
+            description: "Password reset email is not being received even after multiple attempts.",
+            status: "Open",
+            priority: "Medium",
+            conversations: [
+                {
+                    role: "support",
+                    text: "We are checking the email delivery logs and will update you shortly.",
+                    timestamp: new Date().toISOString()
+                }
+            ]
         },
     ];
 
@@ -652,32 +748,140 @@ async function createSeedKnowledgeBase(organizationId, transaction) {
         {
             folder_id: folderIds[0],
             title: "Welcome to Rhinon",
-            content: "<p>This guide will help you get started with the platform.</p>",
+            content: `<h2>Getting Started with Rhinon</h2>
+<p>
+  Welcome to <strong>Rhinon</strong>, your all-in-one platform for managing conversations,
+  customers, and workflows in one place.<br>
+  This guide is designed to help you quickly understand the core features
+  and start using the platform with confidence.
+</p>
+
+<p>
+  From setting up your first chatbot to tracking visitor activity,
+  Rhinon makes it easy to stay connected with your audience.<br>
+  Use the dashboard to monitor performance, manage leads,
+  and automate repetitive tasks efficiently.
+</p>
+
+<p>
+  <strong>Tip:</strong> Explore the settings section to customize Rhinon
+  based on your business needs and goals.
+</p>`,
         },
         {
             folder_id: folderIds[0],
             title: "Setting up your account",
-            content: "<p>Learn how to configure your account settings.</p>",
+            content: `<h2>Setting up your account</h2>
+                <p>
+                Setting up your account is a simple process.Follow these steps to get started:
+</p>
+
+<ol>
+  <li>
+    <strong>Sign up:</strong> Create an account by providing your email address and a secure password.
+  </li>
+  <li>
+    <strong>Verify your email:</strong> Check your inbox for a verification email and click the link to confirm your account.
+  </li>
+  <li>
+    <strong>Set up your profile:</strong> Add your name, company, and other relevant information to your profile.
+  </li>
+  <li>
+    <strong>Customize your dashboard:</strong> Choose the features you want to use and customize your dashboard to suit your needs.
+  </li>
+</ol>
+
+<p>
+  <strong>Tip:</strong> If you need help setting up your account, contact our support team for assistance.
+</p>`,
         },
         {
             folder_id: folderIds[1],
             title: "How do I reset my password?",
-            content: "<p>Follow these steps to reset your password...</p>",
+            content: `<h3>Resetting Your Password</h3>
+<p>
+  If you’ve forgotten your password, don’t worry — resetting it is quick and easy.<br>
+  Just follow the steps below to regain access to your account.
+</p>
+
+<p>
+  <strong>Step 1:</strong> Go to the login page and click on the <strong>“Forgot Password”</strong> link.<br>
+  <strong>Step 2:</strong> Enter your registered email address and submit the form.<br>
+  <strong>Step 3:</strong> Check your inbox for the password reset email and click the link provided.
+</p>
+
+<p>
+  After creating a new password, you can log in immediately.<br>
+  <strong>Tip:</strong> Choose a strong password that you haven’t used before to keep your account secure.
+</p>
+`,
         },
         {
             folder_id: folderIds[1],
             title: "What are the pricing plans?",
-            content: "<p>We offer several plans to fit your needs...</p>",
+            content: `<h3>Understanding Our Pricing Plans</h3>
+<p>
+  We offer flexible pricing plans designed to suit businesses of all sizes.<br>
+  Whether you’re just getting started or scaling a growing team, there’s a plan for you.
+</p>
+
+<p>
+  <strong>Free Plan:</strong> Ideal for individuals and small teams exploring the platform.<br>
+  <strong>Starter Plan:</strong> Best for startups that need core features and basic support.<br>
+  <strong>Pro Plan:</strong> Perfect for growing businesses that require advanced tools and higher limits.
+</p>
+
+<p>
+  Each plan includes access to essential features like chat management,
+  analytics, and integrations.<br>
+  <strong>Note:</strong> You can upgrade, downgrade, or cancel your plan at any time from your account settings.
+</p>
+`,
         },
         {
             folder_id: folderIds[2],
             title: "API Authentication",
-            content: "<p>Learn how to authenticate API requests...</p>",
+            content: `<h3>API Authentication Overview</h3>
+<p>
+  To securely access the Rhinon API, all requests must be authenticated.<br>
+  Authentication ensures that only authorized applications can interact
+  with your data and perform actions on your behalf.
+</p>
+
+<p>
+  <strong>Authentication Method:</strong> API Key–based authentication is used for all requests.<br>
+  Include your API key in the request headers with each API call.
+</p>
+
+<p>
+  Keep your API keys private and never expose them in client-side code.<br>
+  <strong>Tip:</strong> You can generate and rotate API keys anytime from the developer settings in your dashboard.
+</p>
+`,
         },
         {
             folder_id: folderIds[2],
             title: "Rate Limits",
-            content: "<p>Understand API rate limits and best practices...</p>",
+            content: `<h3>API Rate Limits Explained</h3>
+<p>
+  To ensure fair usage and maintain platform stability, API requests are
+  subject to rate limits.<br>
+  Rate limits define the maximum number of requests that can be made within
+  a specific time window.
+</p>
+
+<p>
+  <strong>How it works:</strong> Each API key has predefined request limits
+  based on your subscription plan.<br>
+  When the limit is exceeded, the API will temporarily block further requests
+  and return a rate limit error response.
+</p>
+
+<p>
+  To avoid interruptions, implement retry logic and monitor response headers.<br>
+  <strong>Best practice:</strong> Batch requests whenever possible and avoid unnecessary polling.
+</p>
+`,
         },
     ];
 
@@ -998,31 +1202,120 @@ async function createSeedChatbotCampaigns(organizationId, transaction) {
 
     const campaigns = [
         {
-            name: "Welcome Message",
             type: "recurring",
             status: "active",
+            name: "Welcome Campaign",
             content: {
-                template: "welcome",
-                heading: "Welcome! How can we help you today?",
-                buttons: ["Get Started", "Learn More"],
+                "media": null,
+                "layout": "heading-buttons",
+                "buttons": [
+                    {
+                        "url": "#",
+                        "text": "Book a Demo",
+                        "style": "secondary",
+                        "actionType": "open-url"
+                    }
+                ],
+                "heading": "👋 Welcome! How can we help you today?",
+                "hasImage": false,
+                "subheading": "",
+                "templateId": "2c3d5e70-9bfa-4bd1-a238-3a7f7d2a7c02"
             },
             targeting: {
-                visitor_type: "new",
-                triggers: ["page_load"],
+                "rules": {
+                    "matchType": "match-all",
+                    "conditions": [
+                        {
+                            "field": "current-page-url",
+                            "value": "",
+                            "operator": "contains"
+                        }
+                    ]
+                },
+                "trigger": {
+                    "type": "time-on-page",
+                    "unit": "seconds",
+                    "value": 10
+                },
+                "visitorType": "all"
             },
         },
         {
-            name: "Promo Campaign",
-            type: "one-time",
+            type: "recurring",
             status: "draft",
+            name: "Discount Offer Campaign",
             content: {
-                template: "promo",
-                heading: "Special Offer: 20% Off!",
-                buttons: ["Claim Offer", "Maybe Later"],
+                media: null,
+                layout: "image-heading-buttons",
+                buttons: [
+                    {
+                        url: "#",
+                        text: "Get 10% Off",
+                        style: "primary",
+                        actionType: "open-url"
+                    }
+                ],
+                heading: "🎉 Special Offer Just for You!",
+                hasImage: false,
+                subheading: "Enjoy a limited-time discount on your first purchase.",
+                templateId: "7f1a2b44-6cde-4a91-9a3f-1c2d9e8a4f10"
             },
             targeting: {
-                visitor_type: "returning",
-                triggers: ["exit_intent"],
+                rules: {
+                    matchType: "match-any",
+                    conditions: [
+                        {
+                            field: "current-page-url",
+                            value: "/pricing",
+                            operator: "contains"
+                        }
+                    ]
+                },
+                trigger: {
+                    type: "scroll-depth",
+                    unit: "percent",
+                    value: 50
+                },
+                visitorType: "new"
+            },
+        },
+        {
+            type: "one-time",
+            status: "draft",
+            name: "Offer Campaign",
+            content: {
+                "media": null,
+                "layout": "heading-buttons",
+                "buttons": [
+                    {
+                        "url": "#",
+                        "text": "New Button",
+                        "style": "secondary",
+                        "actionType": "open-url"
+                    }
+                ],
+                "heading": "Special Offer: 20% Off!",
+                "hasImage": false,
+                "subheading": "",
+                "templateId": "2c3d5e70-9bfa-4bd1-a238-3a7f7d2a7c02"
+            },
+            targeting: {
+                "rules": {
+                    "matchType": "match-all",
+                    "conditions": [
+                        {
+                            "field": "current-page-url",
+                            "value": "",
+                            "operator": "contains"
+                        }
+                    ]
+                },
+                "trigger": {
+                    "type": "time-on-page",
+                    "unit": "seconds",
+                    "value": 13
+                },
+                "visitorType": "all"
             },
         },
     ];
@@ -1070,7 +1363,7 @@ async function createSeedLiveVisitors(organizationId, transaction) {
             country: "United States",
             latitude: 37.7749,
             longitude: -122.4194,
-            is_online: true,
+            is_online: false,
         },
         {
             visitor_id: `visitor_seed_${Date.now()}_002`,
@@ -1087,10 +1380,52 @@ async function createSeedLiveVisitors(organizationId, transaction) {
             is_online: false,
         },
         {
-            chatbot_id: "seed_bot_2",
             visitor_id: `visitor_seed_${Date.now()}_003`,
-            visitor_email: null,
+            visitor_email: "visitor3@example.com",
             room: `room_seed_${Date.now()}_003`,
+            socket_id: "socket_seed_003",
+            chatbot_id: chatbot_id,
+            ip_address: "192.168.1.102",
+            city: "Los Angeles",
+            region: "California",
+            country: "United States",
+            latitude: 34.0522,
+            longitude: -118.2437,
+            is_online: false,
+        },
+        {
+            visitor_id: `visitor_seed_${Date.now()}_004`,
+            visitor_email: "visitor4@example.com",
+            room: `room_seed_${Date.now()}_004`,
+            socket_id: "socket_seed_004",
+            chatbot_id: chatbot_id,
+            ip_address: "192.168.1.103",
+            city: "Chicago",
+            region: "Illinois",
+            country: "United States",
+            latitude: 41.8781,
+            longitude: -87.6298,
+            is_online: false,
+        },
+        {
+            visitor_id: `visitor_seed_${Date.now()}_005`,
+            visitor_email: "visitor5@example.com",
+            room: `room_seed_${Date.now()}_005`,
+            socket_id: "socket_seed_005",
+            chatbot_id: chatbot_id,
+            ip_address: "192.168.1.104",
+            city: "Seattle",
+            region: "Washington",
+            country: "United States",
+            latitude: 47.6062,
+            longitude: -122.3321,
+            is_online: false,
+        },
+        {
+            chatbot_id: "seed_bot_2",
+            visitor_id: `visitor_seed_${Date.now()}_007`,
+            visitor_email: null,
+            room: `room_seed_${Date.now()}_007`,
             socket_id: "socket_seed_003",
             ip_address: "192.168.1.102",
             city: "London",
@@ -1098,7 +1433,7 @@ async function createSeedLiveVisitors(organizationId, transaction) {
             country: "United Kingdom",
             latitude: 51.5074,
             longitude: -0.1278,
-            is_online: true,
+            is_online: false,
         },
     ];
 
@@ -1470,7 +1805,7 @@ async function createSeedSEO(organizationId, transaction) {
 /**
  * Create seed CRM data (companies, deals, peoples, pipelines)
  */
-async function createSeedCRM(organizationId, userId, transaction) {
+async function createSeedCRM(organizationId, userId, transaction, crmTransaction) {
     // Create companies
     const companyData = [
         {
@@ -1497,6 +1832,22 @@ async function createSeedCRM(organizationId, userId, transaction) {
             size: "500+",
             location: "New York, NY",
         },
+        {
+            name: "Apex Solutions",
+            domain: "apexsolutions.io",
+            website: "https://apexsolutions.io",
+            industry: "Technology Services",
+            size: "200–500",
+            location: "San Francisco, CA",
+        },
+        {
+            name: "BrightWave Marketing",
+            domain: "brightwavemarketing.com",
+            website: "https://brightwavemarketing.com",
+            industry: "Digital Marketing",
+            size: "50–200",
+            location: "Austin, TX",
+        },
     ];
 
     const companyIds = [];
@@ -1507,7 +1858,7 @@ async function createSeedCRM(organizationId, userId, transaction) {
                 created_by: userId,
                 ...data,
             },
-            { transaction }
+            { transaction: crmTransaction }
         );
         await registerSeedData("companies", company.id, organizationId, transaction);
         companyIds.push(company.id);
@@ -1553,7 +1904,7 @@ async function createSeedCRM(organizationId, userId, transaction) {
                 created_by: userId,
                 ...data,
             },
-            { transaction }
+            { transaction: crmTransaction }
         );
         await registerSeedData("peoples", person.id, organizationId, transaction);
         peopleIds.push(person.id);
@@ -1564,8 +1915,8 @@ async function createSeedCRM(organizationId, userId, transaction) {
         organization_id: organizationId,
         created_by: userId,
         group_name: "Sales",
-        manage_type: "deal",
-    }, { transaction });
+        manage_type: "company",
+    }, { transaction: crmTransaction });
     await registerSeedData("groups", group.id, organizationId, transaction);
 
     // Create View
@@ -1573,11 +1924,22 @@ async function createSeedCRM(organizationId, userId, transaction) {
         organization_id: organizationId,
         created_by: userId,
         group_id: group.id,
-        view_name: "All Deals",
-        view_manage_type: "deal",
+        view_name: "pipeline",
+        view_manage_type: "company",
         view_type: "pipeline", // changed from 'list'
-    }, { transaction });
+    }, { transaction: crmTransaction });
     await registerSeedData("views", view.id, organizationId, transaction);
+
+    const view2 = await views.create({
+        organization_id: organizationId,
+        created_by: userId,
+        group_id: group.id,
+        view_name: "All Companies",
+        view_manage_type: "company",
+        view_type: "table", // changed from 'list'
+        table_columns: [{ key: "name", label: "Company Name", visible: true }],
+    }, { transaction: crmTransaction });
+    await registerSeedData("views", view2.id, organizationId, transaction);
 
     // Create pipeline
     const pipeline = await pipelines.create(
@@ -1585,17 +1947,17 @@ async function createSeedCRM(organizationId, userId, transaction) {
             organization_id: organizationId,
             view_id: view.id,
             name: "Sales Pipeline",
-            pipeline_manage_type: "deal",
+            pipeline_manage_type: "company",
             stages: [
-                { id: 1, name: "Lead", color: "#EFF6FF", order: 0, entities: [] },
-                { id: 2, name: "Qualified", color: "#F5F3FF", order: 1, entities: [] },
-                { id: 3, name: "Proposal", color: "#ECFDF5", order: 2, entities: [] },
+                { id: 1, name: "Lead", color: "#EFF6FF", order: 0, entities: [{ entity_id: companyIds[0], entity_type: "company" }, { entity_id: companyIds[4], entity_type: "company" }] },
+                { id: 2, name: "Qualified", color: "#F5F3FF", order: 1, entities: [{ entity_id: companyIds[1], entity_type: "company" }] },
+                { id: 3, name: "Proposal", color: "#ECFDF5", order: 2, entities: [{ entity_id: companyIds[2], entity_type: "company" }, { entity_id: companyIds[3], entity_type: "company" }] },
                 { id: 4, name: "Negotiation", color: "#FEFCE8", order: 3, entities: [] },
                 { id: 5, name: "Closed Won", color: "#ECFDF5", order: 4, entities: [] },
             ],
             created_by: userId,
         },
-        { transaction }
+        { transaction: crmTransaction }
     );
     await registerSeedData("pipelines", pipeline.id, organizationId, transaction);
 
@@ -1659,7 +2021,7 @@ async function createSeedCRM(organizationId, userId, transaction) {
                 created_by: userId,
                 ...data,
             },
-            { transaction }
+            { transaction: crmTransaction }
         );
         await registerSeedData("deals", deal.id, organizationId, transaction);
         dealIds.push(deal.id);
@@ -1683,7 +2045,7 @@ async function createSeedCRM(organizationId, userId, transaction) {
                 moved_by: userId,
                 moved_at: new Date(),
                 duration_in_stage: 0
-            }, { transaction });
+            }, { transaction: crmTransaction });
             await registerSeedData("pipeline_stage_histories", history.id, organizationId, transaction);
         }
     }

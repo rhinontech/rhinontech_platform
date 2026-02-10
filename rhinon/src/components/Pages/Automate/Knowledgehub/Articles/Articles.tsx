@@ -150,14 +150,25 @@ export default function Articles() {
       setTrainingProgress(response.training_progress || 0);
       setTrainLoading(false);
       await getArticle(); // Refresh articles
+      toast.success("Training completed successfully!");
+    };
+
+    const handleTrainingError = async (data: any) => {
+      if (data.organization_id !== organizationId) return;
+      await getArticle(); // Refresh data to see if anything partially succeeded or to reset UI
+      setTrainingStatus("failed"); // Or "idle"
+      setTrainLoading(false);
+      toast.error(`Training failed: ${data.message || "Unknown error"}`);
     };
 
     socket.on(`training:progress:${organizationId}`, handleTrainingProgress);
     socket.on(`training:completed:${organizationId}`, handleTrainingCompleted);
+    socket.on(`training:error:${organizationId}`, handleTrainingError);
 
     return () => {
       socket.off(`training:progress:${organizationId}`, handleTrainingProgress);
       socket.off(`training:completed:${organizationId}`, handleTrainingCompleted);
+      socket.off(`training:error:${organizationId}`, handleTrainingError);
     };
   }, []);
 
@@ -267,13 +278,14 @@ export default function Articles() {
       setArticles(updatedArticles);
       handleCloseModal();
       toast.success("Article added successfully.");
+      setIsTrained(false);
+      setUntrainedArticlesCount((pre) => pre + 1);
       // try {
       //   await trainAndSetAssistant(chatbotId);
       // } catch (trainError) {
       //   console.error("Failed to retrain chatbot after upload:", trainError);
       //   toast.error("Article addedd, but retraining failed.");
       // }
-      setUntrainedArticlesCount((prev) => prev + 1);
       setIsTrained(false);
     } catch (error) {
       console.error("Failed to add article:", error);

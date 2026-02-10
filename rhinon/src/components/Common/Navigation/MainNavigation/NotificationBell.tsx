@@ -146,25 +146,25 @@ export function NotificationBell() {
                                     key={notif.id}
                                     className={`p-4 border-b hover:bg-muted/50 transition-colors ${notif.type === "call" ? "bg-red-50 dark:bg-red-950/10" : ""
                                         }`}>
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex-1 space-y-1">
-                                            <div className="flex items-center gap-2">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1 min-w-0 space-y-1">
+                                            <div className="flex items-start gap-2">
                                                 {notif.type === "call" && (
-                                                    <Phone className="h-3 w-3 text-red-500 animate-pulse" />
+                                                    <Phone className="h-3 w-3 text-red-500 animate-pulse flex-shrink-0 mt-0.5" />
                                                 )}
-                                                <p className="text-sm font-medium leading-none">
+                                                <p className="text-sm font-medium leading-tight break-words">
                                                     {notif.title}
                                                 </p>
                                             </div>
-                                            <p className="text-xs text-muted-foreground line-clamp-2">
+                                            <p className="text-xs text-muted-foreground break-words line-clamp-3">
                                                 {notif.message}
                                             </p>
-                                            <span className="text-[10px] text-muted-foreground">
+                                            <span className="text-[10px] text-muted-foreground block">
                                                 {new Date(notif.created_at).toLocaleTimeString()}
                                             </span>
                                         </div>
                                         {notif.type === "call" ? (
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 flex-shrink-0">
                                                 <Button
                                                     size="sm"
                                                     className="bg-green-600 hover:bg-green-700 h-8"
@@ -183,7 +183,7 @@ export function NotificationBell() {
                                                 </Button>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 flex-shrink-0">
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"

@@ -210,6 +210,16 @@ async def ingest_to_vector_db_async(
     except Exception as e:
         logging.error(f"❌ Training job {job_id} failed: {e}")
         logging.error(f"Traceback:", exc_info=True)
+        
+        # Fallback: Update DB directly in case webhook fails
+        try:
+             def mark_failed():
+                with get_db_connection() as conn:
+                    run_query(conn, "UPDATE automations SET training_status='failed', training_message=%s WHERE organization_id=%s", (str(e), organization_id))
+             await asyncio.to_thread(mark_failed)
+        except Exception as db_err:
+             logging.error(f"Failed to update DB status to failed: {db_err}")
+
         await send_webhook(
             webhook_url, organization_id, 'failed', 0, f"Training error: {str(e)}", str(e)
         )
