@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronsUpDown, Check } from "lucide-react";
+import Cookies from "js-cookie";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,8 +22,6 @@ export interface Env {
   DB_HOST: string;
   DB_PORT: string;
   DB_NAME: string;
-  DB_USERNAME: string;
-  DB_PASSWORD: string;
 }
 
 interface EnvSwitcherProps {
@@ -32,6 +31,22 @@ interface EnvSwitcherProps {
 export function EnvSwitcher({ envs }: EnvSwitcherProps) {
   const { isMobile } = useSidebar();
   const [activeEnv, setActiveEnv] = React.useState<Env>(envs[0]);
+
+  React.useEffect(() => {
+    const savedEnvName = Cookies.get("NEXT_ADMIN_ENV");
+    if (savedEnvName) {
+      const foundEnv = envs.find((e) => e.name === savedEnvName);
+      if (foundEnv) {
+        setActiveEnv(foundEnv);
+      }
+    }
+  }, [envs]);
+
+  const handleEnvChange = (env: Env) => {
+    Cookies.set("NEXT_ADMIN_ENV", env.name);
+    setActiveEnv(env);
+    window.location.reload();
+  };
 
   return (
     <SidebarMenu className="w-fit">
@@ -66,7 +81,7 @@ export function EnvSwitcher({ envs }: EnvSwitcherProps) {
             {envs.map((env, index) => (
               <DropdownMenuItem
                 key={env.name}
-                onClick={() => setActiveEnv(env)}
+                onClick={() => handleEnvChange(env)}
                 className="gap-2 p-2"
               >
                 <div className="flex size-6 items-center justify-center rounded-sm border">

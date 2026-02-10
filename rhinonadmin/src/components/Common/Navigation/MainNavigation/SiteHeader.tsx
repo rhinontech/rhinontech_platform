@@ -13,28 +13,16 @@ export function SiteHeader() {
 
   const envs: Env[] = [
     {
-      name: "Development",
-      DB_HOST: process.env.NEXT_PUBLIC_DEV_DB_HOST || "localhost",
-      DB_PORT: process.env.NEXT_PUBLIC_DEV_DB_PORT || "5432",
-      DB_NAME: process.env.NEXT_PUBLIC_DEV_DB_NAME || "rhinontech_local",
-      DB_USERNAME: process.env.NEXT_PUBLIC_DEV_DB_USERNAME || "postgres",
-      DB_PASSWORD: process.env.NEXT_PUBLIC_DEV_DB_PASSWORD || "postgres",
-    },
-    {
       name: "Beta",
       DB_HOST: process.env.NEXT_PUBLIC_BETA_DB_HOST || "",
       DB_PORT: process.env.NEXT_PUBLIC_BETA_DB_PORT || "5432",
       DB_NAME: process.env.NEXT_PUBLIC_BETA_DB_NAME || "",
-      DB_USERNAME: process.env.NEXT_PUBLIC_BETA_DB_USERNAME || "postgres",
-      DB_PASSWORD: process.env.NEXT_PUBLIC_BETA_DB_PASSWORD || "",
     },
     {
       name: "Production",
       DB_HOST: process.env.NEXT_PUBLIC_PROD_DB_HOST || "",
       DB_PORT: process.env.NEXT_PUBLIC_PROD_DB_PORT || "5432",
       DB_NAME: process.env.NEXT_PUBLIC_PROD_DB_NAME || "",
-      DB_USERNAME: process.env.NEXT_PUBLIC_PROD_DB_USERNAME || "postgres",
-      DB_PASSWORD: process.env.NEXT_PUBLIC_PROD_DB_PASSWORD || "",
     },
   ];
 

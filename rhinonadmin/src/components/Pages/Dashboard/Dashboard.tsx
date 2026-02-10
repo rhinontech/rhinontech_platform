@@ -30,12 +30,26 @@ interface User {
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     fetchUser();
+    fetchStats();
   }, []);
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch("/api/dashboard/stats");
+      if (res.ok) {
+        const data = await res.json();
+        setTotalUsers(data.totalUsers);
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
 
   const fetchUser = async () => {
     try {
@@ -98,7 +112,9 @@ export default function Dashboard() {
                   <Users className="h-4 w-4 text-gray-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">2,345</div>
+                  <div className="text-2xl font-bold">
+                    {totalUsers !== null ? totalUsers : "..."}
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     +12% from last month
                   </p>
