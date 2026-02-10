@@ -193,6 +193,7 @@ export function useMessengerState(
               preChatForm: formResponse.pre_chat_form,
               postChatForm: formResponse.post_chat_form,
               ticketForm: formResponse.ticket_form,
+              isChatHistory: cfg.isChatHistory,
             },
           });
         } catch (err) {
@@ -270,11 +271,16 @@ export function useMessengerState(
           new Date(a.last_chat_time).getTime(),
       );
 
-      setSelectedChatId(
-        sortedConversations.length > 0
-          ? sortedConversations[0].conversation_id
-          : 'NEW_CHAT',
-      );
+      if (!chatbot_config.isChatHistory) {
+        setSelectedChatId(
+          sortedConversations.length > 0
+            ? sortedConversations[0].conversation_id
+            : 'NEW_CHAT',
+        );
+
+      }
+
+
 
       if (sortedConversations.length > 0) {
         const resultSocket = await getSocketConversationsByUserId(

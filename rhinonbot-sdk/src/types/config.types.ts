@@ -21,6 +21,7 @@ export interface ChatbotConfig {
   postChatForm?: PostChatFormConfig;
   ticketForm?: FormField[];
   selectedPage?: string; // For admin preview mode
+  isChatHistory?:boolean;
 }
 
 export interface FormField {
