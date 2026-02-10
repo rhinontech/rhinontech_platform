@@ -34,6 +34,7 @@ interface ThemeSettings {
   primaryLogo: string;
   secondaryLogo: string;
   theme: 'light' | 'dark' | 'system';
+  isChatHistory:boolean;
 }
 
 interface CollapsibleSectionProps {
@@ -507,6 +508,23 @@ export default function CollapsibleSection({
               onChange={(e) => updateGreeting(1, e.target.value)}
               placeholder="Enter introduction message"
               className="transition-colors focus:border-primary"
+            />
+          </div>
+
+          <Separator />
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Chat History</Label>
+              <p className="text-xs text-muted-foreground">
+                Enable chat history
+              </p>
+            </div>
+            <Switch
+              checked={themeSettings.isChatHistory}
+              onCheckedChange={(checked) =>
+                updateThemeSettings("isChatHistory", checked)
+              }
             />
           </div>
 

@@ -9,11 +9,14 @@ interface UseScreenNavigationProps {
     | 'setActiveScreen'
     | 'setSelectedChatId'
     | 'setIsSpeakingWithRealPerson'
-  >;
+  > & {
+    setIsExternalTrigger?: React.Dispatch<React.SetStateAction<boolean>>;
+    isChatHistory: boolean;
+  };
 }
 
 export function useScreenNavigation({ state }: UseScreenNavigationProps) {
-  const { setIsOpen, setActiveScreen, setSelectedChatId, setIsSpeakingWithRealPerson } = state;
+  const { setIsOpen, setActiveScreen, setSelectedChatId, setIsSpeakingWithRealPerson, setIsExternalTrigger, isChatHistory } = state;
 
   // Toggle chat open/closed
   const toggleChat = useCallback(() => {
@@ -41,9 +44,13 @@ export function useScreenNavigation({ state }: UseScreenNavigationProps) {
 
   // Go back to chat list
   const handleBackToChats = useCallback(() => {
-    // setSelectedChatId(null);
-    // setIsSpeakingWithRealPerson(false);
-    setActiveScreen('home');
+    if (isChatHistory) {
+      setSelectedChatId(null);
+      setIsSpeakingWithRealPerson(false);
+      setActiveScreen('chats');
+    } else {
+      setActiveScreen('home')
+    }
   }, [setSelectedChatId, setIsSpeakingWithRealPerson]);
 
   // Navigate to raise ticket screen

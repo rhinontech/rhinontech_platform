@@ -526,6 +526,44 @@ export default function Chats() {
 
     setMessages((prev) => [...prev, newMessage]);
 
+    // Update chat history for the user
+    const userEmail = selectedConversation.user_id;
+    if (userEmail) {
+      setChatHistoryByUser((prev) => {
+        const userHistory = prev[userEmail] ? [...prev[userEmail]] : [];
+
+        // Find the conversation to update
+        const historyIndex = userHistory.findIndex(
+          (c) => c.chatbot_history === selectedConversation.chatbot_history
+        );
+
+        if (historyIndex !== -1) {
+          const updatedConv = {
+            ...userHistory[historyIndex],
+            messages: [...(userHistory[historyIndex].messages || []), newMessage]
+          };
+          userHistory[historyIndex] = updatedConv;
+
+          // Sort user history to bring latest conversation to top
+          userHistory.sort((a, b) => {
+            const aLast = a.messages?.length
+              ? new Date(a.messages[a.messages.length - 1].timestamp).getTime()
+              : 0;
+            const bLast = b.messages?.length
+              ? new Date(b.messages[b.messages.length - 1].timestamp).getTime()
+              : 0;
+            return bLast - aLast;
+          });
+
+          return {
+            ...prev,
+            [userEmail]: userHistory
+          };
+        }
+        return prev;
+      });
+    }
+
     if (!selectedConversation.assigned_user_id) {
       await updateConversation(selectedConversation.id, {
         assigned_user_id: userId,
@@ -550,12 +588,39 @@ export default function Chats() {
 
     const handleConversation = (newConversation: any) => {
       if (newConversation.chatbot_id !== chatbot_id) return;
+      console.log("new conversation", newConversation);
+
+      const userEmail = newConversation.user_id;
+
+      setChatHistoryByUser((prev) => {
+        const userHistory = prev[userEmail] ? [...prev[userEmail]] : [];
+        const existingIndex = userHistory.findIndex((c) => c.id === newConversation.id);
+
+        if (existingIndex !== -1) {
+          userHistory[existingIndex] = newConversation;
+        } else {
+          userHistory.push(newConversation);
+        }
+
+        userHistory.sort((a, b) => {
+          const aLast = a.messages?.length
+            ? new Date(a.messages[a.messages.length - 1].timestamp).getTime()
+            : 0;
+          const bLast = b.messages?.length
+            ? new Date(b.messages[b.messages.length - 1].timestamp).getTime()
+            : 0;
+          return bLast - aLast;
+        });
+
+        return {
+          ...prev,
+          [userEmail]: userHistory,
+        };
+      });
 
       setConversations((prev) => {
-        const updated = [
-          newConversation,
-          ...prev.filter((c) => c.id !== newConversation.id),
-        ];
+        const filtered = prev.filter((c) => c.user_id !== userEmail);
+        const updated = [newConversation, ...filtered];
         return sortConversations(updated);
       });
     };
@@ -586,6 +651,48 @@ export default function Chats() {
 
         return sortConversations(updated);
       });
+
+      console.log(newMessage);
+
+      // Update chat history for the user
+      const userEmail = newMessage.user_id; // Fallback if user_email is missing
+      if (userEmail) {
+        setChatHistoryByUser((prev) => {
+          const userHistory = prev[userEmail] ? [...prev[userEmail]] : [];
+
+          // Find the conversation to update
+          const historyIndex = userHistory.findIndex(
+            (c) => c.chatbot_history === newMessage.chatbot_history
+          );
+
+          if (historyIndex !== -1) {
+            const updatedConv = {
+              ...userHistory[historyIndex],
+              messages: [...(userHistory[historyIndex].messages || []), newMessage]
+            };
+            userHistory[historyIndex] = updatedConv;
+
+            // Sort user history to bring latest conversation to top
+            userHistory.sort((a, b) => {
+              const aLast = a.messages?.length
+                ? new Date(a.messages[a.messages.length - 1].timestamp).getTime()
+                : 0;
+              const bLast = b.messages?.length
+                ? new Date(b.messages[b.messages.length - 1].timestamp).getTime()
+                : 0;
+              return bLast - aLast;
+            });
+
+            return {
+              ...prev,
+              [userEmail]: userHistory
+            };
+          }
+          return prev;
+        });
+      }
+
+
 
       if (
         newMessage.chatbot_history === selectedConversation?.chatbot_history &&
@@ -686,13 +793,45 @@ export default function Chats() {
       }
     };
 
+    // Add this new handler
+    const handleConversationClosed = (data: {
+      chatbot_history: string;
+    }) => {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === data.chatbot_history
+            ? { ...c, is_closed: true }
+            : c
+        )
+      );
+      // If currently viewing this conversation, update UI
+      if (selectedConversation?.id === data.chatbot_history) {
+        setSelectedConversation((prev: any) => ({
+          ...prev,
+          is_closed: true,
+        }));
+
+        // // Optionally add a system message
+        // setMessages((prev) => [
+        //   ...prev,
+        //   {
+        //     role: 'system',
+        //     text: 'This conversation has been closed.',
+        //   }
+        // ]);
+      }
+    };
+
     socket.on("newConversation", handleConversation);
     socket.on("message", handleMessage);
+    socket.on("conversation:closed", handleConversationClosed);
+
     socket.on("whatsapp:message:received", handleWhatsAppMessage);
 
     return () => {
       socket.off("newConversation", handleConversation);
       socket.off("message", handleMessage);
+      socket.off("conversation:closed", handleConversationClosed);
       socket.off("whatsapp:message:received", handleWhatsAppMessage);
     };
   }, [selectedConversation, chatbot_id]);
@@ -971,7 +1110,7 @@ export default function Chats() {
                       Chat History - {selectedConversation?.user_email}
                     </DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  <div className="space-y-2 mt-2 max-h-[400px] overflow-y-auto">
                     {currentUserHistory.slice(1).map((conv, index) => (
                       <div
                         key={conv.id}
@@ -984,7 +1123,7 @@ export default function Chats() {
                               {currentUserHistory.length - index - 1}
                             </p>
                             <p className="text-sm font-medium text-muted-foreground mt-1">
-                              {conv.user_email} →{" "}
+                              {(conv.user_email === 'New Customer' && selectedConversation.user_email) ? selectedConversation.user_email : conv.user_email} →{" "}
                               {availableUsers.find(
                                 (user: any) =>
                                   user.user_id === conv.assigned_user_id
