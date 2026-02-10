@@ -46,7 +46,7 @@ interface User {
     userCreatedAt: string;
     currentRole: string;
     assignedRoles: string[];
-    organization: Organization;
+    organization: Organization | null;
     subscription: Subscription;
 }
 
@@ -111,7 +111,7 @@ export default function OrganizationsPage({
         }
     };
 
-    const uniqueOrgs = [...new Set(users.map((u) => u.organization.id))].length;
+    const uniqueOrgs = [...new Set(users.filter((u) => u.organization).map((u) => u.organization!.id))].length;
     const activeSubscriptions = users.filter((u) => u.subscription.isActive).length;
 
     return (
@@ -214,7 +214,7 @@ export default function OrganizationsPage({
                                                 )}
                                             </div>
                                         </TableCell>
-                                        <TableCell>{user.organization.name}</TableCell>
+                                        <TableCell>{user.organization?.name || 'No Organization'}</TableCell>
                                         <TableCell>
                                             <span className="px-2 py-1 bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 rounded text-xs capitalize">
                                                 {user.currentRole || 'User'}
@@ -321,49 +321,56 @@ export default function OrganizationsPage({
                                 </div>
 
                                 {/* Organization Information */}
-                                <div className="pt-4 border-t">
-                                    <h3 className="text-lg font-semibold mb-3">Organization</h3>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <div className="text-sm font-medium">Name</div>
-                                            <div className="text-sm text-neutral-600">
-                                                {selectedUser.organization.name}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-medium">Email</div>
-                                            <div className="text-sm text-neutral-600">
-                                                {selectedUser.organization.email}
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
+                                {selectedUser.organization ? (
+                                    <div className="pt-4 border-t">
+                                        <h3 className="text-lg font-semibold mb-3">Organization</h3>
+                                        <div className="space-y-3">
                                             <div>
-                                                <div className="text-sm font-medium">Size</div>
+                                                <div className="text-sm font-medium">Name</div>
                                                 <div className="text-sm text-neutral-600">
-                                                    {selectedUser.organization.size}
+                                                    {selectedUser.organization.name}
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium">Type</div>
+                                                <div className="text-sm font-medium">Email</div>
                                                 <div className="text-sm text-neutral-600">
-                                                    {selectedUser.organization.type}
+                                                    {selectedUser.organization.email}
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-medium">Total Users</div>
-                                            <div className="text-sm text-neutral-600">
-                                                {selectedUser.organization.userCount}
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <div className="text-sm font-medium">Size</div>
+                                                    <div className="text-sm text-neutral-600">
+                                                        {selectedUser.organization.size}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-medium">Type</div>
+                                                    <div className="text-sm text-neutral-600">
+                                                        {selectedUser.organization.type}
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <div className="text-sm font-medium">Created</div>
-                                            <div className="text-sm text-neutral-600">
-                                                {formatDate(selectedUser.organization.createdAt)}
+                                            <div>
+                                                <div className="text-sm font-medium">Total Users</div>
+                                                <div className="text-sm text-neutral-600">
+                                                    {selectedUser.organization.userCount}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-medium">Created</div>
+                                                <div className="text-sm text-neutral-600">
+                                                    {formatDate(selectedUser.organization.createdAt)}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="pt-4 border-t">
+                                        <h3 className="text-lg font-semibold mb-3">Organization</h3>
+                                        <div className="text-sm text-neutral-500">No organization associated</div>
+                                    </div>
+                                )}
 
                                 {/* Subscription Information */}
                                 <div className="pt-4 border-t">

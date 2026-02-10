@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken } from '@/lib/auth';
-import { getPostgresPool } from '@/lib/postgres';
 import { getDatabase } from '@/lib/mongodb';
+import { getPrismaClient } from '@/lib/prisma';
 
 export async function GET(req: NextRequest) {
     try {
@@ -22,67 +22,62 @@ export async function GET(req: NextRequest) {
         if (payload.role === 'superadmin') {
             // Get environment from cookie (default to beta)
             const env = cookieStore.get('NEXT_ADMIN_ENV')?.value || 'beta';
-            const pool = getPostgresPool(env as 'beta' | 'prod');
+            const prisma = getPrismaClient(env as 'beta' | 'prod');
 
             try {
-                const client = await pool.connect();
+                const [totalUsers, totalOrgs, activeSubs] = await Promise.all([
+                    prisma.users.count(),
+                    prisma.organizations.count(),
+                    prisma.subscriptions.count({
+                        where: {
+                            subscription_end_date: {
+                                gt: new Date(),
+                            },
+                        },
+                    }),
+                ]);
 
-                try {
-                    const [usersRes, orgsRes, subsRes, revenueRes] = await Promise.all([
-                        client.query('SELECT COUNT(*) FROM "users"'),
-                        client.query('SELECT COUNT(*) FROM "organizations"'),
-                        client.query(
-                            'SELECT COUNT(*) FROM "subscriptions" WHERE "subscription_end_date" > NOW()'
-                        ),
-                        client.query(`
-              SELECT SUM(payment_amount) as total 
-              FROM "transactions" 
-              WHERE "payment_status" = 'success' 
-              AND "created_at" > NOW() - INTERVAL '30 days'
-            `),
-                    ]);
+                const stats = {
+                    totalUsers,
+                    totalOrgs,
+                    activeSubs,
+                    monthlyRevenue: 0, // TODO: Calculate from transactions if needed
+                    environment: env,
+                };
 
-                    const stats = {
-                        totalUsers: parseInt(usersRes.rows[0].count, 10),
-                        totalOrgs: parseInt(orgsRes.rows[0].count, 10),
-                        activeSubs: parseInt(subsRes.rows[0].count, 10),
-                        monthlyRevenue: parseInt(revenueRes.rows[0].total || '0', 10),
-                        environment: env,
-                    };
-
-                    return Response.json(stats);
-                } finally {
-                    client.release();
-                }
+                return Response.json(stats);
             } catch (error: any) {
-                console.error('PostgreSQL error:', error);
+                console.error('Prisma error:', error);
                 return Response.json(
-                    { error: 'Database connection failed', details: error.message },
+                    { error: 'Database query failed', details: error.message },
                     { status: 500 }
                 );
             }
         } else {
             // For other roles, fetch MongoDB stats
-            const db = await getDatabase();
+            try {
+                const db = await getDatabase();
 
-            const [totalAdmins, totalRoles] = await Promise.all([
-                db.collection('users').countDocuments({ isActive: true }),
-                db.collection('roles').countDocuments(),
-            ]);
+                const [totalBots] = await Promise.all([db.collection('bots').estimatedDocumentCount()]);
 
-            const stats = {
-                totalAdmins,
-                totalRoles,
-                recentLogins: 0, // Placeholder
-            };
+                const stats = {
+                    totalBots,
+                    totalUsers: 0,
+                    activeSubscriptions: 0,
+                    revenue: 0,
+                };
 
-            return Response.json(stats);
+                return Response.json(stats);
+            } catch (error: any) {
+                console.error('MongoDB error:', error);
+                return Response.json(
+                    { error: 'Database connection failed', details: error.message },
+                    { status: 500 }
+                );
+            }
         }
     } catch (error: any) {
-        console.error('Dashboard stats error:', error);
-        return Response.json(
-            { error: 'Internal server error' },
-            { status: 500 }
-        );
+        console.error('Get stats error:', error);
+        return Response.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

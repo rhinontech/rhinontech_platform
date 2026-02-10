@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, Users, Shield, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Shield, Settings, LogOut, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { EnvSwitcher } from './EnvSwitcher';
@@ -28,6 +28,12 @@ export function Sidebar({ role, permissions }: SidebarProps) {
             href: `/${role}/dashboard`,
             icon: LayoutDashboard,
             permission: 'view_dashboard',
+        },
+        {
+            title: 'Organizations',
+            href: `/${role}/organizations`,
+            icon: Building2,
+            permission: 'view_dashboard', // Superadmin has this via wildcard
         },
         {
             title: 'Users',
