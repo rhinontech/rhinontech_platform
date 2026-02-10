@@ -13,9 +13,12 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Users,
-  Settings,
+  Building2,
+  CreditCard,
+  DollarSign,
   BarChart3,
   FileText,
+  Settings,
   Shield,
 } from "lucide-react";
 import Loading from "@/app/loading";
@@ -30,7 +33,12 @@ interface User {
 
 export default function Dashboard() {
   const [user, setUser] = useState<User | null>(null);
-  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [stats, setStats] = useState({
+    totalUsers: null,
+    totalOrgs: null,
+    activeSubs: null,
+    monthlyRevenue: null,
+  });
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -44,7 +52,12 @@ export default function Dashboard() {
       const res = await fetch("/api/dashboard/stats");
       if (res.ok) {
         const data = await res.json();
-        setTotalUsers(data.totalUsers);
+        setStats({
+          totalUsers: data.totalUsers,
+          totalOrgs: data.totalOrgs,
+          activeSubs: data.activeSubs,
+          monthlyRevenue: data.monthlyRevenue,
+        });
       }
     } catch (error) {
       console.error("Error fetching stats:", error);
@@ -113,23 +126,25 @@ export default function Dashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {totalUsers !== null ? totalUsers : "..."}
+                    {stats.totalUsers !== null ? stats.totalUsers : "..."}
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    +12% from last month
+                    Registered users
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-gray-500" />
+                  <CardTitle className="text-sm font-medium">Organizations</CardTitle>
+                  <Building2 className="h-4 w-4 text-gray-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">$45,231</div>
+                  <div className="text-2xl font-bold">
+                    {stats.totalOrgs !== null ? stats.totalOrgs : "..."}
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    +20% from last month
+                    Total companies
                   </p>
                 </CardContent>
               </Card>
@@ -137,27 +152,31 @@ export default function Dashboard() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Active Projects
+                    Active Subscriptions
                   </CardTitle>
-                  <FileText className="h-4 w-4 text-gray-500" />
+                  <CreditCard className="h-4 w-4 text-gray-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">24</div>
-                  <p className="text-xs text-gray-500 mt-1">+4 new this week</p>
+                  <div className="text-2xl font-bold">
+                    {stats.activeSubs !== null ? stats.activeSubs : "..."}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Current active plans</p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Security Score
+                    30-Day Revenue
                   </CardTitle>
-                  <Shield className="h-4 w-4 text-gray-500" />
+                  <DollarSign className="h-4 w-4 text-gray-500" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">98%</div>
+                  <div className="text-2xl font-bold">
+                    {stats.monthlyRevenue !== null ? `$${stats.monthlyRevenue}` : "..."}
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    All systems secure
+                    From successful transactions
                   </p>
                 </CardContent>
               </Card>
