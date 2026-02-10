@@ -1,0 +1,803 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SequelizeMeta {
+  name String @id @db.VarChar(255)
+}
+
+model activities {
+  id              Int           @id @default(autoincrement())
+  user_id         Int
+  organization_id Int
+  action          String        @db.VarChar(255)
+  message         String?
+  metadata        Json?
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime      @default(now()) @db.Timestamptz(6)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  users           users         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model articles {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title           String?              @db.VarChar(255)
+  content         String?
+  folder_id       String?              @db.Uuid
+  organization_id Int?
+  status          enum_articles_status @default(draft)
+  views           Int?                 @default(0)
+  likes           Int?                 @default(0)
+  dislikes        Int?                 @default(0)
+  keywords        String[]             @db.VarChar(255)
+  seo_title       String?              @db.VarChar(255)
+  seo_description String?              @db.VarChar(255)
+  created_at      DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime             @default(now()) @db.Timestamptz(6)
+  folders         folders?             @relation(fields: [folder_id], references: [id])
+  organizations   organizations?       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+}
+
+model automations {
+  id                  Int           @id @default(autoincrement())
+  organization_id     Int
+  training_url        Json          @default("[]")
+  training_pdf        Json          @default("[]")
+  training_article    Json          @default("[]")
+  is_chatbot_trained  Boolean       @default(false)
+  created_at          DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime?     @default(now()) @db.Timestamptz(6)
+  training_status     String        @default("idle") @db.VarChar(50)
+  training_progress   Int           @default(0)
+  training_job_id     String?       @db.VarChar(255)
+  training_started_at DateTime?     @db.Timestamptz(6)
+  training_message    String?
+  organizations       organizations @relation(fields: [organization_id], references: [id], onDelete: NoAction)
+
+  @@index([training_status], map: "idx_automations_training_status")
+}
+
+model bot_assistants {
+  id           Int      @id @default(autoincrement())
+  chatbot_id   String   @unique @db.VarChar(100)
+  assistant_id String   @db.VarChar(150)
+  chat_count   Int?     @default(0)
+  token_count  Int?     @default(0)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model bot_conversations {
+  id               Int      @id @default(autoincrement())
+  user_id          String   @db.VarChar(255)
+  user_email       String   @db.VarChar(255)
+  chatbot_id       String   @db.VarChar(255)
+  user_plan        String   @db.VarChar(255)
+  conversation_id  String   @db.VarChar(255)
+  title            String   @db.VarChar(255)
+  history          Json     @default("[]")
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+  post_chat_review Json?
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model chatbot_campaigns {
+  id              Int           @id @default(autoincrement())
+  organization_id Int
+  type            String        @db.VarChar(255)
+  status          String        @default("draft") @db.VarChar(255)
+  content         Json          @default("{}")
+  targeting       Json          @default("{}")
+  created_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: NoAction)
+}
+
+model chatbots {
+  id               Int           @id @default(autoincrement())
+  organization_id  Int
+  chatbot_id       String        @unique @db.VarChar(6)
+  chatbot_base_url String?       @db.VarChar(255)
+  api_key          String?       @db.VarChar(255)
+  chatbot_config   Json          @default("{}")
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime      @default(now()) @db.Timestamptz(6)
+  organizations    organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+}
+
+model customers {
+  id              Int           @id @default(autoincrement())
+  organization_id Int
+  email           String        @db.VarChar(255)
+  custom_data     Json          @default("{}")
+  created_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  tickets         tickets[]
+}
+
+model emails {
+  id              Int           @id @default(autoincrement())
+  email_thread_id String        @unique @db.VarChar(255)
+  email           String?       @db.VarChar(255)
+  in_reply_to     String?       @db.VarChar(255)
+  organization_id Int
+  ticket_id       String?       @db.VarChar(255)
+  subject         String?       @db.VarChar(255)
+  conversations   Json          @default("[]")
+  is_new          Boolean       @default(true)
+  processed       Boolean       @default(false)
+  created_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+}
+
+model folders {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String?        @db.VarChar(255)
+  parent_id       String?        @db.Uuid
+  organization_id Int?
+  description     String?        @db.VarChar(255)
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime       @default(now()) @db.Timestamptz(6)
+  articles        articles[]
+  organizations   organizations? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  folders         folders?       @relation("foldersTofolders", fields: [parent_id], references: [id])
+  other_folders   folders[]      @relation("foldersTofolders")
+}
+
+model forms {
+  id              Int           @id @default(autoincrement())
+  organization_id Int
+  chatbot_id      String        @db.VarChar(255)
+  ticket_form     Json?         @default("[]")
+  pre_chat_form   Json?         @default("[]")
+  post_chat_form  Json?         @default("[]")
+  created_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime?     @default(now()) @db.Timestamptz(6)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+}
+
+model knowledge_bases {
+  id              Int           @id @default(autoincrement())
+  organization_id Int
+  uuid            String        @unique @db.VarChar(30)
+  domain          String        @default("rhinon.help") @db.VarChar(255)
+  created_at      DateTime?     @db.Timestamptz(6)
+  updated_at      DateTime?     @db.Timestamptz(6)
+  theme           Json          @default("{\"seo\": {\"title\": null, \"description\": null}, \"logo\": null, \"favicon\": null, \"primary_color\": \"#1e3a8a\", \"background_image\": null}")
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model linkedin_campaigns {
+  id                   Int                                   @id @default(autoincrement())
+  organization_id      Int
+  user_id              Int
+  campaign_name        String                                @db.VarChar(255)
+  campaign_description String?
+  campaign_type        enum_linkedin_campaigns_campaign_type @default(post)
+  content              String
+  media_urls           Json?                                 @db.Json
+  hashtags             Json?                                 @db.Json
+  target_audience      Json?                                 @db.Json
+  scheduled_time       DateTime?                             @db.Timestamptz(6)
+  status               enum_linkedin_campaigns_status        @default(draft)
+  linkedin_post_id     String?                               @db.VarChar(255)
+  engagement_metrics   Json?                                 @db.Json
+  budget               Decimal?                              @db.Decimal(10, 2)
+  is_sponsored         Boolean                               @default(false)
+  call_to_action       String?                               @db.VarChar(255)
+  cta_link             String?                               @db.VarChar(500)
+  published_at         DateTime?                             @db.Timestamptz(6)
+  error_message        String?
+  created_at           DateTime                              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime                              @default(now()) @db.Timestamptz(6)
+  organizations        organizations                         @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  users                users                                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at], map: "linkedin_campaigns_created_at")
+  @@index([organization_id], map: "linkedin_campaigns_organization_id")
+  @@index([scheduled_time], map: "linkedin_campaigns_scheduled_time")
+  @@index([status], map: "linkedin_campaigns_status")
+  @@index([user_id], map: "linkedin_campaigns_user_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model linkedin_tokens {
+  id                    Int           @id @default(autoincrement())
+  organization_id       Int
+  user_id               Int
+  access_token          String
+  refresh_token         String?
+  token_type            String        @default("Bearer") @db.VarChar(50)
+  expires_in            Int
+  expires_at            DateTime      @db.Timestamptz(6)
+  scope                 String?
+  linkedin_user_id      String?       @db.VarChar(255)
+  linkedin_profile_data Json?
+  is_active             Boolean       @default(true)
+  created_at            DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime      @default(now()) @db.Timestamptz(6)
+  organizations         organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  users                 users         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([expires_at], map: "linkedin_tokens_expires_at")
+  @@index([is_active], map: "linkedin_tokens_is_active")
+  @@index([linkedin_user_id], map: "linkedin_tokens_linkedin_user_id")
+  @@index([organization_id], map: "linkedin_tokens_organization_id")
+  @@index([user_id], map: "linkedin_tokens_user_id")
+}
+
+model live_visitors {
+  id            Int      @id @default(autoincrement())
+  chatbot_id    String   @db.VarChar(255)
+  visitor_id    String   @db.VarChar(255)
+  visitor_email String?  @db.VarChar(255)
+  room          String   @unique @db.VarChar(255)
+  socket_id     String   @db.VarChar(255)
+  ip_address    String?  @db.VarChar(255)
+  last_seen     DateTime @default(now()) @db.Timestamptz(6)
+  is_online     Boolean? @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+  city          String?  @db.VarChar(255)
+  region        String?  @db.VarChar(255)
+  country       String?  @db.VarChar(255)
+  latitude      Decimal? @db.Decimal(10, 8)
+  longitude     Decimal? @db.Decimal(11, 8)
+}
+
+model notifications {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id Int
+  type            String        @db.VarChar(255)
+  title           String        @db.VarChar(255)
+  message         String
+  data            Json?         @default("{}")
+  status          String        @default("unread") @db.VarChar(255)
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime      @default(now()) @db.Timestamptz(6)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at], map: "notifications_created_at")
+  @@index([organization_id, status], map: "notifications_organization_id_status")
+}
+
+model onboardings {
+  id                 Int           @id @default(autoincrement())
+  organization_id    Int
+  tours_completed    Json?         @default("{}")
+  banners_seen       Json?         @default("{}")
+  installation_guide Json?         @default("{}")
+  chatbot_installed  Boolean?      @default(false)
+  created_at         DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime      @default(now()) @db.Timestamptz(6)
+  organizations      organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+}
+
+model organizations {
+  id                 Int                  @id @default(autoincrement())
+  organization_name  String               @db.VarChar(255)
+  company_size       String?              @db.VarChar(255)
+  company_email      String?              @db.VarChar(255)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  organization_type  String?              @db.VarChar(255)
+  activities         activities[]
+  articles           articles[]
+  automations        automations[]
+  chatbot_campaigns  chatbot_campaigns[]
+  chatbots           chatbots[]
+  customers          customers[]
+  emails             emails[]
+  folders            folders[]
+  forms              forms[]
+  knowledge_bases    knowledge_bases[]
+  linkedin_campaigns linkedin_campaigns[]
+  linkedin_tokens    linkedin_tokens[]
+  notifications      notifications[]
+  onboardings        onboardings[]
+  roles              roles[]
+  seed_data_registry seed_data_registry[]
+  subscriptions      subscriptions[]
+  tasks              tasks[]
+  teams_channels     teams_channels[]
+  teams_members      teams_members[]
+  teams_messages     teams_messages[]
+  tickets            tickets[]
+  transactions       transactions[]
+  users              users[]
+  whatsapp_accounts  whatsapp_accounts[]
+  whatsapp_contacts  whatsapp_contacts[]
+  whatsapp_messages  whatsapp_messages[]
+  whatsapp_webhooks  whatsapp_webhooks[]
+}
+
+model roles {
+  id              Int            @id @default(autoincrement())
+  organization_id Int?
+  roles           String[]       @default(dbgenerated("(ARRAY[]::character varying[])::character varying(255)[]")) @db.VarChar(255)
+  access          Json           @default("{}")
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime       @default(now()) @db.Timestamptz(6)
+  organizations   organizations? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model seed_data_registry {
+  id              Int           @id @default(autoincrement())
+  table_name      String        @db.VarChar(100)
+  record_id       String        @db.VarChar(255)
+  organization_id Int
+  created_at      DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime      @db.Timestamptz(6)
+  organizations   organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@unique([table_name, record_id], map: "idx_seed_data_registry_table_record")
+  @@index([organization_id], map: "idx_seed_data_registry_org_id")
+  @@index([table_name, organization_id], map: "idx_seed_data_registry_table_org")
+}
+
+model seo_compliances {
+  id           Int      @id @default(autoincrement())
+  chatbot_id   String?  @db.VarChar(255)
+  baseUrl      String   @db.VarChar(255)
+  seoScore     String?  @db.VarChar(255)
+  passedChecks Int?
+  totalChecks  Int?
+  categories   Json?
+  actionItems  Json?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model seo_engagements {
+  id         Int      @id @default(autoincrement())
+  chatbot_id String?  @db.VarChar(255)
+  sessionId  String?  @db.VarChar(255)
+  userId     String?  @db.VarChar(255)
+  type       String?  @db.VarChar(255)
+  url        String?  @db.VarChar(255)
+  timestamp  BigInt?
+  metadata   Json?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model seo_page_views {
+  id           Int      @id @default(autoincrement())
+  chatbot_id   String?  @db.VarChar(255)
+  sessionId    String?  @db.VarChar(255)
+  userId       String?  @db.VarChar(255)
+  url          String?  @db.VarChar(255)
+  referrer     String?  @db.VarChar(255)
+  userAgent    String?  @db.VarChar(255)
+  timestamp    BigInt?
+  utm_source   String?  @db.VarChar(255)
+  utm_medium   String?  @db.VarChar(255)
+  utm_campaign String?  @db.VarChar(255)
+  utm_term     String?  @db.VarChar(255)
+  utm_content  String?  @db.VarChar(255)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model seo_performances {
+  id              Int      @id @default(autoincrement())
+  chatbot_id      String?  @db.VarChar(255)
+  baseUrl         String?  @db.VarChar(255)
+  overallScore    Json?
+  metrics         Json?
+  accessibility   Json?
+  bestPractices   Json?
+  seo             Json?
+  opportunities   Json?
+  diagnostics     Json?
+  recommendations Json?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model seo_sessions {
+  id          Int      @id @default(autoincrement())
+  chatbot_id  String?  @db.VarChar(255)
+  sessionId   String?  @db.VarChar(255)
+  userId      String?  @db.VarChar(255)
+  userAgent   String?  @db.VarChar(255)
+  screenSize  String?  @db.VarChar(255)
+  language    String?  @db.VarChar(255)
+  isReturning Boolean? @default(false)
+  country     String?  @db.VarChar(255)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model subscriptions {
+  id                            Int            @id @default(autoincrement())
+  organization_id               Int?
+  subscription_tier             String?        @default("Trial") @db.VarChar(255)
+  subscription_cycle            String?        @db.VarChar(255)
+  subscription_start_date       DateTime       @default(now()) @db.Timestamptz(6)
+  subscription_end_date         DateTime       @default(dbgenerated("(now() + '14 days'::interval)")) @db.Timestamptz(6)
+  seo_performance_trigger_count Int            @default(0)
+  seo_compliance_trigger_count  Int            @default(0)
+  created_at                    DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at                    DateTime       @default(now()) @db.Timestamptz(6)
+  organizations                 organizations? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+}
+
+model support_conversations {
+  id               Int      @id @default(autoincrement())
+  user_id          String   @db.VarChar(255)
+  user_email       String   @db.VarChar(255)
+  chatbot_id       String?  @db.VarChar(255)
+  chatbot_history  String?
+  assigned_user_id Int?
+  messages         Json     @default("[]")
+  is_closed        Boolean? @default(false)
+  is_new           Boolean? @default(true)
+  is_pinned        Boolean? @default(false)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model tasks {
+  id                             Int           @id @default(autoincrement())
+  task_id                        String        @db.VarChar(255)
+  organization_id                Int
+  title                          String        @db.VarChar(255)
+  description                    String?
+  status                         String        @default("in-progress") @db.VarChar(255)
+  priority                       String        @default("medium") @db.VarChar(255)
+  type                           String        @default("task") @db.VarChar(255)
+  assignee_id                    Int?
+  reporter_id                    Int?
+  due_date                       DateTime?     @db.Timestamptz(6)
+  estimated_hours                Float?
+  actual_hours                   Float?
+  tags                           String[]      @default(dbgenerated("(ARRAY[]::character varying[])::character varying(255)[]")) @db.VarChar(255)
+  attachments                    Json?         @default("[]")
+  comments                       Json?         @default("[]")
+  activities                     Json?         @default("[]")
+  created_at                     DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime      @default(now()) @db.Timestamptz(6)
+  parent_task_id                 Int?
+  users_tasks_assignee_idTousers users?        @relation("tasks_assignee_idTousers", fields: [assignee_id], references: [id], onUpdate: SetNull)
+  organizations                  organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  tasks                          tasks?        @relation("tasksTotasks", fields: [parent_task_id], references: [id], onDelete: Cascade)
+  other_tasks                    tasks[]       @relation("tasksTotasks")
+  users_tasks_reporter_idTousers users?        @relation("tasks_reporter_idTousers", fields: [reporter_id], references: [id], onUpdate: SetNull)
+
+  @@unique([task_id, organization_id], map: "unique_task_id_per_organization")
+}
+
+model teams_channels {
+  id              String                   @id @db.Uuid
+  organization_id Int
+  name            String                   @db.VarChar(255)
+  type            enum_teams_channels_type @default(public)
+  created_by      Int
+  created_at      DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime                 @default(now()) @db.Timestamptz(6)
+  users           users                    @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  organizations   organizations            @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  teams_members   teams_members[]
+
+  @@index([created_by], map: "teams_channels_created_by")
+  @@index([organization_id], map: "teams_channels_organization_id")
+}
+
+model teams_members {
+  id              String                  @id @db.Uuid
+  channel_id      String                  @db.Uuid
+  user_id         Int
+  organization_id Int
+  role            enum_teams_members_role @default(member)
+  joined_at       DateTime                @default(now()) @db.Timestamptz(6)
+  teams_channels  teams_channels          @relation(fields: [channel_id], references: [id], onDelete: Cascade)
+  organizations   organizations           @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  users           users                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([channel_id, user_id], map: "unique_channel_user")
+  @@index([channel_id], map: "teams_members_channel_id")
+  @@index([organization_id], map: "teams_members_organization_id")
+  @@index([user_id], map: "teams_members_user_id")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model teams_messages {
+  id              String                         @id @db.Uuid
+  organization_id Int
+  scope_type      enum_teams_messages_scope_type
+  scope_id        String                         @db.VarChar(255)
+  sender_id       Int
+  content         String
+  created_at      DateTime                       @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime                       @default(now()) @db.Timestamptz(6)
+  organizations   organizations                  @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  users           users                          @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at], map: "teams_messages_created_at")
+  @@index([organization_id], map: "teams_messages_organization_id")
+  @@index([scope_type, scope_id], map: "teams_messages_scope_type_scope_id")
+  @@index([sender_id], map: "teams_messages_sender_id")
+}
+
+model tickets {
+  id               Int           @id @default(autoincrement())
+  ticket_id        String        @unique @db.VarChar(255)
+  customer_id      Int
+  organization_id  Int
+  assigned_user_id Int?
+  custom_data      Json          @default("{}")
+  subject          String?       @db.VarChar(255)
+  conversations    Json          @default("[]")
+  is_new           Boolean       @default(true)
+  status           String        @default("Open") @db.VarChar(255)
+  priority         String        @default("Medium") @db.VarChar(255)
+  tags             String[]      @default(dbgenerated("(ARRAY[]::character varying[])::character varying(255)[]")) @db.VarChar(255)
+  rating           Int?
+  created_at       DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?     @default(now()) @db.Timestamptz(6)
+  users            users?        @relation(fields: [assigned_user_id], references: [id], onUpdate: SetNull)
+  customers        customers     @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  organizations    organizations @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+}
+
+model training_chunks {
+  id          Int                    @id @default(autoincrement())
+  chatbot_id  String                 @db.VarChar(255)
+  chunk_index Int
+  content     String
+  embedding   Unsupported("vector")?
+  created_at  DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime               @default(now()) @db.Timestamptz(6)
+  source      String?                @db.VarChar(512)
+
+  @@index([chatbot_id], map: "idx_training_chunks_chatbot_id")
+  @@index([source], map: "idx_training_chunks_source")
+  @@index([embedding])
+}
+
+model transactions {
+  id                 Int            @id @default(autoincrement())
+  organization_id    Int?
+  user_id            Int?
+  subscription_tier  String?        @db.VarChar(255)
+  subscription_cycle String?        @db.VarChar(255)
+  payment_amount     Int?
+  payment_status     String?        @db.VarChar(255)
+  payment_order_id   String?        @db.VarChar(255)
+  payment_id         String?        @db.VarChar(255)
+  payment_signature  String?        @db.VarChar(255)
+  created_at         DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime       @default(now()) @db.Timestamptz(6)
+  organizations      organizations? @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  users              users?         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model users {
+  id                                               Int                  @id @default(autoincrement())
+  email                                            String               @unique @db.VarChar(255)
+  password_hash                                    String               @db.VarChar(255)
+  is_email_confirmed                               Boolean              @default(false)
+  organization_id                                  Int?
+  created_at                                       DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at                                       DateTime             @default(now()) @db.Timestamptz(6)
+  phone_number                                     String?              @db.VarChar(255)
+  is_onboarded                                     Boolean?             @default(false)
+  email_otp                                        String?              @db.VarChar(8)
+  email_otp_expires_at                             DateTime?            @db.Timestamptz(6)
+  activities                                       activities[]
+  linkedin_campaigns                               linkedin_campaigns[]
+  linkedin_tokens                                  linkedin_tokens[]
+  tasks_tasks_assignee_idTousers                   tasks[]              @relation("tasks_assignee_idTousers")
+  tasks_tasks_reporter_idTousers                   tasks[]              @relation("tasks_reporter_idTousers")
+  teams_channels                                   teams_channels[]
+  teams_members                                    teams_members[]
+  teams_messages                                   teams_messages[]
+  tickets                                          tickets[]
+  transactions                                     transactions[]
+  organizations                                    organizations?       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  users_accounts                                   users_accounts[]
+  users_profiles_users_profiles_assigned_byTousers users_profiles[]     @relation("users_profiles_assigned_byTousers")
+  users_profiles_users_profiles_user_idTousers     users_profiles?      @relation("users_profiles_user_idTousers")
+  users_roles                                      users_roles[]
+  whatsapp_accounts                                whatsapp_accounts[]
+}
+
+model users_accounts {
+  id            Int      @id @default(autoincrement())
+  user_id       Int?
+  provider      String   @db.VarChar(255)
+  access_token  String
+  id_token      String
+  refresh_token String?
+  scope         String
+  token_type    String?  @db.VarChar(255)
+  expires_in    DateTime @default(now()) @db.Timestamptz(6)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+  users         users?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model users_profiles {
+  id                                      Int      @id @default(autoincrement())
+  user_id                                 Int      @unique
+  first_name                              String   @db.VarChar(255)
+  last_name                               String   @db.VarChar(255)
+  assigned_by                             Int?
+  image_url                               String?  @db.VarChar(255)
+  contact                                 String?  @db.VarChar(255)
+  location                                String?  @db.VarChar(255)
+  last_active                             DateTime @default(now()) @db.Timestamptz(6)
+  created_at                              DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                              DateTime @default(now()) @db.Timestamptz(6)
+  users_users_profiles_assigned_byTousers users?   @relation("users_profiles_assigned_byTousers", fields: [assigned_by], references: [id])
+  users_users_profiles_user_idTousers     users    @relation("users_profiles_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model users_roles {
+  id             Int      @id @default(autoincrement())
+  user_id        Int
+  current_role   String?  @db.VarChar(255)
+  assigned_roles String[] @default(dbgenerated("(ARRAY[]::character varying[])::character varying(255)[]")) @db.VarChar(255)
+  permissions    Json     @default("{}")
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+  users          users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model whatsapp_accounts {
+  id                   Int                 @id @default(autoincrement())
+  organization_id      Int
+  user_id              Int?
+  phone_number_id      String              @unique @db.VarChar(255)
+  waba_id              String              @db.VarChar(255)
+  business_id          String?             @db.VarChar(255)
+  display_phone_number String              @db.VarChar(50)
+  verified_name        String?             @db.VarChar(255)
+  quality_rating       String?             @db.VarChar(50)
+  access_token         String
+  token_type           String              @default("Bearer") @db.VarChar(50)
+  token_expires_at     DateTime?           @db.Timestamptz(6)
+  status               String              @default("active") @db.VarChar(50)
+  is_default           Boolean             @default(false)
+  last_sync_at         DateTime?           @db.Timestamptz(6)
+  created_at           DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime            @default(now()) @db.Timestamptz(6)
+  organizations        organizations       @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+  users                users?              @relation(fields: [user_id], references: [id], onUpdate: SetNull)
+  whatsapp_contacts    whatsapp_contacts[]
+  whatsapp_messages    whatsapp_messages[]
+  whatsapp_webhooks    whatsapp_webhooks[]
+
+  @@index([organization_id], map: "whatsapp_accounts_organization_id")
+  @@index([phone_number_id], map: "whatsapp_accounts_phone_number_id")
+  @@index([status], map: "whatsapp_accounts_status")
+  @@index([user_id], map: "whatsapp_accounts_user_id")
+}
+
+model whatsapp_contacts {
+  id                Int               @id @default(autoincrement())
+  account_id        Int
+  organization_id   Int
+  phone_number      String            @db.VarChar(50)
+  name              String?           @db.VarChar(255)
+  profile_name      String?           @db.VarChar(255)
+  is_blocked        Boolean           @default(false)
+  last_message_at   DateTime?         @db.Timestamptz(6)
+  created_at        DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime          @default(now()) @db.Timestamptz(6)
+  whatsapp_accounts whatsapp_accounts @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  organizations     organizations     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@unique([account_id, phone_number], map: "unique_account_phone")
+  @@index([account_id], map: "whatsapp_contacts_account_id")
+  @@index([organization_id], map: "whatsapp_contacts_organization_id")
+  @@index([phone_number], map: "whatsapp_contacts_phone_number")
+}
+
+model whatsapp_messages {
+  id                Int               @id @default(autoincrement())
+  account_id        Int
+  organization_id   Int
+  message_id        String?           @unique @db.VarChar(255)
+  wamid             String?           @db.VarChar(255)
+  from_number       String            @db.VarChar(50)
+  to_number         String            @db.VarChar(50)
+  direction         String            @db.VarChar(20)
+  message_type      String            @db.VarChar(50)
+  content           String?
+  media_url         String?
+  media_mime_type   String?           @db.VarChar(100)
+  caption           String?
+  template_name     String?           @db.VarChar(255)
+  template_language String?           @db.VarChar(10)
+  template_params   Json?
+  status            String            @default("pending") @db.VarChar(50)
+  error_code        String?           @db.VarChar(50)
+  error_message     String?
+  sent_at           DateTime?         @db.Timestamptz(6)
+  delivered_at      DateTime?         @db.Timestamptz(6)
+  read_at           DateTime?         @db.Timestamptz(6)
+  conversation_id   Int?
+  contact_id        Int?
+  metadata          Json?             @default("{}")
+  created_at        DateTime          @default(now()) @db.Timestamptz(6)
+  whatsapp_accounts whatsapp_accounts @relation(fields: [account_id], references: [id], onDelete: Cascade)
+  organizations     organizations     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id], map: "whatsapp_messages_account_id")
+  @@index([conversation_id], map: "whatsapp_messages_conversation_id")
+  @@index([created_at], map: "whatsapp_messages_created_at")
+  @@index([direction], map: "whatsapp_messages_direction")
+  @@index([from_number], map: "whatsapp_messages_from_number")
+  @@index([message_id], map: "whatsapp_messages_message_id")
+  @@index([organization_id], map: "whatsapp_messages_organization_id")
+  @@index([status], map: "whatsapp_messages_status")
+  @@index([to_number], map: "whatsapp_messages_to_number")
+}
+
+model whatsapp_webhooks {
+  id                Int                @id @default(autoincrement())
+  account_id        Int?
+  organization_id   Int?
+  event_type        String             @db.VarChar(100)
+  payload           Json
+  processed         Boolean            @default(false)
+  processed_at      DateTime?          @db.Timestamptz(6)
+  error             String?
+  created_at        DateTime           @default(now()) @db.Timestamptz(6)
+  whatsapp_accounts whatsapp_accounts? @relation(fields: [account_id], references: [id], onUpdate: SetNull)
+  organizations     organizations?     @relation(fields: [organization_id], references: [id], onDelete: Cascade)
+
+  @@index([account_id], map: "whatsapp_webhooks_account_id")
+  @@index([created_at], map: "whatsapp_webhooks_created_at")
+  @@index([event_type], map: "whatsapp_webhooks_event_type")
+  @@index([organization_id], map: "whatsapp_webhooks_organization_id")
+  @@index([processed], map: "whatsapp_webhooks_processed")
+}
+
+enum enum_articles_status {
+  draft
+  published
+}
+
+enum enum_linkedin_campaigns_campaign_type {
+  post
+  article
+  video
+  carousel
+  poll
+}
+
+enum enum_linkedin_campaigns_status {
+  draft
+  scheduled
+  published
+  failed
+  cancelled
+}
+
+enum enum_teams_channels_type {
+  public
+  private
+}
+
+enum enum_teams_members_role {
+  admin
+  member
+}
+
+enum enum_teams_messages_scope_type {
+  channel
+  dm
+}
