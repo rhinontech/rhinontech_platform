@@ -17,7 +17,7 @@ class PrismaClientSingleton {
     static getProdClient(): PrismaClient {
         if (!this.prodClient) {
             // Construct prod DATABASE_URL from environment variables
-            const prodUrl = `postgresql://${process.env.PROD_DB_USERNAME}:${process.env.PROD_DB_PASSWORD}@${process.env.PROD_DB_HOST}:${process.env.PROD_DB_PORT}/${process.env.PROD_DB_NAME}?schema=public`;
+            const prodUrl = `postgresql://${process.env.PROD_DB_USERNAME}:${process.env.PROD_DB_PASSWORD}@${process.env.PROD_DB_HOST}:${process.env.PROD_DB_PORT || '5432'}/${process.env.PROD_DB_NAME}?schema=public`;
             this.prodClient = new PrismaClient({
                 datasourceUrl: prodUrl,
             });
