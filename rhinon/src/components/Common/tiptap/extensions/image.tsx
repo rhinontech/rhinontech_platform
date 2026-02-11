@@ -19,6 +19,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { getSecureViewUrl } from "@/services/fileUploadService";
+import { isS3Key } from "@/utils/html-image-resolver";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -93,6 +95,42 @@ function TiptapImage(props: NodeViewProps) {
   const [openedMore, setOpenedMore] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [altText, setAltText] = useState(node.attrs.alt || "");
+  const [resolvedSrc, setResolvedSrc] = useState<string>("");
+  const [loadingImage, setLoadingImage] = useState(true);
+
+  // Resolve S3 keys to presigned URLs for display
+  useEffect(() => {
+    const resolveSrc = async () => {
+      const src = node.attrs.src;
+      if (!src) {
+        setLoadingImage(false);
+        return;
+      }
+
+      // Check if it's an S3 key
+      if (isS3Key(src)) {
+        setLoadingImage(true);
+        try {
+          const presignedUrl = await getSecureViewUrl(src);
+          if (presignedUrl) {
+            setResolvedSrc(presignedUrl);
+          } else {
+            setResolvedSrc(src); // Fallback to original
+          }
+        } catch (error) {
+          console.error("Failed to resolve S3 key:", error);
+          setResolvedSrc(src); // Fallback to original
+        } finally {
+          setLoadingImage(false);
+        }
+      } else {
+        setResolvedSrc(src);
+        setLoadingImage(false);
+      }
+    };
+
+    resolveSrc();
+  }, [node.attrs.src]);
 
   const {
     previewUrl,
@@ -258,18 +296,24 @@ function TiptapImage(props: NodeViewProps) {
           resizing && ""
         )}>
         <figure className="relative m-0">
-          <img
-            ref={imageRef}
-            src={node.attrs.src}
-            alt={node.attrs.alt}
-            title={node.attrs.title}
-            className="rounded-lg transition-shadow duration-200 hover:shadow-lg"
-            onLoad={(e) => {
-              const img = e.currentTarget;
-              const aspectRatio = img.naturalWidth / img.naturalHeight;
-              updateAttributes({ aspectRatio });
-            }}
-          />
+          {loadingImage ? (
+            <div className="flex items-center justify-center p-12 bg-muted rounded-lg">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <img
+              ref={imageRef}
+              src={resolvedSrc}
+              alt={node.attrs.alt}
+              title={node.attrs.title}
+              className="rounded-lg transition-shadow duration-200 hover:shadow-lg"
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                const aspectRatio = img.naturalWidth / img.naturalHeight;
+                updateAttributes({ aspectRatio });
+              }}
+            />
+          )}
           {editor?.isEditable && (
             <>
               <div

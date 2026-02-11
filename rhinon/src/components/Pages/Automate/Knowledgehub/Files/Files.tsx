@@ -23,7 +23,7 @@ import {
   triggerTraining,
   deleteTrainingSource,
 } from "@/services/automations/automationServices";
-import { uploadPdfFile } from "@/services/fileUploadService";
+import { uploadPdfFile, getSecureViewUrl } from "@/services/fileUploadService";
 import { useUserStore } from "@/utils/store";
 import Loading from "@/app/loading";
 import { FileViewerModal } from "@/components/Common/FileViewerModal/FileViewerModal";
@@ -55,6 +55,7 @@ export default function Files() {
   const chatbotId = useUserStore((state) => state.userData.chatbotId);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<any>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>(""); // New state for secure URL
   const [isTrained, setIsTrained] = useState(true);
   const [trainLoading, setTrainLoading] = useState(false);
   const [untrainedWebsitesCount, setUntrainedWebsitesCount] = useState(0);
@@ -205,12 +206,12 @@ export default function Files() {
 
     try {
       const response = await uploadPdfFile(selectedFile);
-      if (!response || !response.fileName) {
+      if (!response || !response.key) {
         throw new Error("File upload failed");
       }
 
       const newFile: FileItem = {
-        s3Name: response.fileName,
+        s3Name: response.key, // Store Key
         originalName: selectedFile.name,
         size: selectedFile.size,
         uploadedAt: new Date().toISOString(),
@@ -481,11 +482,14 @@ export default function Files() {
                   {files.map((file) => (
                     <div
                       key={file.uploadedAt}
-                      onClick={() => {
+                      onClick={async () => {
                         setPreviewFile(file);
+                        // Convert S3 Key to Secure URL
+                        const url = await getSecureViewUrl(file.s3Name);
+                        setPreviewUrl(url);
                         setIsPreviewOpen(true);
                       }}
-                      className="flex items-center justify-between p-4 bg-card rounded-lg border border-border hover:bg-accent/50 transition-colors group">
+                      className="flex items-center justify-between p-4 bg-card rounded-lg border border-border hover:bg-accent/50 transition-colors group cursor-pointer">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-destructive/10 rounded-lg flex items-center justify-center">
                           <FileText className="h-5 w-5 text-destructive" />
@@ -567,7 +571,7 @@ export default function Files() {
         <FileViewerModal
           isOpen={isPreviewOpen}
           onClose={() => setIsPreviewOpen(false)}
-          fileUrl={`https://rhinon-prod-assets-platform-prod.s3.ap-south-1.amazonaws.com/platform-uploads/${previewFile.s3Name}`} // adjust path
+          fileUrl={previewUrl} // Pass secure URL here
           fileName={previewFile.originalName}
           fileType={previewFile.originalName.split(".").pop()}
         />

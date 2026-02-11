@@ -49,3 +49,26 @@ export const getArticle = async (articleId: string) => {
   return res.json();
 };
 
+export const getPresignedUrl = async (key: string): Promise<string> => {
+  if (!API_URL) throw new Error("API_URL is not defined");
+
+  try {
+    const res = await fetch(`${API_URL}/aws/presigned-url`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ key }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to get presigned URL: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    return data.downloadUrl || "";
+  } catch (error) {
+    console.error("Error getting presigned URL:", error);
+    return "";
+  }
+};

@@ -2,6 +2,8 @@
 
 import { getArticle } from "@/services/knowledgeBase/articleService";
 import { useEffect, useState } from "react";
+import { resolveImagesInHTML } from "@/utils/html-image-resolver";
+import { Loader2 } from "lucide-react";
 import "./tiptap.css";
 
 interface Article {
@@ -18,6 +20,8 @@ interface Article {
 export function ArticleViewer({ articleId }: { articleId: string }) {
   const [article, setArticle] = useState<Article | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [processedContent, setProcessedContent] = useState<string>("");
+  const [loadingImages, setLoadingImages] = useState(false);
 
   const fetchArticle = async () => {
     if (articleId) {
@@ -35,6 +39,27 @@ export function ArticleViewer({ articleId }: { articleId: string }) {
   useEffect(() => {
     fetchArticle();
   }, [articleId]);
+
+  // Process article content to resolve S3 keys in images
+  useEffect(() => {
+    const processContent = async () => {
+      if (!article?.content) return;
+
+      setLoadingImages(true);
+      try {
+        const sanitized = sanitizeQuillHTML(article.content);
+        const resolved = await resolveImagesInHTML(sanitized);
+        setProcessedContent(resolved);
+      } catch (error) {
+        console.error("Error processing article content:", error);
+        setProcessedContent(sanitizeQuillHTML(article.content));
+      } finally {
+        setLoadingImages(false);
+      }
+    };
+
+    processContent();
+  }, [article?.content]);
 
   if (isLoading) {
     return <p className="text-center text-gray-500">Loading article...</p>;
@@ -68,12 +93,21 @@ export function ArticleViewer({ articleId }: { articleId: string }) {
         </div>
       </header>
 
-      <div
-        className="ProseMirror prose max-w-full overflow-x-auto text-base leading-7 !text-black [&_*]:!text-black"
-        dangerouslySetInnerHTML={{
-          __html: sanitizeQuillHTML(article.content),
-        }}
-      />
+      {loadingImages ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Loading images...</p>
+          </div>
+        </div>
+      ) : (
+        <div
+          className="ProseMirror prose max-w-full overflow-x-auto text-base leading-7 !text-black [&_*]:!text-black"
+          dangerouslySetInnerHTML={{
+            __html: processedContent,
+          }}
+        />
+      )}
 
       <footer className="mt-8 pt-4 border-t text-gray-400 dark:text-gray-500 text-sm">
         Last updated: {new Date(article.updated_at).toLocaleString()}

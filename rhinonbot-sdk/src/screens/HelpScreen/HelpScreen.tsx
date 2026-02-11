@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import './HelpScreen.scss';
 import { Loader } from '@/components/common';
+import { resolveS3Key, getInitialSrc } from '@/utils/s3KeyResolver';
 
 // New imports from restructured modules
 import type { Article, Folder, ChatbotConfig, HelpScreenProps } from '@/types';
@@ -23,6 +24,7 @@ const HelpScreen: React.FC<HelpScreenProps> = ({
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [resolvedSecondaryLogo, setResolvedSecondaryLogo] = useState<string>(() => getInitialSrc(chatbot_config?.secondaryLogo));
 
   // Fetch folders on mount
   useEffect(() => {
@@ -39,6 +41,17 @@ const HelpScreen: React.FC<HelpScreenProps> = ({
 
     fetchFolders();
   }, [appId]);
+
+  // Resolve S3 key for secondary logo
+  useEffect(() => {
+    const resolveLogo = async () => {
+      if (chatbot_config?.secondaryLogo) {
+        const resolved = await resolveS3Key(chatbot_config.secondaryLogo, null);
+        setResolvedSecondaryLogo(resolved);
+      }
+    };
+    resolveLogo();
+  }, [chatbot_config?.secondaryLogo]);
 
   // useEffect(() => {
   //   console.log(folders)
@@ -99,7 +112,7 @@ const HelpScreen: React.FC<HelpScreenProps> = ({
         )}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
           <img
-            src={chatbot_config?.secondaryLogo}
+            src={resolvedSecondaryLogo || chatbot_config?.secondaryLogo}
             alt='Rhinon Logo'
             style={{
               maxHeight: '36px',

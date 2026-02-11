@@ -1,8 +1,9 @@
 // ChatButton - Floating chat button component
-import React, { memo } from 'react';
+import React, { memo, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X } from 'lucide-react';
 import type { ChatbotConfig } from '@/types';
+import { resolveS3Key, getInitialSrc } from '@/utils/s3KeyResolver';
 
 interface ChatButtonProps {
   chatbot_config: ChatbotConfig;
@@ -25,6 +26,19 @@ export const ChatButton: React.FC<ChatButtonProps> = memo(({
   onClose,
   showNotification,
 }) => {
+  const [resolvedLogo, setResolvedLogo] = useState<string>(() => getInitialSrc(chatbot_config.primaryLogo));
+
+  // Resolve S3 key for logo
+  useEffect(() => {
+    const resolveLogo = async () => {
+      if (chatbot_config.primaryLogo) {
+        const resolved = await resolveS3Key(chatbot_config.primaryLogo, null);
+        setResolvedLogo(resolved);
+      }
+    };
+    resolveLogo();
+  }, [chatbot_config.primaryLogo]);
+
   // Hide button if free plan + no API key
   if (freePlan && !isApiKeyProvided) {
     return null;
@@ -65,7 +79,7 @@ export const ChatButton: React.FC<ChatButtonProps> = memo(({
         <X size={24} color='#fff' aria-hidden="true" />
       ) : (
         <img
-          src={chatbot_config.primaryLogo}
+          src={resolvedLogo || chatbot_config.primaryLogo}
           alt={`${chatbot_config.chatbotName || 'Chat'} icon`}
           style={{ width: '32px', height: '32px', objectFit: 'fill' }}
         />

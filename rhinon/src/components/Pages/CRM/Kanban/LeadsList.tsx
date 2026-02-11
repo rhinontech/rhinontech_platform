@@ -22,6 +22,7 @@ import {
 
 import { Checkbox } from "@/components/ui/checkbox";
 import LeadDetailSidebar from "./LeadDetailSidebar";
+import { SecureImage } from "@/components/Common/SecureImage";
 
 interface LeadsListProps {
   type: "people" | "company" | "deal" | "default_customers";
@@ -127,16 +128,24 @@ export default function LeadsList({
     .filter((c) => c.key !== "avatar")
     .filter((c) => !(type === "default_customers" && c.key === "email"));
 
-  const getAvatarSrc = (avatar: any) => {
-    if (!avatar) return "/image/sample-avatar.png"; // no avatar → default
-
-    // If avatar starts with http/https → it's an image
-    if (typeof avatar === "string" && avatar.startsWith("http")) {
-      return avatar;
+  // Helper to get initials from name
+  const getInitials = (name: string) => {
+    if (!name) return "?";
+    const parts = name.trim().split(" ");
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
+    return name.substring(0, 2).toUpperCase();
+  };
 
-    // If avatar is color code or something else → still use default image
-    return "/image/sample-avatar.png";
+  // Check if avatar is an actual image (S3 key or URL)
+  const hasAvatarImage = (avatar: any) => {
+    if (!avatar || typeof avatar !== "string") return false;
+    // If it's a color code, it's not an image
+    if (avatar.startsWith("#")) return false;
+    // If it's a placeholder path, treat as no image
+    if (avatar.includes("sample-avatar")) return false;
+    return true;
   };
 
   const getAvatarBg = (avatar: any) => {
@@ -239,12 +248,24 @@ export default function LeadsList({
                           style={{ backgroundColor: getStableLightColor(lead.id) }}>
                           💰
                         </div>
+                      ) : hasAvatarImage(lead.avatar) ? (
+                        <div className="w-5 h-5 rounded-full overflow-hidden border border-gray-300 dark:border-gray-600">
+                          <SecureImage
+                            src={lead.avatar}
+                            alt="avatar"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
                       ) : (
-                        <img
-                          src={getAvatarSrc(lead.avatar)}
-                          className="w-5 h-5 rounded-full object-cover"
-                          style={{ backgroundColor: getAvatarBg(lead.avatar) }}
-                        />
+                        <div
+                          className="w-5 h-5 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 overflow-hidden"
+                          style={{ backgroundColor: getStableLightColor(lead.id) }}>
+                          <img
+                            src="/image/sample-avatar.png"
+                            alt="avatar"
+                            className="w-4 h-4 object-cover opacity-80"
+                          />
+                        </div>
                       )}
                     </div>
 

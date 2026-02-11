@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import type { Message, ChatbotConfig } from '@/types';
 import { saveCustomerPhone } from '@/services/config';
 import { AVATARS, getQRCodeUrl, getWhatsAppLink } from '@/constants/urls';
+import { SecureImage } from '../common';
 
 export interface MessageItemProps {
   msg: Message;
@@ -77,7 +78,7 @@ const PhoneRequestMessage: React.FC<{
   return (
     <div key={index} className='message bot'>
       <div className='message-avatar'>
-        <img src={supportImage || AVATARS.SUPPORT} alt='Support' />
+        <SecureImage src={supportImage || AVATARS.SUPPORT} alt='Support' />
       </div>
       <div className='message-content'>
         <div className='message-bubble'>
@@ -198,7 +199,7 @@ const WhatsAppQRMessage: React.FC<{
     >
       <div style={{ display: 'flex', gap: '8px', maxWidth: '85%' }}>
         <div className='message-avatar'>
-          <img src={supportImage || AVATARS.SUPPORT} alt='Support' />
+          <SecureImage src={supportImage || AVATARS.SUPPORT} alt='Support' />
         </div>
         <div
           style={{
@@ -278,7 +279,7 @@ const RegularMessage: React.FC<{
   supportImage: string | null;
   chatbot_config: ChatbotConfig;
 }> = ({ msg, index, supportImage, chatbot_config }) => {
-  
+
   // Helper to parse and render text with clickable links
   const parseTextWithLinks = (text: string) => {
     const parts: (string | JSX.Element)[] = [];
@@ -547,7 +548,7 @@ const RegularMessage: React.FC<{
       {(msg.role === 'bot' || msg.role === 'support') && (
         <div className='message-avatar'>
           {msg.role === 'support' ? (
-            <img src={supportImage || AVATARS.SUPPORT} alt='Support' />
+            <SecureImage src={supportImage || AVATARS.SUPPORT} alt='Support' />
           ) : (
             <img src={AVATARS.BOT} alt='bot' />
           )}

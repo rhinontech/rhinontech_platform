@@ -24,6 +24,8 @@ const EmojiPickerComponent = lazy(() => import('emoji-picker-react'));
 // New imports from restructured modules
 import type { Message } from '@/types';
 import { saveCustomerPhone } from '@/services/config';
+import { getSecureViewUrl } from '@/services/chat/fileService';
+import { SecureImage } from '@/components/common';
 
 export type { Message };
 
@@ -107,14 +109,10 @@ export const ChatHeader: React.FC<{
           )}
           <div className='avatar'>
             {isSpeakingWithRealPerson ? (
-              supportImage ? (
-                <img src={supportImage} alt={supportName} />
-              ) : (
-                <img
-                  src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'
-                  alt='Support img'
-                />
-              )
+              <SecureImage
+                src={supportImage || 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'}
+                alt={supportName}
+              />
             ) : (
               <img
                 src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png'
@@ -217,6 +215,111 @@ export const ChatHeader: React.FC<{
     );
   };
 
+const SecureAttachment: React.FC<{
+  fileUrl: string;
+  fileName: string;
+  isImage: boolean;
+}> = ({ fileUrl, fileName, isImage }) => {
+  // If it starts with http/data, it's a URL. Otherwise it's a key.
+  // We initialize src to fileUrl ONLY if it's already a valid URL, to avoid 404s from trying to load the key as a relative path.
+  const isDirectUrl = fileUrl && (fileUrl.startsWith('http') || fileUrl.startsWith('data:'));
+  const [src, setSrc] = React.useState(isDirectUrl ? fileUrl : '');
+
+  React.useEffect(() => {
+    if (fileUrl && !fileUrl.startsWith('http') && !fileUrl.startsWith('data:')) {
+      let active = true;
+      getSecureViewUrl(fileUrl).then((url) => {
+        if (active && url) {
+          setSrc(url);
+        }
+      });
+      return () => {
+        active = false;
+      };
+    } else if (fileUrl !== src && (fileUrl.startsWith('http') || fileUrl.startsWith('data:'))) {
+      // Update src if prop changes to a direct URL
+      setSrc(fileUrl);
+    }
+  }, [fileUrl]);
+
+  if (isImage) {
+    return (
+      <a
+        href={src}
+        target='_blank'
+        rel='noopener noreferrer'
+        style={{
+          display: 'block',
+          maxWidth: '200px',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          border: '1px solid #ddd',
+          textDecoration: 'none',
+        }}
+      >
+        <img
+          src={src}
+          alt={fileName}
+          style={{
+            width: '100%',
+            height: 'auto',
+            display: 'block',
+          }}
+        />
+        <p
+          style={{
+            fontSize: '12px',
+            textAlign: 'center',
+            padding: '4px',
+            background: '#f9fafb',
+            color: '#374151',
+            margin: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {fileName}
+        </p>
+      </a>
+    );
+  } else {
+    return (
+      <a
+        href={src}
+        target='_blank'
+        rel='noopener noreferrer'
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '8px',
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          background: 'white',
+          textDecoration: 'none',
+          color: '#111827',
+          fontSize: '14px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+        }}
+      >
+        📎
+        <div
+          style={{
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontWeight: 500,
+          }}
+        >
+          {fileName}
+        </div>
+      </a>
+    );
+  }
+};
+
 // ====== Message Item Component ======
 export const MessageItem: React.FC<{
   msg: Message;
@@ -301,14 +404,10 @@ export const MessageItem: React.FC<{
     return (
       <div key={index} className='message bot'>
         <div className='message-avatar'>
-          {supportImage ? (
-            <img src={supportImage} alt='Support' />
-          ) : (
-            <img
-              src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png'
-              alt='Support img'
-            />
-          )}
+          <SecureImage
+            src={supportImage || 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png'}
+            alt='Support'
+          />
         </div>
         <div className='message-content'>
           <div className='message-bubble'>
@@ -414,14 +513,10 @@ export const MessageItem: React.FC<{
     return (
       <div key={index} className='message bot'>
         <div className='message-avatar'>
-          {supportImage ? (
-            <img src={supportImage} alt='Support' />
-          ) : (
-            <img
-              src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'
-              alt='Support img'
-            />
-          )}
+          <SecureImage
+            src={supportImage || 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'}
+            alt='Support'
+          />
         </div>
         <div className='message-content'>
           <div className='message-bubble'>
@@ -560,15 +655,10 @@ export const MessageItem: React.FC<{
       >
         <div style={{ display: 'flex', gap: '8px', maxWidth: '85%' }}>
           <div className='message-avatar'>
-            {/* <img src={supportImage} alt='bot' /> */}
-            {supportImage ? (
-              <img src={supportImage} alt='Support' />
-            ) : (
-              <img
-                src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'
-                alt='Support img'
-              />
-            )}
+            <SecureImage
+              src={supportImage || 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'}
+              alt='Support'
+            />
           </div>
           <div
             style={{
@@ -687,17 +777,10 @@ export const MessageItem: React.FC<{
       {(msg.role === 'bot' || msg.role === 'support') && (
         <div className='message-avatar'>
           {msg.role === 'support' ? (
-            supportImage ? (
-              <img
-                src={supportImage}
-                alt={msg.role === 'support' ? 'Support' : 'Bot'}
-              />
-            ) : (
-              <img
-                src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'
-                alt='Support img'
-              />
-            )
+            <SecureImage
+              src={supportImage || 'https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'}
+              alt='Support'
+            />
           ) : (
             <img
               src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png'
@@ -717,77 +800,12 @@ export const MessageItem: React.FC<{
               const fileName = match ? match[2] : 'Download file';
               const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
 
-              return isImage ? (
-                <a
-                  href={fileUrl}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  style={{
-                    display: 'block',
-                    maxWidth: '200px',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    border: '1px solid #ddd',
-                    textDecoration: 'none',
-                  }}
-                >
-                  <img
-                    src={fileUrl}
-                    alt={fileName}
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      display: 'block',
-                    }}
-                  />
-                  <p
-                    style={{
-                      fontSize: '12px',
-                      textAlign: 'center',
-                      padding: '4px',
-                      background: '#f9fafb',
-                      color: '#374151',
-                      margin: 0,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {fileName}
-                  </p>
-                </a>
-              ) : (
-                <a
-                  href={fileUrl}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    background: 'white',
-                    textDecoration: 'none',
-                    color: '#111827',
-                    fontSize: '14px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                  }}
-                >
-                  📎
-                  <div
-                    style={{
-                      flex: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {fileName}
-                  </div>
-                </a>
+              return (
+                <SecureAttachment
+                  fileUrl={fileUrl}
+                  fileName={fileName}
+                  isImage={isImage}
+                />
               );
             })()
           ) : typeof msg.text === 'string' ? (

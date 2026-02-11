@@ -108,7 +108,8 @@ export default function AI_Prompt({
       setUploading(true);
 
       const result = await uploadFileAndGetFullUrl(file);
-      const fileUrl = result?.fileUrl || result?.url;
+      // Use key as the file URL for secure access
+      const fileUrl = result.key;
       const fileName = file.name;
 
       const fileMessage = `<a href="${fileUrl}" target="_blank">${fileName}</a>`;

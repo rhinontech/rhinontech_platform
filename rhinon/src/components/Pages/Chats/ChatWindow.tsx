@@ -1,4 +1,5 @@
 import { useRef, useEffect } from "react";
+import { SecureImage } from "@/components/Common/SecureImage";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -170,7 +171,7 @@ export function ChatWindow({
                 </div>
               );
             }
-            
+
             if (msg.role === "trigger") {
               return (
                 <div key={i} className="flex justify-center">
@@ -219,7 +220,7 @@ export function ChatWindow({
                               })
                             }
                             className="cursor-pointer block max-w-xs rounded-lg overflow-hidden border shadow-sm hover:opacity-90">
-                            <img
+                            <SecureImage
                               src={fileUrl}
                               alt={fileName}
                               className="w-full h-auto"

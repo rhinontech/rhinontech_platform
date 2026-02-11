@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft,
   EllipsisVertical,
@@ -6,6 +6,7 @@ import {
   Minimize2,
 } from 'lucide-react';
 import './HelpArticlePage.scss';
+import { resolveS3Key, getInitialSrc } from '@/utils/s3KeyResolver';
 
 // New imports from restructured modules
 import type { Article, ChatbotConfig, HelpArticlePageProps } from '@/types';
@@ -17,6 +18,18 @@ const HelpArticlePage: React.FC<HelpArticlePageProps> = ({
   selectedHelpArticle,
 }) => {
   const [maxScreen, setMaxScreen] = useState<boolean>(false);
+  const [resolvedSecondaryLogo, setResolvedSecondaryLogo] = useState<string>(() => getInitialSrc(chatbot_config?.secondaryLogo));
+
+  // Resolve S3 key for secondary logo
+  useEffect(() => {
+    const resolveLogo = async () => {
+      if (chatbot_config?.secondaryLogo) {
+        const resolved = await resolveS3Key(chatbot_config.secondaryLogo, null);
+        setResolvedSecondaryLogo(resolved);
+      }
+    };
+    resolveLogo();
+  }, [chatbot_config?.secondaryLogo]);
 
   const handleOnBack = () => {
     setSelectedHelpArticle(null);
@@ -55,7 +68,7 @@ const HelpArticlePage: React.FC<HelpArticlePageProps> = ({
 
         <div style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
           <img
-            src={chatbot_config?.secondaryLogo}
+            src={resolvedSecondaryLogo || chatbot_config?.secondaryLogo}
             alt='Rhinon Logo'
             style={{
               maxHeight: '36px',

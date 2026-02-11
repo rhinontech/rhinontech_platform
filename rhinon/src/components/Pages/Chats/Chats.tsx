@@ -33,6 +33,7 @@ import { ChatSidebar } from "./ChatSidebar";
 import { ChatInfoSidebar } from "./ChatInfoSidebar";
 import { ChatWindow } from "./ChatWindow";
 import { WhatsAppPanel } from "./WhatsAppPanel";
+import { SecureImage } from "@/components/Common/SecureImage";
 import { X, Info, MessageCircle } from "lucide-react";
 
 export default function Chats() {
@@ -1034,7 +1035,7 @@ export default function Chats() {
                                           setIsModalOpen(true);
                                         }}
                                         className="cursor-pointer block max-w-xs rounded-lg overflow-hidden border shadow-sm hover:opacity-90">
-                                        <img
+                                        <SecureImage
                                           src={fileUrl}
                                           alt={fileName}
                                           className="w-full h-auto"
