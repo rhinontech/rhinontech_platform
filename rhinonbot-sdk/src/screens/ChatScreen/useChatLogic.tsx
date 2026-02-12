@@ -218,7 +218,6 @@ export const useChatLogic = ({
     setIsConversationClosed(false);
     setIsConversationActive(true);
     setIsSpeakingWithRealPerson(false);
-    console.log("fetchChats")
     //setChatMessages([]);
 
     const requestBody = {
