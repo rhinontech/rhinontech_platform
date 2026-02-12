@@ -1,7 +1,7 @@
 # Rhinon Tech Platform - Complete Project Overview
 
-> **Last Updated:** January 14, 2026  
-> **Version:** 2.0.0  
+> **Last Updated:** February 12, 2026  
+> **Version:** 2.1.0  
 > **Status:** ✅ Production Ready
 
 ---
@@ -37,10 +37,12 @@
 | Frontend | Next.js 15 | TypeScript | 4000 |
 | Backend API | Express.js | JavaScript | 3000/5000 |
 | AI Service | FastAPI | Python 3.11 | 5002 |
+| Real-time Communication | Socket.IO | JavaScript | 5000 |
 | Database | PostgreSQL + pgvector | SQL | 5432 |
 | Cache | Redis | - | 6379 |
 | Reverse Proxy | Nginx | - | 80/443 |
 | SDK | TypeScript Library | TypeScript | - |
+| File Storage | AWS S3 (Presigned URLs) | - | - |
 
 ---
 
@@ -968,7 +970,189 @@ psql -h localhost -U postgres -d rhinontech
 
 ---
 
-## 📚 Additional Documentation
+## � Real-time Communication (WebSocket Architecture)
+
+### WebSocket Implementation
+
+**Technology:** Socket.IO v4.x running on RT Server (Express.js)
+
+**Architecture:** Room-based routing with organization-level isolation
+
+#### Connection Types
+
+| Connection Type | Query Parameters | Joins Rooms | Purpose |
+|----------------|------------------|-------------|---------|
+| **Dashboard** | `dashboard=true`, `chatbot_id` | `dashboard:{chatbot_id}` | Support agent interface |
+| **Customer/Visitor** | `is_visitor=true`, `chatbot_id`, `visitor_id`, `user_email` | Auto-joins conversation rooms | End-user chatbot widget |
+
+#### Room Naming Convention
+
+```javascript
+// Conversation rooms (1-to-1 messaging)
+conv:{chatbot_history}:{organization_id}
+
+// Dashboard broadcast rooms (notifications)
+dashboard:{chatbot_id}
+```
+
+### Message Routing Flow
+
+```mermaid
+graph LR
+    subgraph "Customer Side"
+        CUSTOMER[Customer Socket]
+    end
+    
+    subgraph "Server"
+        SOCKET[Socket.IO Server]
+        CONV_ROOM[Conversation Room\u003cbr/\u003econv:ID:ORG]
+        DASH_ROOM[Dashboard Room\u003cbr/\u003edashboard:CHATBOT]
+    end
+    
+    subgraph "Dashboard Side"
+        DASHBOARD[Dashboard Socket]
+    end
+    
+    CUSTOMER -->|Sends Message| SOCKET
+    SOCKET -->|broadcast.to| CONV_ROOM
+    SOCKET -->|emit to| DASH_ROOM
+    CONV_ROOM -->|Receives| DASHBOARD
+    DASH_ROOM -->|Notification| DASHBOARD
+    DASHBOARD -->|Reply| SOCKET
+    SOCKET -->|broadcast.to| CONV_ROOM
+    CONV_ROOM -->|Receives| CUSTOMER
+```
+
+### Key Features
+
+✅ **One-to-One Routing** - Messages only reach intended recipients  
+✅ **Organization Isolation** - Multi-tenant security  
+✅ **Auto-Join Rooms** - Sockets automatically join conversation rooms on first message  
+✅ **No Echo** - Using `socket.broadcast.to()` prevents sender from receiving own messages  
+✅ **Duplicate Prevention** - Client-side deduplication for messages received from multiple rooms  
+✅ **Real-time Notifications** - Dashboard receives immediate updates for new conversations  
+
+### WebSocket Events
+
+#### Client → Server
+
+| Event | Data | Description |
+|-------|------|-------------|
+| `message` | `{text, role, chatbot_id, chatbot_history, organization_id}` | Send a message |
+| `join_conversation` | `{chatbot_history, chatbot_id, organization_id}` | Join a conversation room |
+| `open_chat` | `{room, conversationId}` | Trigger chat open in customer widget |
+
+#### Server → Client
+
+| Event | Data | Description |
+|-------|------|-------------|
+| `message` | `{text, role, timestamp, chatbot_history, ...}` | Receive a message |
+| `newConversation` | `{conversation object}` | New conversation started |
+| `conversation:closed` | `{chatbot_history, organization_id}` | Conversation ended |
+| `visitor_update` | `{visitor data}` | Visitor activity update |
+
+### Organization-Level Security
+
+**Multi-layer isolation:**
+
+1. **Room-based routing** - Messages emitted only to specific conversation rooms
+2. **Organization filtering** - Client-side validation of `organization_id`
+3. **Query parameter validation** - Server validates `chatbot_id` and `organization_id` match
+
+**Implementation:**
+```javascript
+// Backend (rtserver/utils/socket.js)
+const conversationRoom = `conv:${chatbot_history}:${organization_id}`;
+socket.broadcast.to(conversationRoom).emit("message", data);
+
+// Frontend (rhinon/src/app/[role]/layout.tsx)
+socket.on("message", (msg) => {
+  if (msg.organization_id !== userOrganizationId) return;
+  // Process message...
+});
+```
+
+---
+
+## 🗂️ AWS S3 Configuration
+
+### Presigned URL Implementation
+
+**Version:** AWS SDK v3 for JavaScript  
+**Purpose:** Secure, time-limited access to private S3 objects
+
+#### Use Cases
+
+| Asset Type | Bucket | Expiration | Use Case |
+|------------|--------|------------|----------|
+| **Chatbot Avatars** | `rhinon-{env}-assets` | 1 hour | Bot profile images |
+| **Background Images** | `rhinon-{env}-assets` | 1 hour | Chat widget backgrounds |
+| **Uploaded Files** | `rhinon-{env}-assets` | 15 minutes | Message attachments |
+| **Email Attachments** | `rhinon-{env}-emails` | 30 minutes | Email content |
+
+#### Architecture
+
+```mermaid
+graph LR
+    CLIENT[Client Request]
+    BACKEND[RT Server]
+    S3[AWS S3]
+    
+    CLIENT -->|Request S3 Key| BACKEND
+    BACKEND -->|Generate Presigned URL| S3
+    S3 -->|Return Signed URL| BACKEND  
+    BACKEND -->|Send Presigned URL| CLIENT
+    CLIENT -->|Direct Access| S3
+```
+
+#### Implementation Details
+
+**Backend Service:**
+```javascript
+// rtserver/utils/s3.js
+const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+
+const generatePresignedUrl = async (s3Key) => {
+  const command = new GetObjectCommand({
+    Bucket: process.env.AWS_S3_BUCKET,
+    Key: s3Key,
+  });
+  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+};
+```
+
+**API Endpoints:**
+- `GET /api/s3/presigned-url?key={s3Key}` - Generate presigned URL for any S3 key
+- Integrated into chatbot config endpoints for automatic resolution
+
+#### Benefits
+
+✅ **Security** - S3 buckets remain private, no public access  
+✅ **Scalability** - Direct S3 access, no bandwidth through backend  
+✅ **Cost Efficiency** - Reduced data transfer costs  
+✅ **Flexibility** - Time-limited access with automatic expiration  
+
+### S3 Bucket Structure
+
+```
+rhinon-{env}-assets/
+├── chatbots/
+│   ├── avatars/
+│   └── backgrounds/
+├── users/
+│   └── uploads/
+└── organizations/
+    └── assets/
+
+rhinon-{env}-emails/
+├── inbound/
+└── outbound/
+```
+
+---
+
+## �📚 Additional Documentation
 
 - [README.md](README.md) - Getting started guide
 - [DOCKER_SETUP.md](docs/DOCKER_SETUP.md) - Docker configuration details
@@ -988,6 +1172,8 @@ psql -h localhost -U postgres -d rhinontech
 | **SSL Certificates** | 2 (Prod, Beta) |
 | **Database Tables** | 48+ |
 | **API Endpoints** | 100+ |
+| **WebSocket Events** | 6 core events |
+| **S3 Buckets** | 4 (2 prod, 2 beta) |
 | **Lines of Code** | ~55,500 |
 | **Docker Images** | 3 custom images |
 | **Terraform Modules** | 7 reusable modules |

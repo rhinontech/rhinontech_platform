@@ -4,6 +4,7 @@ const {
   PutObjectCommand,
   GetObjectCommand,
 } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const multer = require("multer");
 const multerS3 = require("multer-s3");
 const path = require("path");
@@ -181,7 +182,6 @@ const handleConversationFileUpload = (req, res) => {
     message: "Conversation file uploaded successfully",
     fileName,
     key: req.file.key,
-    url: req.file.location,
     mimeType: req.file.mimetype,
   });
 };
@@ -216,6 +216,62 @@ const handleKBFileUpload = (req, res) => {
 };
 
 
+
+
+// Controller: Get Presigned Upload URL (PUT)
+const getPresignedUploadUrl = async (req, res) => {
+  const { fileName, fileType, folder } = req.body;
+
+  if (!fileName || !fileType) {
+    return res.status(400).json({ error: "fileName and fileType are required" });
+  }
+
+  const uniqueFileName = generateFileName(fileName);
+  const targetFolder = folder ? `${process.env.S3_FOLDER_NAME}/${folder}` : process.env.S3_FOLDER_NAME;
+  const key = `${targetFolder}/${uniqueFileName}`;
+
+  const command = new PutObjectCommand({
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: key,
+    ContentType: fileType,
+  });
+
+  try {
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 }); // 5 minutes
+    res.json({
+      uploadUrl,
+      key,
+      fileName: uniqueFileName,
+    });
+  } catch (err) {
+    console.error("Presigned Upload URL error:", err);
+    res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+};
+
+// Controller: Get Presigned Download URL (GET)
+const getPresignedDownloadUrl = async (req, res) => {
+  // Support both body (POST) and query (GET) for flexibility
+  const key = req.query.key || (req.body && req.body.key);
+
+  if (!key) {
+    return res.status(400).json({ error: "File key is required" });
+  }
+
+  const command = new GetObjectCommand({
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: key,
+  });
+
+  try {
+    const downloadUrl = await getSignedUrl(s3, command, { expiresIn: 3600 }); // 1 hour
+    res.json({ downloadUrl });
+  } catch (err) {
+    console.error("Presigned Download URL error:", err);
+    res.status(500).json({ error: "Failed to generate download URL" });
+  }
+};
+
 module.exports = {
   uploadSingleImage,
   uploadSingleFile,
@@ -226,5 +282,7 @@ module.exports = {
   uploadConversationFile,
   handleConversationFileUpload,
   uploadKBFile,
-  handleKBFileUpload
+  handleKBFileUpload,
+  getPresignedUploadUrl,
+  getPresignedDownloadUrl
 };

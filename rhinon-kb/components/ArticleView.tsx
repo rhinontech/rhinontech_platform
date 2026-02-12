@@ -1,8 +1,9 @@
 "use client";
 
 import { Article, Theme } from "@/types/kb";
-import { ChevronLeft, Copy, Calendar, Eye, ThumbsUp, ThumbsDown } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, Copy, Calendar, Eye, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { resolveImagesInHTML } from "@/helpers/html-image-resolver";
 import "./tiptap.css";
 
 import { useRouter } from "next/navigation";
@@ -17,7 +18,28 @@ export function ArticleView({ article, theme, onBack }: ArticleViewProps) {
     const [copied, setCopied] = useState(false);
     const [liked, setLiked] = useState(false);
     const [disliked, setDisliked] = useState(false);
+    const [processedContent, setProcessedContent] = useState<string>("");
+    const [loadingImages, setLoadingImages] = useState(true);
     const router = useRouter();
+
+    // Process article content to resolve S3 keys in images
+    useEffect(() => {
+        const processContent = async () => {
+            setLoadingImages(true);
+            try {
+                const sanitized = sanitizeQuillHTML(article.content);
+                const resolved = await resolveImagesInHTML(sanitized);
+                setProcessedContent(resolved);
+            } catch (error) {
+                console.error("Error processing article content:", error);
+                setProcessedContent(sanitizeQuillHTML(article.content));
+            } finally {
+                setLoadingImages(false);
+            }
+        };
+
+        processContent();
+    }, [article.content]);
 
     const handleBack = () => {
         if (onBack) {
@@ -101,12 +123,21 @@ export function ArticleView({ article, theme, onBack }: ArticleViewProps) {
                 </div>
 
                 {/* Main Content */}
-                <div
-                    className="ProseMirror prose max-w-full overflow-x-auto text-base leading-7 !text-black [&_*]:!text-black"
-                    dangerouslySetInnerHTML={{
-                        __html: sanitizeQuillHTML(article.content),
-                    }}
-                />
+                {loadingImages ? (
+                    <div className="flex items-center justify-center py-12">
+                        <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Loading images...</p>
+                        </div>
+                    </div>
+                ) : (
+                    <div
+                        className="ProseMirror prose max-w-full overflow-x-auto text-base leading-7 !text-black [&_*]:!text-black"
+                        dangerouslySetInnerHTML={{
+                            __html: processedContent,
+                        }}
+                    />
+                )}
 
                 {/* Keywords Section */}
                 {article.keywords && article.keywords.length > 0 && (

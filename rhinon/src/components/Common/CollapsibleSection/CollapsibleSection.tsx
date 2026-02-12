@@ -15,6 +15,7 @@ import ReactCrop, {
   convertToPixelCrop,
   makeAspectCrop,
 } from "react-image-crop";
+import { SecureImage } from "@/components/Common/SecureImage";
 import "react-image-crop/dist/ReactCrop.css";
 import { uploadFileAndGetFullUrl } from "@/services/fileUploadService";
 import { Separator } from "@radix-ui/react-select";
@@ -159,11 +160,15 @@ export default function CollapsibleSection({
       setUploading(true);
 
       const result = await uploadFileAndGetFullUrl(file);
-      const fileUrl = result?.fileUrl || result?.url;
-      if (!fileUrl) throw new Error("File upload failed, no URL returned");
+      // We now receive a KEY, not a permanent URL.
+      // But for immediate feedback, we can use the result.key
+      // SecureImage will handle fetching the signed URL.
+      const fileKey = result?.key;
 
-      // update themeSettings with uploaded logo URL
-      updateThemeSettings(logoType, fileUrl);
+      if (!fileKey) throw new Error("File upload failed, no Key returned");
+
+      // update themeSettings with uploaded logo Key
+      updateThemeSettings(logoType, fileKey);
     } catch (err) {
       console.error("File upload failed:", err);
     } finally {
@@ -312,7 +317,7 @@ export default function CollapsibleSection({
                 {/* Preview */}
                 {themeSettings.backgroundImage && (
                   <div className="relative">
-                    <img
+                    <SecureImage
                       src={themeSettings.backgroundImage}
                       alt="Background preview"
                       className="w-full h-32 object-cover rounded-lg border-2 border-muted"
@@ -646,7 +651,7 @@ export default function CollapsibleSection({
                 {themeSettings.primaryLogo && (
                   <div className="flex flex-col items-center gap-2">
                     <div className="w-20 h-20 rounded-lg border-2 border-muted flex items-center justify-center bg-background overflow-hidden shadow-sm">
-                      <img
+                      <SecureImage
                         src={themeSettings.primaryLogo}
                         alt="Primary Logo"
                         className="object-contain h-full"
@@ -680,7 +685,7 @@ export default function CollapsibleSection({
                 {themeSettings.secondaryLogo && (
                   <div className="flex flex-col items-center gap-2">
                     <div className="w-20 h-20 rounded-lg border-2 border-muted flex items-center justify-center bg-background overflow-hidden shadow-sm">
-                      <img
+                      <SecureImage
                         src={themeSettings.secondaryLogo}
                         alt="Secondary Logo"
                         className="object-contain h-full"

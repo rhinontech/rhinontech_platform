@@ -9,6 +9,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Eye, EyeOff, Pencil } from "lucide-react";
 import { FileViewerModal } from "@/components/Common/FileViewerModal/FileViewerModal";
+import { SecureImage } from "@/components/Common/SecureImage";
 import {
   getUserProfileDetials,
   updateUserProfileDetials,
@@ -113,8 +114,8 @@ const Profile = () => {
     try {
       setUploading(true);
       const result = await uploadFileAndGetFullUrl(file);
-      const fileUrl = result?.fileUrl || result?.url;
-      if (!fileUrl) throw new Error("File upload failed, no URL returned");
+      const fileUrl = result.key;
+      if (!fileUrl) throw new Error("File upload failed, no Key returned");
 
       setProfileImage(fileUrl);
       setSelectedFile({ url: fileUrl, name: file.name, type: file.type });
@@ -200,13 +201,12 @@ const Profile = () => {
                       className="w-48 h-48 flex items-center justify-center rounded-full bg-[#1a2753] text-white text-3xl font-bold overflow-hidden cursor-pointer"
                       onClick={handlePreview}>
                       {profileImage ? (
-                        <Image
+                        <SecureImage
                           src={profileImage}
                           alt="Profile"
                           width={128}
                           height={128}
                           className="w-full h-full object-cover"
-                          unoptimized
                         />
                       ) : (
                         (firstName[0] || "") + (lastName[0] || "")

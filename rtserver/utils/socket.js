@@ -2,6 +2,7 @@ const {
   live_visitors,
   support_conversations,
   bot_conversations,
+  chatbots,
 } = require("../models");
 
 module.exports = (io) => {
@@ -118,8 +119,10 @@ module.exports = (io) => {
         console.log(`[Dashboard Disconnected] ${dashboardRoom}`);
       });
 
-      return; // Dashboard logic ends here
+      // Don't return - allow dashboard to also send messages
+      // return; // Dashboard logic ends here
     }
+
 
     // Visitor Connections
 
@@ -129,6 +132,14 @@ module.exports = (io) => {
       visitorSockets.set(visitor_id, socket.id);
 
       try {
+        // Lookup organization_id for visitor's chatbot
+        const chatbot = await chatbots.findOne({
+          where: { chatbot_id },
+          attributes: ["organization_id"],
+        });
+
+        const organization_id = chatbot?.organization_id;
+
         const [visitorRecord] = await live_visitors.upsert({
           chatbot_id,
           visitor_id,
@@ -141,6 +152,9 @@ module.exports = (io) => {
         });
 
         console.log(`[Visitor Connected] ${room}`);
+
+        // Join visitor to their conversation room if they have an active conversation
+        // This will be done dynamically when conversation is created/loaded
 
         io.to(`dashboard:${chatbot_id}`).emit("visitor_update", {
           type: "connected",
@@ -171,6 +185,26 @@ module.exports = (io) => {
       });
     }
 
+
+    // Join Conversation Room Handler
+    socket.on("join_conversation", async ({ chatbot_history, chatbot_id, organization_id }) => {
+      if (!chatbot_history) return;
+      try {
+        let org_id = organization_id;
+        if (!org_id && chatbot_id) {
+          const chatbot = await chatbots.findOne({ where: { chatbot_id }, attributes: ["organization_id"] });
+          org_id = chatbot?.organization_id;
+        }
+        if (org_id) {
+          const room = `conv:${chatbot_history}:${org_id}`;
+          socket.join(room);
+          console.log(`[JoinConversation] Socket joined ${room}`);
+        }
+      } catch (error) {
+        console.error("[JoinConversation] Error:", error);
+      }
+    });
+
     // Message Handling
 
     socket.on("message", async (data) => {
@@ -188,6 +222,19 @@ module.exports = (io) => {
       if (!text) return console.error("Message text is required");
 
       try {
+        // Lookup organization_id from chatbot_id
+        const chatbot = await chatbots.findOne({
+          where: { chatbot_id },
+          attributes: ["organization_id"],
+        });
+
+        if (!chatbot) {
+          console.error(`Chatbot not found for chatbot_id: ${chatbot_id}`);
+          return;
+        }
+
+        const organization_id = chatbot.organization_id;
+
         // Ensure bot conversation exists
         let conv = await bot_conversations.findOne({
           where: {
@@ -240,10 +287,34 @@ module.exports = (io) => {
           updated_at: new Date(),
         });
 
+        // Define conversation room
+        const conversationRoom = `conv:${chatbot_history}:${organization_id}`;
+
+        // Auto-join the sender to the conversation room if not already joined
+        socket.join(conversationRoom);
+        console.log(`[AutoJoin] Socket ${socket.id} joined ${conversationRoom}`);
+
+        // Attach organization_id to the message data for frontend filtering
+        const enrichedData = { ...data, organization_id };
+
         if (isNewConversation) {
-          io.emit("newConversation", conversation);
-        } else {
-          socket.broadcast.emit("message", data);
+          // Emit new conversation only to organization dashboard
+          io.to(`dashboard:${chatbot_id}`).emit("newConversation", {
+            ...conversation.dataValues,
+            organization_id,
+          });
+          console.log(`[NewConversation] Emitted to dashboard:${chatbot_id}`);
+        }
+
+        // Emit message to conversation room (broadcast to others, not sender)
+        // Use socket.broadcast.to to prevent sender from receiving their own message
+        socket.broadcast.to(conversationRoom).emit("message", enrichedData);
+        console.log(`[Message] Broadcast to room: ${conversationRoom}`);
+
+        // If message is from user/customer, also notify the dashboard
+        if (role === "user") {
+          io.to(`dashboard:${chatbot_id}`).emit("message", enrichedData);
+          console.log(`[UserMessage] Also notified dashboard:${chatbot_id}`);
         }
       } catch (error) {
         console.error("Error saving message:", error);
@@ -253,17 +324,35 @@ module.exports = (io) => {
     // Conversation Close Handler
     socket.on("conversation:closed", async (data) => {
       console.log("🔒 Conversation closed:", data);
-      const { chatbot_history, conversation_id } = data;
+      const { chatbot_history, conversation_id, chatbot_id } = data;
 
       try {
-        
-        // Broadcast to all connected clients (including admin dashboard)
-        io.emit("conversation:closed", {
-          ...data,
-          chatbot_history: chatbot_history || conversation_id,
+        // Lookup organization_id
+        const chatbot = await chatbots.findOne({
+          where: { chatbot_id },
+          attributes: ["organization_id"],
         });
 
-        console.log("✅ Conversation close event broadcasted");
+        const organization_id = chatbot?.organization_id;
+        const conversationRoom = `conv:${chatbot_history || conversation_id}:${organization_id}`;
+
+        // Emit to conversation room (customer + support in that conversation)
+        io.to(conversationRoom).emit("conversation:closed", {
+          ...data,
+          chatbot_history: chatbot_history || conversation_id,
+          organization_id,
+        });
+
+        // Also emit to organization dashboard
+        if (chatbot_id) {
+          io.to(`dashboard:${chatbot_id}`).emit("conversation:closed", {
+            ...data,
+            chatbot_history: chatbot_history || conversation_id,
+            organization_id,
+          });
+        }
+
+        console.log(`✅ Conversation close event emitted to ${conversationRoom} and dashboard:${chatbot_id}`);
       } catch (error) {
         console.error("❌ Error handling conversation close:", error);
       }

@@ -613,12 +613,15 @@ export const useChatLogic = ({
       setLoading(true);
       const result = await uploadConversationFile(file);
 
+      // Prefer key if available, otherwise fallback to url (legacy)
+      const linkTarget = result.key || result.url;
+
       const newMessage: Message = {
         user_email: userEmail,
         chatbot_id: appId,
         user_id: userId,
         role: 'user',
-        text: `<a href="${result.url}" target="_blank">${result.fileName}</a>`,
+        text: `<a href="${linkTarget}" target="_blank">${result.fileName}</a>`,
         chatbot_history: convoId,
         timestamp: new Date().toISOString(),
       };

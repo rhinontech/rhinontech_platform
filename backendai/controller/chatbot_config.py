@@ -11,9 +11,29 @@ import PyPDF2
 import base64
 from typing import Optional
 from services.openai_services import client
+import boto3
+import os
+
+# Initialize S3 Client
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+    region_name=os.getenv('AWS_REGION')
+)
+BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
 
 def encode_image(image_bytes):
     return base64.b64encode(image_bytes).decode('utf-8')
+
+def fetch_file_from_s3(key: str) -> Optional[bytes]:
+    """Helper to fetch file content bytes from S3 securely"""
+    try:
+        response = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)
+        return response['Body'].read()
+    except Exception as e:
+        logging.error(f"Error fetching file from S3 (Key: {key}): {e}")
+        return None
 
 def generate_chatbot_training_instruction(content: str, image_bytes: Optional[bytes] = None) -> str:
     """
@@ -124,22 +144,19 @@ def get_url_data(url):
         return ""
 
 
-# Fetch the image from the URL
-def image_data(url):
-    response_image = requests.get(url)
-    if response_image.status_code == 200:
-        # img = PIL.Image.open(BytesIO(response_image.content)) # Not needed for OpenAI logic here
-        summary = generate_chatbot_training_instruction("", image_bytes=response_image.content)
+# Fetch the image from S3 Key (formerly URL)
+def image_data(s3_key: str):
+    image_bytes = fetch_file_from_s3(s3_key)
+    if image_bytes:
+        summary = generate_chatbot_training_instruction("", image_bytes=image_bytes)
         return summary
     else:
-        print("Failed to retrieve the image. Status code:", response_image.status_code)
+        print(f"Failed to retrieve image: {s3_key}")
 
-def pdf_data(pdf_url):
-    response = requests.get(pdf_url)
-    response.raise_for_status()
-    
-    if response.status_code == 200:
-        file = BytesIO(response.content)
+def pdf_data(s3_key: str):
+    file_bytes = fetch_file_from_s3(s3_key)
+    if file_bytes:
+        file = BytesIO(file_bytes)
         reader = PyPDF2.PdfReader(file)
         text = ""
         for page_num in range(len(reader.pages)):
@@ -151,12 +168,10 @@ def pdf_data(pdf_url):
         return summary
         
         
-def doc_data(docx_url):
-    response = requests.get(docx_url)
-    response.raise_for_status()
-    
-    if response.status_code == 200:
-        file = BytesIO(response.content)
+def doc_data(s3_key: str):
+    file_bytes = fetch_file_from_s3(s3_key)
+    if file_bytes:
+        file = BytesIO(file_bytes)
         doc = docx.Document(file)
         text = "\n".join([para.text for para in doc.paragraphs])
         
@@ -164,23 +179,19 @@ def doc_data(docx_url):
         print(summary)
         return summary
         
-def txt_data(txt_url):
-    response = requests.get(txt_url)
-    response.raise_for_status()
-    
-    if response.status_code == 200:
-        text = response.text
+def txt_data(s3_key: str):
+    file_bytes = fetch_file_from_s3(s3_key)
+    if file_bytes:
+        text = file_bytes.decode('utf-8')
         
         summary = generate_chatbot_training_instruction(text)
         print(summary)
         return summary
 
-def ppt_data(pptx_url):
-    response = requests.get(pptx_url)
-    response.raise_for_status()
-
-    if response.status_code == 200:
-        file = BytesIO(response.content)
+def ppt_data(s3_key: str):
+    file_bytes = fetch_file_from_s3(s3_key)
+    if file_bytes:
+        file = BytesIO(file_bytes)
         presentation = Presentation(file)
         text = ""
 

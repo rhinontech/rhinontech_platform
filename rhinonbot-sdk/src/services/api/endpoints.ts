@@ -36,6 +36,7 @@ export const ENDPOINTS = {
 
   // Files
   FILE_UPLOAD_CONVERSATION: '/aws/fileUploadForConversation',
+  PRESIGNED_URL: '/aws/presigned-url',
 
   // SEO / Analytics
   SEO_PAGEVIEW: '/seo/pageview',

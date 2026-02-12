@@ -17,6 +17,7 @@ import { getTicketsStatus, updateTicketRating } from '@/services/ticket';
 
 // Assets
 import svgIcons from '@assets/svgIcons';
+import { resolveS3Key, getInitialSrc } from '@/utils/s3KeyResolver';
 
 interface IConversationIds {
   conversation_id: string;
@@ -73,6 +74,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   const [ticket, setTicket] = useState<ticket>(null);
   const [openTicket, setOpenTicket] = useState<boolean>(false);
   const [tickets, setTickets] = useState<ticket[]>([]);
+  const [resolvedBgImage, setResolvedBgImage] = useState<string>(() => getInitialSrc(chatbot_config.backgroundImage));
+  const [resolvedLogo, setResolvedLogo] = useState<string>(() => getInitialSrc(chatbot_config.primaryLogo));
 
   const fetchConversation = async () => {
     try {
@@ -115,6 +118,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
       setLoading(false);
     }
   }, [userId, appId, showNotification]);
+
+  // Resolve S3 keys for images
+  useEffect(() => {
+    const resolveImages = async () => {
+      if (chatbot_config.backgroundImage) {
+        const resolved = await resolveS3Key(chatbot_config.backgroundImage, null);
+        setResolvedBgImage(resolved);
+      }
+      if (chatbot_config.primaryLogo) {
+        const resolved = await resolveS3Key(chatbot_config.primaryLogo, null);
+        setResolvedLogo(resolved);
+      }
+    };
+    resolveImages();
+  }, [chatbot_config.backgroundImage, chatbot_config.primaryLogo]);
 
   const handleSendMessage = (conversationId?: string) => {
     onNavigate('chats');
@@ -419,7 +437,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             } ${chatbot_config.isBgFade ? 'fade' : ''}`}
           style={{
             ['--primary-color' as any]: `${chatbot_config.primaryColor}`,
-            ['--background-image' as any]: `url(${chatbot_config.backgroundImage})`,
+            ['--background-image' as any]: `url(${resolvedBgImage || chatbot_config.backgroundImage})`,
           }}
         >
           {/* Logo */}
@@ -432,7 +450,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
           >
             <img
-              src={chatbot_config.primaryLogo}
+              src={resolvedLogo || chatbot_config.primaryLogo}
               alt='Chatbot Logo'
               style={{
                 maxHeight: '60px', // controls vertical size

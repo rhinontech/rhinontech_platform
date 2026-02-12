@@ -26,11 +26,13 @@ export function useImageUpload({
     setUploading(true);
 
     try {
-      const result = await uploadFileAndGetFullUrl(file); // 🚀 upload to backend
-      const fileUrl = result?.fileUrl || result?.url; // depends on API response
-      if (!fileUrl) throw new Error("No file URL returned from server");
+      const result = await uploadFileAndGetFullUrl(file);
+      const key = result?.key;
+      if (!key) throw new Error("No S3 key returned from server");
 
-      onUpload?.(fileUrl);
+      // Store S3 key (not presigned URL) in article content
+      // The viewer will resolve it to presigned URL when displaying
+      onUpload?.(key);
     } catch (err: any) {
       console.error("Upload error:", err);
       setError("Failed to upload image");

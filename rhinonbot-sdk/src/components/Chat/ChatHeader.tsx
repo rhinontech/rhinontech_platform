@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { ChatbotConfig, ActiveScreen } from '@/types';
 import { AVATARS } from '@/constants/urls';
+import { SecureImage } from '../common';
 
 export interface ChatHeaderProps {
   onBack?: () => void;
@@ -101,7 +102,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           </div>
         )}
         <div className='avatar'>
-          <img src={getAvatarSrc()} alt={isSpeakingWithRealPerson ? supportName : 'bot'} />
+          <SecureImage src={getAvatarSrc()} alt={isSpeakingWithRealPerson ? supportName : 'bot'} />
         </div>
         <div className='contact-details'>
           <div className='name'>{supportName}</div>

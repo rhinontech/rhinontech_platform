@@ -1,7 +1,7 @@
 "use client";
 
 import { KnowledgeBaseData } from "@/types/knowledgeBase";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ChevronLeft,
   ThumbsUp,
@@ -10,8 +10,10 @@ import {
   Calendar,
   Share2,
   Copy,
+  Loader2,
 } from "lucide-react";
 import "./tiptap.css";
+import { resolveImagesInHTML } from "@/utils/html-image-resolver";
 
 type Article = KnowledgeBaseData["folders"][number]["articles"][number];
 
@@ -39,6 +41,28 @@ export function ArticleDetailView({
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [processedContent, setProcessedContent] = useState<string>("");
+  const [loadingImages, setLoadingImages] = useState(true);
+
+  // Process article content to resolve S3 keys in images
+  useEffect(() => {
+    const processContent = async () => {
+      setLoadingImages(true);
+      try {
+        const sanitized = sanitizeQuillHTML(article.content);
+        const resolved = await resolveImagesInHTML(sanitized);
+        setProcessedContent(resolved);
+      } catch (error) {
+        console.error("Error processing article content:", error);
+        // Fallback to sanitized content without image resolution
+        setProcessedContent(sanitizeQuillHTML(article.content));
+      } finally {
+        setLoadingImages(false);
+      }
+    };
+
+    processContent();
+  }, [article.content]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -119,12 +143,22 @@ export function ArticleDetailView({
             dangerouslySetInnerHTML={{ __html: article.content }}
           /> */}
 
-        <div
-          className="ProseMirror prose max-w-full overflow-x-auto text-base leading-7 !text-black [&_*]:!text-black"
-          dangerouslySetInnerHTML={{
-            __html: sanitizeQuillHTML(article.content),
-          }}
-        />
+        {/* Main Content */}
+        {loadingImages ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Loading images...</p>
+            </div>
+          </div>
+        ) : (
+          <div
+            className="ProseMirror prose max-w-full overflow-x-auto text-base leading-7 !text-black [&_*]:!text-black"
+            dangerouslySetInnerHTML={{
+              __html: processedContent,
+            }}
+          />
+        )}
 
         {/* Keywords Section */}
         {article.keywords && article.keywords.length > 0 && (
@@ -156,11 +190,10 @@ export function ArticleDetailView({
                 setLiked(!liked);
                 if (disliked) setDisliked(false);
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
-                liked
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-foreground hover:bg-border"
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-medium ${liked
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-foreground hover:bg-border"
+                }`}
             >
               <ThumbsUp className="w-4 h-4" />
               Yes ({article.likes || 0})
@@ -170,11 +203,10 @@ export function ArticleDetailView({
                 setDisliked(!disliked);
                 if (liked) setLiked(false);
               }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
-                disliked
-                  ? "bg-destructive text-destructive-foreground"
-                  : "bg-card text-foreground hover:bg-border"
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-medium ${disliked
+                ? "bg-destructive text-destructive-foreground"
+                : "bg-card text-foreground hover:bg-border"
+                }`}
             >
               <ThumbsDown className="w-4 h-4" />
               No ({article.dislikes || 0})

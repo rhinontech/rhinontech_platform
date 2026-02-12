@@ -12,6 +12,7 @@ import {
 
 import type { Lead } from "@/types/crm";
 import { CHANNEL_STYLES } from "@/lib/crm-data";
+import { SecureImage } from "@/components/Common/SecureImage";
 
 interface LeadCardProps {
   lead: Lead;
@@ -59,6 +60,26 @@ export default function LeadCard({
     Critical: "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300",
   }[p || "Medium"]);
 
+  // Helper to get initials from name
+  const getInitials = (name: string) => {
+    if (!name) return "?";
+    const parts = name.trim().split(" ");
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Check if avatar is an actual image (S3 key or URL)
+  const hasAvatarImage = (avatar: any) => {
+    if (!avatar || typeof avatar !== "string") return false;
+    // If it's a color code, it's not an image
+    if (avatar.startsWith("#")) return false;
+    // If it's a placeholder path, treat as no image
+    if (avatar.includes("sample-avatar")) return false;
+    return true;
+  };
+
   return (
     <div
       onClick={onClick}
@@ -68,28 +89,32 @@ export default function LeadCard({
           {/* -------------------- AVATAR LOGIC -------------------- */}
           <div className="w-7 h-7 flex-shrink-0">
             {(pipelineType === "people" || pipelineType === "company" || pipelineType === "default_customers") && (
-              <div
-                className="
-                  w-7 h-7 rounded-full overflow-hidden
-                  border border-gray-300 dark:border-gray-600
-                  bg-gray-200 dark:bg-gray-700
-                ">
-                {lead.avatar &&
-                  typeof lead.avatar === "string" &&
-                  lead.avatar.startsWith("http") ? (
-                  <img
-                    src={lead.avatar}
-                    className="w-full h-full object-cover"
-                  />
-                  
+              <>
+                {hasAvatarImage(lead.avatar) ? (
+                  <div
+                    className="
+                      w-7 h-7 rounded-full overflow-hidden
+                      border border-gray-300 dark:border-gray-600
+                      bg-gray-200 dark:bg-gray-700
+                    ">
+                    <SecureImage
+                      src={lead.avatar}
+                      alt="avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 ) : (
-                  <img
-                    src="/image/sample-avatar.png"
-                    className="w-full h-full object-cover opacity-80"
-                  />
-                  
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center border border-gray-300 dark:border-gray-600 overflow-hidden"
+                    style={{ backgroundColor: getStableLightColor(lead.id) }}>
+                    <img
+                      src="/image/sample-avatar.png"
+                      alt="avatar"
+                      className="w-5 h-5 object-cover opacity-80"
+                    />
+                  </div>
                 )}
-              </div>
+              </>
             )}
 
             {pipelineType === "deal" && (

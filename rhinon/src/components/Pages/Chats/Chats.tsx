@@ -33,6 +33,7 @@ import { ChatSidebar } from "./ChatSidebar";
 import { ChatInfoSidebar } from "./ChatInfoSidebar";
 import { ChatWindow } from "./ChatWindow";
 import { WhatsAppPanel } from "./WhatsAppPanel";
+import { SecureImage } from "@/components/Common/SecureImage";
 import { X, Info, MessageCircle } from "lucide-react";
 
 export default function Chats() {
@@ -524,8 +525,14 @@ export default function Chats() {
     const socket = getSocket();
     socket.emit("message", newMessage);
 
+    // Add message optimistically to show immediately in dashboard
+    // Since we use socket.broadcast.to(), sender won't receive their own message back
     setMessages((prev) => [...prev, newMessage]);
 
+
+    // Don't update chat history optimistically either
+    // The socket event handler will update this when the message is confirmed
+    /*
     // Update chat history for the user
     const userEmail = selectedConversation.user_id;
     if (userEmail) {
@@ -563,6 +570,7 @@ export default function Chats() {
         return prev;
       });
     }
+    */
 
     if (!selectedConversation.assigned_user_id) {
       await updateConversation(selectedConversation.id, {
@@ -585,6 +593,16 @@ export default function Chats() {
   // WebSocket handling
   useEffect(() => {
     const socket = getSocket();
+
+    // Join the selected conversation room when conversation is selected
+    if (selectedConversation?.chatbot_history && orgId) {
+      socket.emit("join_conversation", {
+        chatbot_history: selectedConversation.chatbot_history,
+        chatbot_id: selectedConversation.chatbot_id,
+        organization_id: orgId,
+      });
+      console.log(`[Chats] Joining conversation room for ${selectedConversation.chatbot_history}`);
+    }
 
     const handleConversation = (newConversation: any) => {
       if (newConversation.chatbot_id !== chatbot_id) return;
@@ -698,7 +716,20 @@ export default function Chats() {
         newMessage.chatbot_history === selectedConversation?.chatbot_history &&
         newMessage.chatbot_id === chatbot_id
       ) {
-        setMessages((prev) => [...prev, newMessage]);
+        // Check for duplicates before adding
+        setMessages((prev) => {
+          const isDuplicate = prev.some(
+            (msg) =>
+              msg.text === newMessage.text &&
+              msg.timestamp === newMessage.timestamp &&
+              msg.role === newMessage.role
+          );
+          if (isDuplicate) {
+            console.log('[Chats] Duplicate message detected, skipping');
+            return prev;
+          }
+          return [...prev, newMessage];
+        });
       }
     };
 
@@ -834,7 +865,7 @@ export default function Chats() {
       socket.off("conversation:closed", handleConversationClosed);
       socket.off("whatsapp:message:received", handleWhatsAppMessage);
     };
-  }, [selectedConversation, chatbot_id]);
+  }, [selectedConversation, chatbot_id, orgId]);
 
   const handleOpenFile = (file: {
     url: string;
@@ -1034,7 +1065,7 @@ export default function Chats() {
                                           setIsModalOpen(true);
                                         }}
                                         className="cursor-pointer block max-w-xs rounded-lg overflow-hidden border shadow-sm hover:opacity-90">
-                                        <img
+                                        <SecureImage
                                           src={fileUrl}
                                           alt={fileName}
                                           className="w-full h-auto"

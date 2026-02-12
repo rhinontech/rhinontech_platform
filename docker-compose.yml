@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: rtserver
     ports:
-      - "3000:3000"
+      - "5001:5001"
     env_file:
       - .env.dev
     extra_hosts:
@@ -16,6 +16,9 @@ services:
       - postgres
     networks:
       - rhinon-network
+    volumes:
+      - ./rtserver:/app
+      - /app/node_modules
 
   backendai:
     build:
@@ -32,6 +35,8 @@ services:
       - redis
     networks:
       - rhinon-network
+    volumes:
+      - ./backendai:/app
 
   redis:
     image: redis:7-alpine
@@ -45,11 +50,11 @@ services:
     image: pgvector/pgvector:pg15
     container_name: postgres
     ports:
-      - "5432:5432"
+      - "5435:5435"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=rhinontech
+      - POSTGRES_DB=rhinontech_local
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql

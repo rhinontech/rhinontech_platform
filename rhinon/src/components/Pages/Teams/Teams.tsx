@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SecureImage } from "@/components/Common/SecureImage";
 import {
   Dialog,
   DialogContent,
@@ -611,9 +612,15 @@ export default function Teams() {
                         {/* User Info */}
                         <div className="col-span-5 flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarImage
-                              src={member.image_url || "/placeholder.svg"}
-                            />
+                            {member.image_url ? (
+                              <SecureImage
+                                src={member.image_url}
+                                alt={member.first_name}
+                                className="aspect-square h-full w-full object-cover"
+                              />
+                            ) : (
+                              <AvatarImage src="/placeholder.svg" />
+                            )}
                             <AvatarFallback className="bg-sidebar-primary text-white">
                               {member.first_name.charAt(0)}
                             </AvatarFallback>
@@ -764,9 +771,15 @@ export default function Teams() {
                   <div className="p-4 space-y-6">
                     <div className="flex items-start gap-3">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage
-                          src={selectedMember.image_url || "/placeholder.svg"}
-                        />
+                        {selectedMember.image_url ? (
+                          <SecureImage
+                            src={selectedMember.image_url}
+                            alt={selectedMember.first_name}
+                            className="aspect-square h-full w-full object-cover"
+                          />
+                        ) : (
+                          <AvatarImage src="/placeholder.svg" />
+                        )}
                         <AvatarFallback className="bg-sidebar-primary text-white text-lg">
                           {selectedMember.first_name.charAt(0)}
                         </AvatarFallback>

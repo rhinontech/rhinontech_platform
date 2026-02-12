@@ -126,20 +126,31 @@ class StandardRAGController:
                             
                         s3_name = file_item.get('s3Name')
                         if s3_name:
-                            file_url = f"{base_url}/{folder_name}/{s3_name}"
-                            _, ext = os.path.splitext(file_url.lower())
+                            # Construct full key including folder if needed, 
+                            # checking if s3Name already includes folder or not.
+                            # Usually s3Name in DB is just filename, but rtserver saves `knowledge-base/${filename}` as key?
+                            # Let's check rtserver: kbStorage key is `${process.env.S3_FOLDER_NAME}/${generateFileName(file.originalname)}`
+                            # But what is stored in DB?
+                            # fileUploadService: returns { key: response.key, ... }
+                            # Files.tsx: onConfirmUpload saves response.key as s3Name?
+                            # YES: `s3Name: response.key` in Files.tsx line 485.
+                            # So s3_name IS the full key (folder + filename).
+                            
+                            s3_key = s3_name
+                            _, ext = os.path.splitext(s3_key.lower())
+                            
                             try:
                                 content = ""
                                 if ext == '.pdf':
-                                    content = pdf_data(file_url)
+                                    content = pdf_data(s3_key)
                                 elif ext in ['.doc', '.docx']:
-                                    content = doc_data(file_url)
+                                    content = doc_data(s3_key)
                                 elif ext == '.txt':
-                                    content = txt_data(file_url)
+                                    content = txt_data(s3_key)
                                 elif ext in ['.ppt', '.pptx']:
-                                    content = ppt_data(file_url)
+                                    content = ppt_data(s3_key)
                                 elif ext in ['.jpeg', '.jpg', '.png']:
-                                    content = image_data(file_url)
+                                    content = image_data(s3_key)
                                 
                                 if content:
                                     documents.append({

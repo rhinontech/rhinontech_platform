@@ -63,6 +63,7 @@ import { toast } from "sonner";
 import { getAllGroupsWithView } from "@/services/crm/groupViewServices";
 import { moveEntityStageService, deleteEntityService, getEntityPipelines, getPipelineWithLead } from "@/services/crm/pipelineServices";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SecureImage } from "@/components/Common/SecureImage";
 
 interface LeadDetailSidebarProps {
   lead: Lead;
@@ -258,17 +259,16 @@ export default function LeadDetailSidebar({
     }
 
     try {
-      const { fileUrl, url } = await uploadFileAndGetFullUrl(file);
-      const finalUrl = fileUrl || url;
-      if (!finalUrl) throw new Error("Upload failed");
+      const { key } = await uploadFileAndGetFullUrl(file);
+      if (!key) throw new Error("Upload failed");
 
       // 1) UPDATE UI
       const updatedLead = {
         ...editedLead,
-        avatar: finalUrl,
+        avatar: key,
         custom_fields: {
           ...(editedLead.custom_fields || {}),
-          avatar: finalUrl,
+          avatar: key,
         },
       };
 
@@ -282,13 +282,13 @@ export default function LeadDetailSidebar({
 
       if (pipelineType === "people") {
         await updatePerson(entityId, {
-          custom_fields: { avatar: finalUrl },
+          custom_fields: { avatar: key },
         });
       }
 
       if (pipelineType === "company") {
         await updateCompany(entityId, {
-          custom_fields: { avatar: finalUrl },
+          custom_fields: { avatar: key },
         });
       }
 
@@ -1182,6 +1182,21 @@ export default function LeadDetailSidebar({
                       ? editedLead.avatar
                       : editedLead.custom_fields?.avatar ?? "";
 
+                  // Check if avatar is an actual image
+                  const hasImage = avatarUrl &&
+                    !avatarUrl.startsWith("#") &&
+                    !avatarUrl.includes("sample-avatar");
+
+                  // Get initials from name
+                  const getInitials = (name: string) => {
+                    if (!name) return "?";
+                    const parts = name.trim().split(" ");
+                    if (parts.length >= 2) {
+                      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                    }
+                    return name.substring(0, 2).toUpperCase();
+                  };
+
                   return (
                     <div
                       onClick={() =>
@@ -1193,18 +1208,22 @@ export default function LeadDetailSidebar({
               flex items-center justify-center bg-gray-200 dark:bg-gray-700
               hover:opacity-90 transition
             ">
-                      {avatarUrl ? (
-                        <img
+                      {hasImage ? (
+                        <SecureImage
                           src={avatarUrl}
                           alt="avatar"
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <img
-                          src="/image/sample-avatar.png"
-                          alt="avatar"
-                          className="w-10 h-10 object-cover opacity-80"
-                        />
+                        <div
+                          className="w-full h-full flex items-center justify-center"
+                          style={{ backgroundColor: getStableLightColor(editedLead.id) }}>
+                          <img
+                            src="/image/sample-avatar.png"
+                            alt="avatar"
+                            className="w-10 h-10 object-cover opacity-80"
+                          />
+                        </div>
                       )}
                     </div>
                   );
@@ -1303,269 +1322,329 @@ export default function LeadDetailSidebar({
 
       {/* Details */}
       <ScrollArea className="flex-1 h-0">
-      {currentTab === "details" && (
-        <div className="flex-1 p-4 space-y-4">
-          {/* Built-in fields (people) */}
-          {pipelineType === "people" && (
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Personal Info
-              </h3>
+        {currentTab === "details" && (
+          <div className="flex-1 p-4 space-y-4">
+            {/* Built-in fields (people) */}
+            {pipelineType === "people" && (
+              <div className="space-y-3">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Personal Info
+                </h3>
 
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  First Name
-                </Label>
-                <ClickToEditInput
-                  id="builtin:firstName"
-                  initial={editedLead.firstName || ""}
-                  onCommit={(val) => handleFieldChange("firstName", val)}
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Last Name
-                </Label>
-                <ClickToEditInput
-                  id="builtin:lastName"
-                  initial={editedLead.lastName || ""}
-                  onCommit={(val) => handleFieldChange("lastName", val)}
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Email
-                </Label>
-                <div className="flex gap-2 mt-1">
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    First Name
+                  </Label>
                   <ClickToEditInput
-                    id="builtin:email"
-                    type="email"
-                    initial={editedLead.email || ""}
-                    onCommit={(val) => handleFieldChange("email", val)}
-                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm flex-1"
+                    id="builtin:firstName"
+                    initial={editedLead.firstName || ""}
+                    onCommit={(val) => handleFieldChange("firstName", val)}
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
                   />
-                  {editedLead.email && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        window.open(`mailto:${editedLead.email || ""}`)
-                      }>
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  )}
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Last Name
+                  </Label>
+                  <ClickToEditInput
+                    id="builtin:lastName"
+                    initial={editedLead.lastName || ""}
+                    onCommit={(val) => handleFieldChange("lastName", val)}
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Email
+                  </Label>
+                  <div className="flex gap-2 mt-1">
+                    <ClickToEditInput
+                      id="builtin:email"
+                      type="email"
+                      initial={editedLead.email || ""}
+                      onCommit={(val) => handleFieldChange("email", val)}
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm flex-1"
+                    />
+                    {editedLead.email && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          window.open(`mailto:${editedLead.email || ""}`)
+                        }>
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Phone
+                  </Label>
+                  <div className="flex gap-2 mt-1">
+                    <ClickToEditInput
+                      id="builtin:phone"
+                      initial={editedLead.phone || ""}
+                      onCommit={(val) => handleFieldChange("phone", val)}
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm flex-1"
+                    />
+                    {editedLead.phone && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          window.open(`tel:${editedLead.phone || ""}`)
+                        }>
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    LinkedIn
+                  </Label>
+                  <div className="flex gap-2 mt-1">
+                    <ClickToEditInput
+                      id="builtin:linkedinUrl"
+                      initial={editedLead.linkedinUrl || ""}
+                      onCommit={(val) => handleFieldChange("linkedinUrl", val)}
+                      className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm flex-1"
+                    />
+                    {editedLead.linkedinUrl && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          window.open(editedLead.linkedinUrl || "", "_blank")
+                        }>
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Phone
-                </Label>
-                <div className="flex gap-2 mt-1">
+            {/* Company, Deal, Customer sections retained — internal fields use CommitInput similarly */}
+            {pipelineType === "company" && (
+              <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Company Info
+                </h3>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Company Name
+                  </Label>
                   <ClickToEditInput
-                    id="builtin:phone"
-                    initial={editedLead.phone || ""}
-                    onCommit={(val) => handleFieldChange("phone", val)}
-                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm flex-1"
+                    id="builtin:company"
+                    initial={editedLead.company || ""}
+                    onCommit={(val) => handleFieldChange("company", val)}
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
                   />
-                  {editedLead.phone && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        window.open(`tel:${editedLead.phone || ""}`)
-                      }>
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  )}
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Company Size
+                  </Label>
+                  <ClickToEditInput
+                    id="builtin:companySize"
+                    initial={editedLead.companySize || ""}
+                    onCommit={(val) => handleFieldChange("companySize", val)}
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Industry
+                  </Label>
+                  <ClickToEditInput
+                    id="builtin:industry"
+                    initial={editedLead.industry || ""}
+                    onCommit={(val) => handleFieldChange("industry", val)}
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Location
+                  </Label>
+                  <ClickToEditInput
+                    id="builtin:companyLocation"
+                    initial={editedLead.companyLocation || ""}
+                    onCommit={(val) => handleFieldChange("companyLocation", val)}
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                  />
                 </div>
               </div>
+            )}
 
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  LinkedIn
-                </Label>
-                <div className="flex gap-2 mt-1">
+            {pipelineType === "deal" && (
+              <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Deal Info
+                </h3>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Deal Name
+                  </Label>
                   <ClickToEditInput
-                    id="builtin:linkedinUrl"
-                    initial={editedLead.linkedinUrl || ""}
-                    onCommit={(val) => handleFieldChange("linkedinUrl", val)}
-                    className="dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm flex-1"
+                    id="builtin:dealName"
+                    initial={editedLead.name || ""}
+                    onCommit={(val) => handleFieldChange("name", val)}
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
                   />
-                  {editedLead.linkedinUrl && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        window.open(editedLead.linkedinUrl || "", "_blank")
-                      }>
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* Company, Deal, Customer sections retained — internal fields use CommitInput similarly */}
-          {pipelineType === "company" && (
-            <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Company Info
-              </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Only show status in pipeline view, hide in table/deal view */}
+                  {statuses && statuses.length > 0 && (
+                    <div>
+                      <Label className="text-xs font-medium dark:text-gray-200">
+                        Status
+                      </Label>
+                      <Select
+                        value={editedLead.status || ""}
+                        onValueChange={async (value) => {
+                          // Update the status field
+                          handleFieldChange("status", value);
 
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Company Name
-                </Label>
-                <ClickToEditInput
-                  id="builtin:company"
-                  initial={editedLead.company || ""}
-                  onCommit={(val) => handleFieldChange("company", val)}
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
+                          // Also update the pipeline stage
+                          if (pipelineId && columns && columns.length > 0) {
+                            try {
+                              const targetStage = columns.find((col) => col.title === value);
+                              if (targetStage && targetStage.id) {
+                                const entityId = Number(lead.id.split("-")[1]);
+                                await moveEntityStageService(
+                                  pipelineType as any,
+                                  entityId,
+                                  targetStage.id,
+                                  pipelineId
+                                );
+                                toast.success("Pipeline stage updated");
+                              }
+                            } catch (error) {
+                              console.error("Failed to update pipeline stage", error);
+                              toast.error("Failed to update pipeline stage");
+                            }
+                          }
+                        }}>
+                        <SelectTrigger className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
+                          {statuses?.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {status}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Company Size
-                </Label>
-                <ClickToEditInput
-                  id="builtin:companySize"
-                  initial={editedLead.companySize || ""}
-                  onCommit={(val) => handleFieldChange("companySize", val)}
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Industry
-                </Label>
-                <ClickToEditInput
-                  id="builtin:industry"
-                  initial={editedLead.industry || ""}
-                  onCommit={(val) => handleFieldChange("industry", val)}
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Location
-                </Label>
-                <ClickToEditInput
-                  id="builtin:companyLocation"
-                  initial={editedLead.companyLocation || ""}
-                  onCommit={(val) => handleFieldChange("companyLocation", val)}
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
-            </div>
-          )}
-
-          {pipelineType === "deal" && (
-            <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Deal Info
-              </h3>
-
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Deal Name
-                </Label>
-                <ClickToEditInput
-                  id="builtin:dealName"
-                  initial={editedLead.name || ""}
-                  onCommit={(val) => handleFieldChange("name", val)}
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {/* Only show status in pipeline view, hide in table/deal view */}
-                {statuses && statuses.length > 0 && (
                   <div>
                     <Label className="text-xs font-medium dark:text-gray-200">
-                      Status
+                      Priority
                     </Label>
                     <Select
-                      value={editedLead.status || ""}
-                      onValueChange={async (value) => {
-                        // Update the status field
-                        handleFieldChange("status", value);
-
-                        // Also update the pipeline stage
-                        if (pipelineId && columns && columns.length > 0) {
-                          try {
-                            const targetStage = columns.find((col) => col.title === value);
-                            if (targetStage && targetStage.id) {
-                              const entityId = Number(lead.id.split("-")[1]);
-                              await moveEntityStageService(
-                                pipelineType as any,
-                                entityId,
-                                targetStage.id,
-                                pipelineId
-                              );
-                              toast.success("Pipeline stage updated");
-                            }
-                          } catch (error) {
-                            console.error("Failed to update pipeline stage", error);
-                            toast.error("Failed to update pipeline stage");
-                          }
-                        }
-                      }}>
+                      value={editedLead.priority || "Medium"}
+                      onValueChange={(value) =>
+                        handleFieldChange("priority", value as any)
+                      }>
                       <SelectTrigger className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
-                        {statuses?.map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {status}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="Low">Low</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Critical">Critical</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                )}
-
-                <div>
-                  <Label className="text-xs font-medium dark:text-gray-200">
-                    Priority
-                  </Label>
-                  <Select
-                    value={editedLead.priority || "Medium"}
-                    onValueChange={(value) =>
-                      handleFieldChange("priority", value as any)
-                    }>
-                    <SelectTrigger className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
-                      <SelectItem value="Low">Low</SelectItem>
-                      <SelectItem value="Medium">Medium</SelectItem>
-                      <SelectItem value="High">High</SelectItem>
-                      <SelectItem value="Critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs font-medium dark:text-gray-200">
+                      Deal Value
+                    </Label>
+                    <ClickToEditInput
+                      id="builtin:dealValue"
+                      type="number"
+                      initial={editedLead.dealValue ?? 0}
+                      onCommit={(val) =>
+                        handleFieldChange("dealValue", Number(val))
+                      }
+                      className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-medium dark:text-gray-200">
+                      Currency
+                    </Label>
+                    <Select
+                      value={editedLead.currency || "USD"}
+                      onValueChange={(value) => handleFieldChange("currency", value)}>
+                      <SelectTrigger className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                        <SelectItem value="INR">INR</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div>
                   <Label className="text-xs font-medium dark:text-gray-200">
-                    Deal Value
+                    Probability (%)
                   </Label>
                   <ClickToEditInput
-                    id="builtin:dealValue"
+                    id="builtin:probability"
                     type="number"
-                    initial={editedLead.dealValue ?? 0}
+                    initial={editedLead.probability ?? 0}
                     onCommit={(val) =>
-                      handleFieldChange("dealValue", Number(val))
+                      handleFieldChange("probability", Number(val))
+                    }
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {pipelineType === "default_customers" && (
+              <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Customer Info
+                </h3>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Name
+                  </Label>
+                  <ClickToEditInput
+                    id="builtin:customer_name"
+                    initial={editedLead.custom_data?.name || ""}
+                    onCommit={(val) =>
+                      handleFieldChange("custom_data", {
+                        ...(editedLead.custom_data || {}),
+                        name: val,
+                      })
                     }
                     className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
                   />
@@ -1573,291 +1652,231 @@ export default function LeadDetailSidebar({
 
                 <div>
                   <Label className="text-xs font-medium dark:text-gray-200">
-                    Currency
+                    Email
                   </Label>
-                  <Select
-                    value={editedLead.currency || "USD"}
-                    onValueChange={(value) => handleFieldChange("currency", value)}>
-                    <SelectTrigger className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="dark:bg-gray-800 dark:border-gray-700">
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                      <SelectItem value="INR">INR</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <ClickToEditInput
+                    id="builtin:customer_email"
+                    initial={editedLead.email || ""}
+                    onCommit={(val) => handleFieldChange("email", val)}
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Phone
+                  </Label>
+                  <ClickToEditInput
+                    id="builtin:customer_phone"
+                    initial={editedLead.custom_data?.phone || ""}
+                    onCommit={(val) =>
+                      handleFieldChange("custom_data", {
+                        ...(editedLead.custom_data || {}),
+                        phone: val,
+                      })
+                    }
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                  />
                 </div>
               </div>
+            )}
 
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Probability (%)
-                </Label>
-                <ClickToEditInput
-                  id="builtin:probability"
-                  type="number"
-                  initial={editedLead.probability ?? 0}
-                  onCommit={(val) =>
-                    handleFieldChange("probability", Number(val))
-                  }
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
-            </div>
-          )}
-
-          {pipelineType === "default_customers" && (
+            {/* Activity */}
             <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Customer Info
+                Activity
               </h3>
 
               <div>
                 <Label className="text-xs font-medium dark:text-gray-200">
-                  Name
+                  Source
                 </Label>
                 <ClickToEditInput
-                  id="builtin:customer_name"
-                  initial={editedLead.custom_data?.name || ""}
-                  onCommit={(val) =>
-                    handleFieldChange("custom_data", {
-                      ...(editedLead.custom_data || {}),
-                      name: val,
-                    })
-                  }
+                  id="builtin:source"
+                  initial={editedLead.source || ""}
+                  onCommit={(val) => handleFieldChange("source", val)}
                   className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
                 />
               </div>
 
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Email
-                </Label>
-                <ClickToEditInput
-                  id="builtin:customer_email"
-                  initial={editedLead.email || ""}
-                  onCommit={(val) => handleFieldChange("email", val)}
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Last Activity
+                  </Label>
+                  <ClickToEditInput
+                    id="builtin:lastActivityAt"
+                    type="date"
+                    initial={formatDate(editedLead?.lastActivityAt)}
+                    onCommit={(val) =>
+                      handleFieldChange(
+                        "lastActivityAt",
+                        val ? new Date(val) : null
+                      )
+                    }
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                  />
+                </div>
 
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Phone
-                </Label>
-                <ClickToEditInput
-                  id="builtin:customer_phone"
-                  initial={editedLead.custom_data?.phone || ""}
-                  onCommit={(val) =>
-                    handleFieldChange("custom_data", {
-                      ...(editedLead.custom_data || {}),
-                      phone: val,
-                    })
-                  }
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
+                <div>
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    Next Followup
+                  </Label>
+                  <ClickToEditInput
+                    id="builtin:nextFollowupAt"
+                    type="date"
+                    initial={formatDate(editedLead?.nextFollowupAt)}
+                    onCommit={(val) =>
+                      handleFieldChange(
+                        "nextFollowupAt",
+                        val ? new Date(val) : null
+                      )
+                    }
+                    className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
+                  />
+                </div>
               </div>
             </div>
-          )}
 
-          {/* Activity */}
-          <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-              Activity
-            </h3>
-
-            <div>
-              <Label className="text-xs font-medium dark:text-gray-200">
-                Source
+            {/* Channels */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">
+                Channels
               </Label>
-              <ClickToEditInput
-                id="builtin:source"
-                initial={editedLead.source || ""}
-                onCommit={(val) => handleFieldChange("source", val)}
-                className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-              />
-            </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Last Activity
-                </Label>
-                <ClickToEditInput
-                  id="builtin:lastActivityAt"
-                  type="date"
-                  initial={formatDate(editedLead?.lastActivityAt)}
-                  onCommit={(val) =>
-                    handleFieldChange(
-                      "lastActivityAt",
-                      val ? new Date(val) : null
-                    )
+              {(() => {
+                // Normalize channels safely inside component
+                let channels: string[] = [];
+
+                const raw = editedLead?.channels;
+
+                if (Array.isArray(raw)) {
+                  channels = raw;
+                } else if (typeof raw === "string") {
+                  try {
+                    channels = JSON.parse(raw);
+                    if (!Array.isArray(channels)) channels = [];
+                  } catch {
+                    channels = [];
                   }
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  Next Followup
-                </Label>
-                <ClickToEditInput
-                  id="builtin:nextFollowupAt"
-                  type="date"
-                  initial={formatDate(editedLead?.nextFollowupAt)}
-                  onCommit={(val) =>
-                    handleFieldChange(
-                      "nextFollowupAt",
-                      val ? new Date(val) : null
-                    )
-                  }
-                  className="mt-1 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Channels */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">
-              Channels
-            </Label>
-
-            {(() => {
-              // Normalize channels safely inside component
-              let channels: string[] = [];
-
-              const raw = editedLead?.channels;
-
-              if (Array.isArray(raw)) {
-                channels = raw;
-              } else if (typeof raw === "string") {
-                try {
-                  channels = JSON.parse(raw);
-                  if (!Array.isArray(channels)) channels = [];
-                } catch {
+                } else {
                   channels = [];
                 }
-              } else {
-                channels = [];
-              }
+
+                return (
+                  <>
+                    {/* Selected Channels */}
+                    <div className="flex flex-wrap gap-2">
+                      {channels.map((channel) => (
+                        <Badge
+                          key={channel}
+                          variant="secondary"
+                          className={`cursor-pointer ${CHANNEL_STYLES[channel]}`}
+                          onClick={() => toggleChannel(channel)}>
+                          {channel}
+                        </Badge>
+                      ))}
+                    </div>
+
+                    {/* Add Channels */}
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {CHANNEL_OPTIONS.filter((c) => !channels.includes(c)).map(
+                        (channel) => (
+                          <Badge
+                            key={channel}
+                            variant="outline"
+                            className="cursor-pointer opacity-50 hover:opacity-100"
+                            onClick={() => toggleChannel(channel)}>
+                            + {channel}
+                          </Badge>
+                        )
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Tags */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">
+                Tags
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {editedLead?.tags?.map((tag) => (
+                  <Badge key={tag} variant="outline">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom fields */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Fields
+              </h3>
+
+              {visibleFieldKeys.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  No visible custom fields. Use Fields → to add or show fields.
+                </p>
+              )}
+
+              {visibleFieldKeys.map((key) => (
+                <div key={key} className="space-y-1">
+                  <Label className="text-xs font-medium dark:text-gray-200">
+                    {key}
+                  </Label>
+                  <div>{renderCustomFieldEditor(key)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Notes tab (keeps the original notes behavior — single textarea, saves on change) */}
+        {currentTab === "notes" && (
+          <div className="flex-1 p-4 space-y-4">
+            {(() => {
+              const container =
+                pipelineType === "default_customers"
+                  ? editedLead.custom_data ?? {}
+                  : editedLead.custom_fields ?? {};
+              const notesMeta = container["notes"];
+              const notesValue = notesMeta?.value ?? "";
 
               return (
                 <>
-                  {/* Selected Channels */}
-                  <div className="flex flex-wrap gap-2">
-                    {channels.map((channel) => (
-                      <Badge
-                        key={channel}
-                        variant="secondary"
-                        className={`cursor-pointer ${CHANNEL_STYLES[channel]}`}
-                        onClick={() => toggleChannel(channel)}>
-                        {channel}
-                      </Badge>
-                    ))}
-                  </div>
+                  <Textarea
+                    placeholder="Write a note here..."
+                    value={notesValue}
+                    onChange={(e) => {
+                      updateSingleCustomKey("notes", {
+                        type: "notes",
+                        value: e.target.value,
+                      });
+                    }}
+                    className="border border-accent rounded-none min-h-[180px]"
+                  />
 
-                  {/* Add Channels */}
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {CHANNEL_OPTIONS.filter((c) => !channels.includes(c)).map(
-                      (channel) => (
-                        <Badge
-                          key={channel}
-                          variant="outline"
-                          className="cursor-pointer opacity-50 hover:opacity-100"
-                          onClick={() => toggleChannel(channel)}>
-                          + {channel}
-                        </Badge>
-                      )
-                    )}
-                  </div>
+                  {!notesValue && (
+                    <div className="flex flex-col items-center justify-center opacity-60">
+                      <CrmNotePlaceholders />
+                      <h3 className="font-semibold text-gray-900 mb-2">
+                        Add a note
+                      </h3>
+                      <p className="text-sm text-accent-foreground text-center">
+                        Track important updates or details about this contact
+                        here.
+                      </p>
+                    </div>
+                  )}
                 </>
               );
             })()}
           </div>
-
-          {/* Tags */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-2">
-              Tags
-            </Label>
-            <div className="flex flex-wrap gap-2">
-              {editedLead?.tags?.map((tag) => (
-                <Badge key={tag} variant="outline">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom fields */}
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-              Fields
-            </h3>
-
-            {visibleFieldKeys.length === 0 && (
-              <p className="text-sm text-gray-500">
-                No visible custom fields. Use Fields → to add or show fields.
-              </p>
-            )}
-
-            {visibleFieldKeys.map((key) => (
-              <div key={key} className="space-y-1">
-                <Label className="text-xs font-medium dark:text-gray-200">
-                  {key}
-                </Label>
-                <div>{renderCustomFieldEditor(key)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Notes tab (keeps the original notes behavior — single textarea, saves on change) */}
-      {currentTab === "notes" && (
-        <div className="flex-1 p-4 space-y-4">
-          {(() => {
-            const container =
-              pipelineType === "default_customers"
-                ? editedLead.custom_data ?? {}
-                : editedLead.custom_fields ?? {};
-            const notesMeta = container["notes"];
-            const notesValue = notesMeta?.value ?? "";
-
-            return (
-              <>
-                <Textarea
-                  placeholder="Write a note here..."
-                  value={notesValue}
-                  onChange={(e) => {
-                    updateSingleCustomKey("notes", {
-                      type: "notes",
-                      value: e.target.value,
-                    });
-                  }}
-                  className="border border-accent rounded-none min-h-[180px]"
-                />
-
-                {!notesValue && (
-                  <div className="flex flex-col items-center justify-center opacity-60">
-                    <CrmNotePlaceholders />
-                    <h3 className="font-semibold text-gray-900 mb-2">
-                      Add a note
-                    </h3>
-                    <p className="text-sm text-accent-foreground text-center">
-                      Track important updates or details about this contact
-                      here.
-                    </p>
-                  </div>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      )}
+        )}
       </ScrollArea>
 
       {/* Fixed Buttons at Bottom */}
