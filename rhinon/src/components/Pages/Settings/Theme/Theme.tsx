@@ -58,7 +58,7 @@ export default function Theme() {
       "https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png",
     selectedPage: "Home",
     theme: "system",
-    isChatHistory: true,
+    isChatHistory: false,
   });
   const [originalSettings, setOriginalSettings] = useState<ThemeSettings | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -220,6 +220,8 @@ export default function Theme() {
             greetings={themeSettings.greetings}
             selectedPage={themeSettings.selectedPage}
             theme={themeSettings.theme}
+            isChatHistory={themeSettings.isChatHistory}
+            adminTestingMode={false}
           />
         </ScrollArea>
       </div>

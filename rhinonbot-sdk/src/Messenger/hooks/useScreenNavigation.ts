@@ -26,7 +26,7 @@ export function useScreenNavigation({ state }: UseScreenNavigationProps) {
   // Navigate to a screen
   const handleNavigate = useCallback(
     (screen: string) => {
-      setActiveScreen(screen);
+      setActiveScreen(screen);   
       // if (screen === 'chats') {
       //   setSelectedChatId(null);
       // }
@@ -46,12 +46,12 @@ export function useScreenNavigation({ state }: UseScreenNavigationProps) {
   const handleBackToChats = useCallback(() => {
     if (isChatHistory) {
       setSelectedChatId(null);
-      setIsSpeakingWithRealPerson(false);
+      // setIsSpeakingWithRealPerson(false);
       setActiveScreen('chats');
     } else {
       setActiveScreen('home')
     }
-  }, [setSelectedChatId, setIsSpeakingWithRealPerson]);
+  }, [setActiveScreen, setSelectedChatId, setIsSpeakingWithRealPerson, isChatHistory]);
 
   // Navigate to raise ticket screen
   const raiseTicket = useCallback(() => {

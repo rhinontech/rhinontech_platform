@@ -23,6 +23,7 @@ interface ThemeSettings {
     secondaryLogo: string;
     selectedPage: string;
     theme?: 'light' | 'dark' | 'system';
+    isChatHistory: boolean;
 }
 
 export default function KnowledgeHubLayout({
@@ -46,12 +47,13 @@ export default function KnowledgeHubLayout({
             "https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png",
         selectedPage: "chats",
         theme: "light",
+        isChatHistory: false,
     });
     const [fetching, setFetching] = useState(true);
     const userEmail = useUserStore((state) => state.userData.userEmail);
     Cookies.set("userEmail", userEmail);
 
-    
+
 
     const getChatbotConfig = async () => {
         try {
@@ -79,6 +81,7 @@ export default function KnowledgeHubLayout({
                     "https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/Logo_Rhinon_Tech_Dark+2.png",
                 selectedPage: "chats",
                 theme: config.theme ?? "light",
+                isChatHistory: config.isChatHistory ?? false,
             });
         } catch (error) {
             console.error("Failed to fetch chatbot config:", error);
@@ -129,6 +132,7 @@ export default function KnowledgeHubLayout({
                         greetings={themeSettings.greetings}
                         selectedPage={themeSettings.selectedPage}
                         theme={themeSettings.theme}
+                        adminTestingMode={true}
                     />
                 </ScrollArea>
             </div>

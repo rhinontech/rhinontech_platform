@@ -695,6 +695,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
 
       {/* Header */}
       <ChatHeader
+        setSelectedChatId={setSelectedChatId}
         onBack={onBack}
         isFreePlan={isFreePlan}
         isAdmin={isAdmin}
@@ -713,6 +714,7 @@ const ChatScreen: React.FC<ChatScreenProps> = (props) => {
         chatbot_config={chatbot_config}
         adminTestingMode={adminTestingMode}
         conversation={conversation}
+        setSupportName={setSupportName}
       />
 
       {/* Messages */}

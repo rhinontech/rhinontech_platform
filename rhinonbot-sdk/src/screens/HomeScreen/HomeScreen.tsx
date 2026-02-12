@@ -136,7 +136,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const handleSendMessage = (conversationId?: string) => {
     onNavigate('chats');
-    conversationId ? onChatSelect(conversationId) : null;
+
+    if (isFreePlan || isAdmin) {
+      onChatSelect('NEW_CHAT');
+    } else {
+      conversationId ? onChatSelect(conversationId) : null;
+    }
   };
 
 

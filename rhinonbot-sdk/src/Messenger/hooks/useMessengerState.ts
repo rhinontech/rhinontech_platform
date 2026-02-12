@@ -193,7 +193,7 @@ export function useMessengerState(
               preChatForm: formResponse.pre_chat_form,
               postChatForm: formResponse.post_chat_form,
               ticketForm: formResponse.ticket_form,
-              isChatHistory: cfg.isChatHistory,
+              isChatHistory: cfg.isChatHistory ?? false,
             },
           });
         } catch (err) {
@@ -259,6 +259,8 @@ export function useMessengerState(
     }
   }, [activeCampaign]);
 
+
+
   const fetchConversation = async () => {
     if (!userId || !config?.app_id) return;
     setMainLoading(true);
@@ -271,13 +273,20 @@ export function useMessengerState(
           new Date(a.last_chat_time).getTime(),
       );
 
-      if (!chatbot_config.isChatHistory) {
+
+      if (config.adminTestingMode || !chatbot_config.isChatHistory) {
         setSelectedChatId(
           sortedConversations.length > 0
             ? sortedConversations[0].conversation_id
             : 'NEW_CHAT',
         );
 
+      } else {
+        setSelectedChatId(null);
+      }
+
+      if (!chatbot_config.isChatHistory && config.admin && !config.adminTestingMode) {
+        setSelectedChatId('NEW_CHAT');
       }
 
 
@@ -301,7 +310,7 @@ export function useMessengerState(
 
   useEffect(() => {
     fetchConversation();
-  }, [userId, config.app_id]);
+  }, [userId, config.app_id, chatbot_config.isChatHistory]);
 
   return {
     // UI State

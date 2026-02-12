@@ -28,6 +28,15 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
           new Date(b.last_chat_time).getTime() -
           new Date(a.last_chat_time).getTime(),
       );
+
+      if (isFreePlan || isAdmin) {
+        setConversationIds([
+          { conversation_id: "NEW_CHAT", last_chat_time: "2026-02-12T02:17:10.083127+00:00", title: "Informal Greeting" },
+          { conversation_id: "NEW_CHAT", last_chat_time: "2026-02-08T02:17:10.083127+00:00", title: "Ticket Search" },
+          { conversation_id: "NEW_CHAT", last_chat_time: "2026-02-10T02:17:10.083127+00:00", title: "Product Inquiry" }
+        ]);
+        return;
+      }
       setConversationIds(sortedConversations);
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -43,7 +52,7 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
 
   //  Auto-start new chat if free plan
   useEffect(() => {
-    if (isFreePlan || isAdmin) {
+    if ((isFreePlan || isAdmin) && !chatbot_config?.isChatHistory) {
       setLoading(true);
       const timer = setTimeout(() => {
         onChatSelect('NEW_CHAT');
@@ -52,7 +61,7 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
       }, 1);
       return () => clearTimeout(timer);
     }
-  }, [isFreePlan, onChatSelect, isAdmin]);
+  }, [isFreePlan, onChatSelect, isAdmin, chatbot_config?.isChatHistory]);
 
   // Check if a conversation is still active (within 15 minutes)
   const findActiveConversation = () => {
@@ -64,6 +73,13 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
 
   //  Handle start button click
   const handleStartConversation = () => {
+
+    if (isFreePlan || isAdmin) {
+      onChatSelect('NEW_CHAT');
+      setIsSpeakingWithRealPerson(false);
+      return;
+    }
+
     const activeConvo = findActiveConversation();
     if (activeConvo) {
       onChatSelect(activeConvo.conversation_id);
@@ -171,9 +187,9 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
                 >
                   <div className='chat-avatar'>
                     {chat.title === 'Support Chat' ? (
-                      
-                        <img src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png' alt='support profile' />
-                      
+
+                      <img src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png' alt='support profile' />
+
                     ) : (
                       <img
                         src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png'
