@@ -54,7 +54,7 @@ const getPublicIp = async (): Promise<string> => {
 // Send event to backend
 const sendToTrackingServer = (endpoint: string, payload: Record<string, any>) => {
   const serverUrl = getServerApiUrl();
-  
+
   payload.sessionId = getSessionId();
   payload.userId = getUserId();
   payload.screenSize = `${window.innerWidth}x${window.innerHeight}`;
@@ -128,6 +128,28 @@ export const connectToSocket = async (appId: string): Promise<Socket> => {
     });
 
     window.dispatchEvent(openChatEvent);
+  });
+
+  // Listen for incoming messages from support
+  socket.on('message', (message) => {
+    console.log('[Socket] Received message:', message);
+    // Only dispatch event for support messages, not customer's own messages
+    if (message.role === 'support') {
+      console.log('[Socket] Support message - dispatching event');
+      const messageEvent = new CustomEvent('support_message_received', {
+        detail: { message },
+      });
+      window.dispatchEvent(messageEvent);
+    }
+  });
+
+  // Listen for conversation closed events
+  socket.on('conversation:closed', (data) => {
+    console.log('[Socket] Conversation closed:', data);
+    const closedEvent = new CustomEvent('conversation_closed_from_server', {
+      detail: data,
+    });
+    window.dispatchEvent(closedEvent);
   });
 
   return socket;

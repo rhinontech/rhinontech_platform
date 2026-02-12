@@ -179,6 +179,8 @@ export default function RootLayout({
 
     // New conversation
     socket.on("newConversation", (conversation) => {
+      // Filter by organization ID first
+      if (conversation.organization_id?.toString() !== organizationId?.toString()) return;
       if (conversation.chatbot_id !== chatbotId) return;
       toast.info(`New conversation started with chatbot`);
       const { userData, setUserData } = useUserStore.getState();
@@ -188,6 +190,8 @@ export default function RootLayout({
 
     // New message
     socket.on("message", (newMessage) => {
+      // Filter by organization ID first
+      if (newMessage.organization_id?.toString() !== organizationId?.toString()) return;
       if (newMessage.chatbot_id !== chatbotId || newMessage.role !== "user")
         return;
       toast.info(`New message received from chatbot`);

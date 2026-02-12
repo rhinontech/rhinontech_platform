@@ -15,7 +15,7 @@ chmod +x setup.sh
 
 That's it! All services will start:
 - ✅ AI Server (FastAPI) on **http://localhost:5002**
-- ✅ RT Server (Express) on **http://localhost:3000**
+- ✅ RT Server (Express + Socket.IO) on **http://localhost:3000**
 - ✅ Frontend (Next.js) on **http://localhost:4000**
 
 ---
@@ -38,7 +38,7 @@ That's it! All services will start:
 
 ### Docker Services (Backend)
 - **backendai** - FastAPI AI server with Gemini integration
-- **rtserver** - Express.js REST API server
+- **rtserver** - Express.js REST API server with Socket.IO for real-time communication
 
 Both services:
 - ✅ Auto-restart on failure
@@ -63,6 +63,7 @@ Features:
 Frontend (Next.js):    http://localhost:4000
 Backend API (Express): http://localhost:3000  
 AI Server (FastAPI):   http://localhost:5002
+WebSocket (Socket.IO): ws://localhost:3000
 
 API Docs:
 - AI Swagger:  http://localhost:5002/docs
@@ -312,9 +313,13 @@ curl http://localhost:4000
 |-----------|-----------|------|
 | AI Server | FastAPI (Python) | 5002 |
 | Backend | Express (Node.js) | 3000 |
+| Real-time | Socket.IO | 3000 |
 | Frontend | Next.js (React) | 4000 |
 | Container | Docker | - |
 | Process Manager | nohup | - |
+| Database | PostgreSQL + pgvector | 5432 |
+| Cache | Redis | 6379 |
+| File Storage | AWS S3 (Presigned URLs) | - |
 
 ---
 
@@ -351,10 +356,12 @@ Expected output:
 - ✅ Health checks
 - ✅ Easy status monitoring
 - ✅ Isolated networking
+- ✅ Real-time WebSocket communication
+- ✅ Secure S3 file access with presigned URLs
 - ✅ Production-ready
 
 ---
 
-**Last Updated:** December 12, 2025  
-**Version:** 1.0.0  
+**Last Updated:** February 12, 2026  
+**Version:** 2.1.0  
 **Status:** ✅ Production Ready
