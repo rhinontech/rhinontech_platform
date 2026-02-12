@@ -47,6 +47,8 @@ export const ChatHeader: React.FC<{
   handleCloseChat: () => void;
   chatbot_config: any;
   conversation: any;
+  setSelectedChatId: React.Dispatch<React.SetStateAction<string | null>>;
+  setSupportName: React.Dispatch<React.SetStateAction<string>>;
 }> = ({
   onBack,
   isFreePlan,
@@ -66,6 +68,8 @@ export const ChatHeader: React.FC<{
   chatbot_config,
   adminTestingMode,
   conversation,
+  setSelectedChatId,
+  setSupportName,
 }) => {
     const handleMaxScreen = () => {
       setMaxScreen(true);
@@ -84,10 +88,16 @@ export const ChatHeader: React.FC<{
             <div
               onClick={() => {
                 if (isFreePlan || isAdmin) {
-                  onNavigate('home');
+                  if (chatbot_config.isChatHistory) {
+                    setSelectedChatId(null);
+                    onNavigate('chats');
+                  } else {
+                    onNavigate('home');
+                  }
                 } else {
                   setWindowWidth('400px');
                   setMaxScreen(false);
+                  setSupportName("Rhinon");
                   onBack();
                 }
               }}
@@ -135,84 +145,86 @@ export const ChatHeader: React.FC<{
             </div>
           </div>
         </div>
-        <div className='header-actions'>
-          {maxScreen ? (
-            <button
-              onClick={handleMinScreen}
-              className='header-btn-extend'
-              style={{
-                border: 'none',
-                background: 'transparent',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <Minimize2 size={18} />
-            </button>
-          ) : (
-            <button
-              onClick={handleMaxScreen}
-              className='header-btn-extend'
-              style={{
-                border: 'none',
-                background: 'transparent',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <Maximize2 size={18} />
-            </button>
-          )}
-          {isSpeakingWithRealPerson && conversation !== null && !isConversationClosed && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setCloseChatPopup((prev) => !prev);
-              }}
-              style={{ position: 'relative', color: 'var(--text-primary)', }}
-              className='header-btn'
-            >
-              <X size={18} />
-              {closeChatPopup && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    position: 'absolute',
-                    top: '40px',
-                    width: '200px',
-                    right: '0',
-                    background: '#fff',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    zIndex: 100,
-                  }}
-                >
-                  <p style={{ margin: 0, color: 'black', marginBottom: '8px' }}>
-                    Are you sure you want to close the chat?
-                  </p>
+        {!isAdmin && (
+          <div className='header-actions'>
+            {maxScreen ? (
+              <button
+                onClick={handleMinScreen}
+                className='header-btn-extend'
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <Minimize2 size={18} />
+              </button>
+            ) : (
+              <button
+                onClick={handleMaxScreen}
+                className='header-btn-extend'
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <Maximize2 size={18} />
+              </button>
+            )}
+            {isSpeakingWithRealPerson && conversation !== null && !isConversationClosed && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCloseChatPopup((prev) => !prev);
+                }}
+                style={{ position: 'relative', color: 'var(--text-primary)', }}
+                className='header-btn'
+              >
+                <X size={18} />
+                {closeChatPopup && (
                   <div
+                    onClick={(e) => e.stopPropagation()}
                     style={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      gap: '8px',
+                      position: 'absolute',
+                      top: '40px',
+                      width: '200px',
+                      right: '0',
+                      background: '#fff',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                      zIndex: 100,
                     }}
                   >
-                    <button
-                      onClick={handleCloseChat}
-                      className='submit-form-btn'
+                    <p style={{ margin: 0, color: 'black', marginBottom: '8px' }}>
+                      Are you sure you want to close the chat?
+                    </p>
+                    <div
                       style={{
-                        ['--primary-color' as any]: chatbot_config.primaryColor,
-                        padding: '10px ',
-                        height: 'auto',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        gap: '8px',
                       }}
                     >
-                      Close the Chat
-                    </button>
+                      <button
+                        onClick={handleCloseChat}
+                        className='submit-form-btn'
+                        style={{
+                          ['--primary-color' as any]: chatbot_config.primaryColor,
+                          padding: '10px ',
+                          height: 'auto',
+                        }}
+                      >
+                        Close the Chat
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </button>
-          )}
-        </div>
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   };

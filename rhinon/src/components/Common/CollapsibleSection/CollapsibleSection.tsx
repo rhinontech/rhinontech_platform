@@ -34,7 +34,7 @@ interface ThemeSettings {
   primaryLogo: string;
   secondaryLogo: string;
   theme: 'light' | 'dark' | 'system';
-  isChatHistory:boolean;
+  isChatHistory: boolean;
 }
 
 interface CollapsibleSectionProps {
@@ -471,6 +471,29 @@ export default function CollapsibleSection({
         </CardContent>
       </Card>
 
+      {/* Chat History */}
+      <Card className="border shadow-sm">
+        <CardHeader className="pb-4 border-b">
+          <CardTitle className="text-lg font-semibold">Chat History</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between py-2">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Chat History</Label>
+              <p className="text-xs text-muted-foreground">
+                Enable chat history
+              </p>
+            </div>
+            <Switch
+              checked={themeSettings.isChatHistory}
+              onCheckedChange={(checked) =>
+                updateThemeSettings("isChatHistory", checked)
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Messages */}
       <Card className="border shadow-sm">
         <CardHeader className="pb-4 border-b">
@@ -511,22 +534,7 @@ export default function CollapsibleSection({
             />
           </div>
 
-          <Separator />
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label className="text-sm font-medium">Chat History</Label>
-              <p className="text-xs text-muted-foreground">
-                Enable chat history
-              </p>
-            </div>
-            <Switch
-              checked={themeSettings.isChatHistory}
-              onCheckedChange={(checked) =>
-                updateThemeSettings("isChatHistory", checked)
-              }
-            />
-          </div>
 
           {/* Popup Message (commented out but styled for consistency) */}
           {/* <div className="space-y-3">
@@ -548,6 +556,8 @@ export default function CollapsibleSection({
     </div> */}
         </CardContent>
       </Card>
+
+
 
       {/* Navigation */}
       <Card className="border shadow-sm">

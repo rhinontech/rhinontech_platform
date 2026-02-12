@@ -17,6 +17,8 @@ export default function ChatbotPreview({
   greetings,
   selectedPage,
   theme,
+  isChatHistory,
+  adminTestingMode
 }: {
   isBgFade?: boolean;
   primaryColor?: string;
@@ -31,6 +33,8 @@ export default function ChatbotPreview({
   greetings?: string[];
   selectedPage: string;
   theme?: 'light' | 'dark' | 'system';
+  isChatHistory?: boolean;
+  adminTestingMode?: boolean;
 }) {
   const chatbotId = useUserStore((state) => state.userData.chatbotId);
 
@@ -49,6 +53,7 @@ export default function ChatbotPreview({
     greetings,
     selectedPage,
     theme,
+    isChatHistory,
   };
 
   return (
@@ -67,7 +72,7 @@ export default function ChatbotPreview({
       <RhinonChatbot
         appId={chatbotId}
         admin={true}
-        adminTestingMode={true}
+        adminTestingMode={adminTestingMode}
         config={chatbotConfig}
       />
     </div>
