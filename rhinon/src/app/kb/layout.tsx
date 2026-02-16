@@ -24,9 +24,9 @@ export default function KbLayout({
           <span className="text-lg font-medium text-gray-900">Help Center</span>
         </div>
         <a
-          href="https://rhinontech.com"
+          href="https://rhinon.tech"
           className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors">
-          Visit rhinontech.com
+          Visit rhinon.tech
           <ArrowRight className="w-4 h-4" />
         </a>
       </header>

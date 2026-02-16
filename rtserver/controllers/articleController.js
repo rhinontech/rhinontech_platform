@@ -1,3 +1,4 @@
+const e = require("express");
 const { articles } = require("../models");
 const { logActivity } = require("../utils/activityLogger");
 
@@ -18,7 +19,7 @@ exports.createArticle = async (req, res) => {
       user_id,
       organization_id,
       "KNOWLEDGE_BASE",
-      "Created an article"
+      "Created an article",
     );
 
     res.status(201).json(article);
@@ -61,7 +62,7 @@ exports.updateArticle = async (req, res) => {
       user_id,
       organization_id,
       "KNOWLEDGE_BASE",
-      "Updated the article"
+      "Updated the article",
     );
 
     res.json(updatedArticle);
@@ -81,6 +82,44 @@ exports.deleteArticle = async (req, res) => {
     }
 
     res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.updateArticleStats = async (req, res) => {
+  try {
+    const { articleId, action, previous } = req.body;
+
+    const article = await articles.findOne({ where: { id: articleId } });
+
+    if (!article) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    // Remove previous reaction
+    if (previous === "like") {
+      article.likes -= 1;
+    }
+
+    if (previous === "dislike") {
+      article.dislikes -= 1;
+    }
+
+    // Add new reaction
+    if (action === "like") {
+      article.likes += 1;
+    } else if (action === "dislike") {
+      article.dislikes += 1;
+    } else if (action === "view") {
+      article.views += 1;
+    } else {
+      return res.status(400).json({ message: "Invalid action" });
+    }
+
+    await article.save();
+
+    res.json(article);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

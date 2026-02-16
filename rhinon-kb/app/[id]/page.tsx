@@ -39,19 +39,26 @@ export async function generateMetadata({
   if (!result) return {};
 
   const { article, theme } = result;
+
+  // Defensive checks for theme properties
+  const seoDescription = article.seoDescription || theme?.seo?.description || "Knowledge Base Article";
+  const seoTitle = article.seoTitle || article.title;
+  const favicon = theme?.favicon || undefined;
+  const previewImage = theme?.preview_image || undefined;
+
   return {
-    title: article.seoTitle || article.title,
-    description: article.seoDescription || theme.seo.description || "Knowledge Base Article",
-    icons: theme.favicon ? [
+    title: seoTitle,
+    description: seoDescription,
+    icons: favicon ? [
       {
         rel: "icon",
-        url: theme.favicon,
+        url: favicon,
       },
     ] : undefined,
     openGraph: {
-      title: article.seoTitle || article.title,
-      description: article.seoDescription || theme.seo.description || "Knowledge Base Article",
-      images: theme.preview_image ? [{ url: theme.preview_image }] : undefined,
+      title: seoTitle,
+      description: seoDescription,
+      images: previewImage ? [{ url: previewImage }] : undefined,
     },
   };
 }

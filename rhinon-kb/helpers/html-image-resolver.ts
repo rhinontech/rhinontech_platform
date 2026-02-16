@@ -24,21 +24,33 @@ export async function resolveImagesInHTML(html: string): Promise<string> {
         if (!src) return;
 
         // Check if src is an S3 key (not a full URL)
+        // Also check if it looks like a relative path that should be an S3 key (contains platform-uploads)
         const isS3KeyValue =
-            !src.startsWith("http://") &&
-            !src.startsWith("https://") &&
-            !src.startsWith("data:") &&
-            !src.startsWith("blob:");
+            (!src.startsWith("http://") &&
+                !src.startsWith("https://") &&
+                !src.startsWith("data:") &&
+                !src.startsWith("blob:")) || src.includes("platform-uploads/");
 
         if (isS3KeyValue) {
+            // If it's a full URL but contains platform-uploads (like localhost:3000/platform-uploads...), 
+            // extract the key part.
+            let s3Key = src;
+            if (src.includes("platform-uploads/")) {
+                // Extract everything from platform-uploads/ onwards
+                const match = src.match(/(platform-uploads\/.*)/);
+                if (match && match[1]) {
+                    s3Key = match[1];
+                }
+            }
+
             // Store original S3 key in data attribute
-            img.setAttribute("data-s3-key", src);
+            img.setAttribute("data-s3-key", s3Key);
             // Remove src temporarily to prevent browser from loading it as relative URL
             img.removeAttribute("src");
 
             try {
                 // Get presigned URL for the S3 key
-                const presignedUrl = await getPresignedUrl(src);
+                const presignedUrl = await getPresignedUrl(s3Key);
                 if (presignedUrl) {
                     img.setAttribute("src", presignedUrl);
                 } else {
@@ -48,7 +60,7 @@ export async function resolveImagesInHTML(html: string): Promise<string> {
                 // Clean up data attribute
                 img.removeAttribute("data-s3-key");
             } catch (error) {
-                console.error(`Failed to resolve S3 key: ${src}`, error);
+                console.error(`Failed to resolve S3 key: ${s3Key}`, error);
                 // Restore original src on error
                 img.setAttribute("src", src);
                 img.removeAttribute("data-s3-key");

@@ -1,4 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+// Server-side: use direct URL, Client-side: use proxy to avoid CORS/blocking
+const API_URL = typeof window === "undefined"
+  ? process.env.NEXT_PUBLIC_API_URL
+  : "/api";
 
 export const fetchKnowledgeBase = async (identifier: string) => {
   if (!API_URL) throw new Error("API_URL is not defined");

@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import './HelpArticlePage.scss';
 import { resolveS3Key, getInitialSrc } from '@/utils/s3KeyResolver';
+import { resolveImagesInHTML } from '@/utils/htmlImageResolver';
+import { Loader } from '@/components/common';
 
 // New imports from restructured modules
 import type { Article, ChatbotConfig, HelpArticlePageProps } from '@/types';
@@ -19,6 +21,8 @@ const HelpArticlePage: React.FC<HelpArticlePageProps> = ({
 }) => {
   const [maxScreen, setMaxScreen] = useState<boolean>(false);
   const [resolvedSecondaryLogo, setResolvedSecondaryLogo] = useState<string>(() => getInitialSrc(chatbot_config?.secondaryLogo));
+  const [processedContent, setProcessedContent] = useState<string>('');
+  const [loadingContent, setLoadingContent] = useState<boolean>(true);
 
   // Resolve S3 key for secondary logo
   useEffect(() => {
@@ -30,6 +34,19 @@ const HelpArticlePage: React.FC<HelpArticlePageProps> = ({
     };
     resolveLogo();
   }, [chatbot_config?.secondaryLogo]);
+
+  // Resolve images in article content
+  useEffect(() => {
+    const processContent = async () => {
+      if (selectedHelpArticle?.content) {
+        setLoadingContent(true);
+        const resolved = await resolveImagesInHTML(selectedHelpArticle.content);
+        setProcessedContent(resolved);
+        setLoadingContent(false);
+      }
+    };
+    processContent();
+  }, [selectedHelpArticle?.content]);
 
   const handleOnBack = () => {
     setSelectedHelpArticle(null);
@@ -110,10 +127,16 @@ const HelpArticlePage: React.FC<HelpArticlePageProps> = ({
         </div>
 
         {/* render content as HTML */}
-        <div
-          className='item-content'
-          dangerouslySetInnerHTML={{ __html: selectedHelpArticle.content }}
-        />
+        {loadingContent ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
+            <Loader />
+          </div>
+        ) : (
+          <div
+            className='item-content'
+            dangerouslySetInnerHTML={{ __html: processedContent }}
+          />
+        )}
       </div>
     </div>
   );

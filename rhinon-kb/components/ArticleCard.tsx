@@ -1,5 +1,7 @@
 import { Article } from "@/types/kb";
 import { Eye, ThumbsUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { resolveImagesInHTML } from "@/helpers/html-image-resolver";
 
 interface ArticleCardProps {
     article: Article;
@@ -7,6 +9,21 @@ interface ArticleCardProps {
 }
 
 export function ArticleCard({ article, onClick }: ArticleCardProps) {
+    const [processedContent, setProcessedContent] = useState<string>(article.content);
+
+    useEffect(() => {
+        const processContent = async () => {
+            try {
+                const resolved = await resolveImagesInHTML(article.content);
+                setProcessedContent(resolved);
+            } catch (error) {
+                console.error("Error processing article card content:", error);
+            }
+        };
+
+        processContent();
+    }, [article.content]);
+
     return (
         <div
             onClick={onClick}
@@ -17,7 +34,7 @@ export function ArticleCard({ article, onClick }: ArticleCardProps) {
             </h4>
             <div
                 className="text-sm text-muted-foreground mt-2 line-clamp-3"
-                dangerouslySetInnerHTML={{ __html: article.content }}
+                dangerouslySetInnerHTML={{ __html: processedContent }}
             />
             <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
