@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { SecureImage } from "@/components/Common/SecureImage";
 
 interface CustomizationSidebarProps {
   isOpen: boolean;
@@ -152,7 +153,7 @@ export const CustomizationSidebar: React.FC<CustomizationSidebarProps> = ({
             heightClass
           )}
         >
-          <img
+          <SecureImage
             src={imageSrc}
             alt={label}
             className="w-full h-full object-cover"

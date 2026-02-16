@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { getKbIdFromHost } from "@/lib/utils";
-import { fetchKnowledgeBase, getArticle } from "@/services/kbServices";
+import { fetchKnowledgeBase, getArticle, getPresignedUrl } from "@/services/kbServices";
 import { ArticleView } from "@/components/ArticleView";
 import { Metadata } from "next";
 import { Theme } from "@/types/kb";
@@ -43,8 +43,17 @@ export async function generateMetadata({
   // Defensive checks for theme properties
   const seoDescription = article.seoDescription || theme?.seo?.description || "Knowledge Base Article";
   const seoTitle = article.seoTitle || article.title;
-  const favicon = theme?.favicon || undefined;
-  const previewImage = theme?.preview_image || undefined;
+
+  // Resolve images if they are S3 keys
+  let favicon = theme?.favicon as string | undefined;
+  if (favicon && !favicon.startsWith('http') && !favicon.startsWith('data:')) {
+    favicon = await getPresignedUrl(favicon);
+  }
+
+  let previewImage = theme?.preview_image as string | undefined;
+  if (previewImage && !previewImage.startsWith('http') && !previewImage.startsWith('data:')) {
+    previewImage = await getPresignedUrl(previewImage);
+  }
 
   return {
     title: seoTitle,
