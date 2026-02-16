@@ -1,7 +1,7 @@
 import KB from "@/components/KB";
 import { headers } from "next/headers";
 import { getKbIdFromHost } from "@/lib/utils";
-import { fetchKnowledgeBase } from "@/services/kbServices";
+import { fetchKnowledgeBase, getPresignedUrl } from "@/services/kbServices";
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -36,19 +36,31 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!result || !result.data) return {};
 
   const { theme } = result.data;
+
+  // Resolve images if they are S3 keys
+  let favicon = theme.favicon as string | undefined;
+  if (favicon && !favicon.startsWith('http') && !favicon.startsWith('data:')) {
+    favicon = await getPresignedUrl(favicon);
+  }
+
+  let previewImage = theme.preview_image as string | undefined;
+  if (previewImage && !previewImage.startsWith('http') && !previewImage.startsWith('data:')) {
+    previewImage = await getPresignedUrl(previewImage);
+  }
+
   return {
     title: theme.seo.title || "Rhinon Tech | Knowledge Base",
     description: theme.seo.description || "Knowledge Base",
-    icons: theme.favicon ? [
+    icons: favicon ? [
       {
         rel: "icon",
-        url: theme.favicon,
+        url: favicon,
       },
     ] : undefined,
     openGraph: {
       title: theme.seo.title || "Rhinon Tech | Knowledge Base",
       description: theme.seo.description || "Knowledge Base",
-      images: theme.preview_image ? [{ url: theme.preview_image }] : undefined,
+      images: previewImage ? [{ url: previewImage }] : undefined,
     },
   };
 }

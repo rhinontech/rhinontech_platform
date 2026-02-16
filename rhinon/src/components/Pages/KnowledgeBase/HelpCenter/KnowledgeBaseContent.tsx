@@ -3,10 +3,13 @@ import {
   ResponsiveMode,
   Theme,
 } from "@/types/knowledgeBase";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ChevronLeft, ThumbsUp, ThumbsDown, Eye, Calendar } from 'lucide-react';
 import { ArticleDetailView } from "./ArticleDetailView";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SecureImage } from "@/components/Common/SecureImage";
+import { getSecureViewUrl } from "@/services/fileUploadService";
+import { resolveImagesInHTML } from "@/utils/html-image-resolver";
 
 interface KnowledgeBaseContentProps {
   data: KnowledgeBaseData;
@@ -23,6 +26,23 @@ export const KnowledgeBaseContent: React.FC<KnowledgeBaseContentProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [bgImage, setBgImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const resolveBg = async () => {
+      if (theme.background_image && typeof theme.background_image === 'string') {
+        if (theme.background_image.startsWith('http') || theme.background_image.startsWith('data:')) {
+          setBgImage(theme.background_image);
+        } else {
+          const url = await getSecureViewUrl(theme.background_image);
+          setBgImage(url);
+        }
+      } else {
+        setBgImage(null);
+      }
+    };
+    resolveBg();
+  }, [theme.background_image]);
 
   const filteredArticles = useMemo(() => {
     if (!searchTerm.trim()) return [];
@@ -65,8 +85,8 @@ export const KnowledgeBaseContent: React.FC<KnowledgeBaseContentProps> = ({
       <div className="flex items-center justify-between w-full h-16 bg-card border-b border-border px-6">
         <div className="flex items-center gap-2">
           {theme.logo ? (
-            <img
-              src={theme.logo || "/placeholder.svg"}
+            <SecureImage
+              src={theme.logo as string}
               alt={theme.company_name || "Logo"}
               className="h-8 object-contain"
             />
@@ -89,8 +109,8 @@ export const KnowledgeBaseContent: React.FC<KnowledgeBaseContentProps> = ({
         className="py-12 px-6 h-96 flex w-full items-center"
         style={{
           backgroundColor: theme.primary_color || "#1e3a8a",
-          backgroundImage: theme.background_image
-            ? `url(${theme.background_image})`
+          backgroundImage: bgImage
+            ? `url(${bgImage})`
             : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
@@ -190,6 +210,12 @@ function ArticleCard({
   article: KnowledgeBaseData["folders"][number]["articles"][number];
   onClick: () => void;
 }) {
+  const [content, setContent] = useState(article.content);
+
+  useEffect(() => {
+    resolveImagesInHTML(article.content).then(setContent);
+  }, [article.content]);
+
   return (
     <div
       onClick={onClick}
@@ -200,7 +226,7 @@ function ArticleCard({
       </h4>
       <div
         className="text-sm text-muted-foreground mt-2 line-clamp-3"
-        dangerouslySetInnerHTML={{ __html: article.content }}
+        dangerouslySetInnerHTML={{ __html: content }}
       />
       <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">

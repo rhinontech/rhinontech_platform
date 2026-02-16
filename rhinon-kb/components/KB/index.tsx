@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
-import { fetchKnowledgeBase } from "@/services/kbServices";
+import { fetchKnowledgeBase, getPresignedUrl } from "@/services/kbServices";
 import { KnowledgeBaseData, Article } from "@/types/kb";
 import { ArticleCard } from "@/components/ArticleCard";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,8 @@ export default function KB({
   const [searchTerm, setSearchTerm] = useState("");
   const [showAll, setShowAll] = useState(false);
   const router = useRouter();
+  const [resolvedLogo, setResolvedLogo] = useState<string | null>(null);
+  const [resolvedBgImage, setResolvedBgImage] = useState<string | null>(null);
 
   const fetchKnowledgeBaseFn = async (kbId: string) => {
     try {
@@ -37,6 +39,31 @@ export default function KB({
       fetchKnowledgeBaseFn(kbId);
     }
   }, [kbId, initialData]);
+
+  // Resolve theme images
+  useEffect(() => {
+    const resolveImages = async () => {
+      if (!data) return;
+      const { theme } = data;
+
+      // Resolve Logo
+      if (theme.logo && !theme.logo.startsWith('http') && !theme.logo.startsWith('data:')) {
+        const url = await getPresignedUrl(theme.logo);
+        setResolvedLogo(url);
+      } else {
+        setResolvedLogo(theme.logo as string);
+      }
+
+      // Resolve Background Image
+      if (theme.background_image && !theme.background_image.startsWith('http') && !theme.background_image.startsWith('data:')) {
+        const url = await getPresignedUrl(theme.background_image);
+        setResolvedBgImage(url);
+      } else {
+        setResolvedBgImage(theme.background_image as string);
+      }
+    };
+    resolveImages();
+  }, [data]);
 
   const filteredArticles = useMemo(() => {
     if (!data || !searchTerm.trim()) return [];
@@ -72,9 +99,9 @@ export default function KB({
       {/* Header with logo and company name */}
       <div className="sticky top-0 z-50 flex items-center justify-between w-full h-16 bg-card border-b border-border px-6">
         <div className="flex items-center gap-2">
-          {theme.logo ? (
+          {resolvedLogo ? (
             <img
-              src={theme.logo || "/placeholder.svg"}
+              src={resolvedLogo}
               alt={theme.company_name || "Logo"}
               className="h-8 object-contain"
             />
@@ -97,8 +124,8 @@ export default function KB({
         className="py-12 px-6 h-96 flex w-full items-center"
         style={{
           backgroundColor: theme.primary_color || "#1e3a8a",
-          backgroundImage: theme.background_image
-            ? `url(${theme.background_image})`
+          backgroundImage: resolvedBgImage
+            ? `url(${resolvedBgImage})`
             : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",

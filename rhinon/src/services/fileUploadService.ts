@@ -87,10 +87,10 @@ export const uploadPdfFile = async (file: File): Promise<UploadPdfResponse> => {
 };
 
 // Legacy support or specific conversation upload if needed by Dashboard
-export const uploadFileAndGetFullUrl = async (file: File) => {
+export const uploadFileAndGetFullUrl = async (file: File, folder: string = "attachments") => {
   try {
     // A. Get Signed URL
-    const { uploadUrl, key, fileName } = await getPresignedUpload(file.name, file.type, "attachments");
+    const { uploadUrl, key, fileName } = await getPresignedUpload(file.name, file.type, folder);
 
     // B. Upload to S3
     await uploadToS3(uploadUrl, file);
