@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const DEFAULT_LOCAL_KB_ID = "5n26450vcq2jmlcsy72eu";
+export const DEFAULT_LOCAL_KB_ID = "g6ma6m5fbczyapihh5htq";
 
 export function getKbIdFromHost(host: string): string | null {
   if (host.includes("localhost")) return DEFAULT_LOCAL_KB_ID;

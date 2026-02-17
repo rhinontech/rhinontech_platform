@@ -106,8 +106,8 @@ const getSeoAnalytics = async (req, res) => {
       const deviceType = /mobile/i.test(ua)
         ? "mobile"
         : /tablet/i.test(ua)
-        ? "tablet"
-        : "desktop";
+          ? "tablet"
+          : "desktop";
       deviceTypes[deviceType] = (deviceTypes[deviceType] || 0) + 1;
 
       const country = s.country || "Unknown";
@@ -146,7 +146,7 @@ const getSeoAnalytics = async (req, res) => {
     const avgSessionDuration =
       timeEngs.length > 0
         ? timeEngs.reduce((sum, e) => sum + (e.metadata?.timeSpent || 0), 0) /
-          timeEngs.length
+        timeEngs.length
         : 0;
 
     const pvBySess = filteredPageviews.reduce((acc, pv) => {
@@ -172,8 +172,8 @@ const getSeoAnalytics = async (req, res) => {
     const returningVisitors =
       uniqueVisitors > 0
         ? (Object.values(visitorCount).filter((v) => v > 1).length /
-            uniqueVisitors) *
-          100
+          uniqueVisitors) *
+        100
         : 0;
 
     const getPrevMetrics = () => {
@@ -194,9 +194,9 @@ const getSeoAnalytics = async (req, res) => {
       const avgSessionDurationPrev =
         timeEngsPrev.length > 0
           ? timeEngsPrev.reduce(
-              (sum, e) => sum + (e.metadata?.timeSpent || 0),
-              0
-            ) / timeEngsPrev.length
+            (sum, e) => sum + (e.metadata?.timeSpent || 0),
+            0
+          ) / timeEngsPrev.length
           : 0;
 
       const pvBySessPrev = pvsPrev.reduce((acc, pv) => {
@@ -223,8 +223,8 @@ const getSeoAnalytics = async (req, res) => {
       const returningVisitorsPrev =
         uniqueVisitorsPrev > 0
           ? (Object.values(visitorCountPrev).filter((v) => v > 1).length /
-              uniqueVisitorsPrev) *
-            100
+            uniqueVisitorsPrev) *
+          100
           : 0;
 
       return {

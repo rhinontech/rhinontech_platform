@@ -14,5 +14,5 @@ router.post("/", verifyToken, createArticle);
 router.get("/:articleId", getArticle);
 router.put("/:id", verifyToken, updateArticle);
 router.delete("/:id", deleteArticle);
-router.post("/stats", verifyToken, updateArticleStats);
+router.post("/stats", updateArticleStats);
 module.exports = router;

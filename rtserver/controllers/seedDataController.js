@@ -1627,8 +1627,8 @@ async function createSeedSEO(organizationId, transaction) {
     for (let i = 0; i < 10; i++) {
         pageviews.push({
             chatbot_id: chatbotId,
-            sessionId: `session_seed_${i % 3}`,
-            userId: `user_seed_${i % 5}`,
+            sessionId: `session_seed_${i % 6}`,
+            userId: `user_seed_${i % 6}`,
             url: `/page-${i % 4}`,
             referrer: i % 2 === 0 ? "https://google.com" : "https://facebook.com",
             userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -1652,6 +1652,50 @@ async function createSeedSEO(organizationId, transaction) {
             chatbot_id: chatbotId,
             sessionId: "session_seed_0",
             userId: "user_seed_0",
+            userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+            screenSize: "1920x1080",
+            language: "en-US",
+            isReturning: false,
+            country: "United States",
+            timestamp: baseTimestamp,
+        },
+        {
+            chatbot_id: chatbotId,
+            sessionId: "session_seed_0",
+            userId: "user_seed_0",
+            userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+            screenSize: "1920x1080",
+            language: "en-US",
+            isReturning: true,
+            country: "United States",
+            timestamp: baseTimestamp + 10000,
+        },
+        {
+            chatbot_id: chatbotId,
+            sessionId: "session_seed_2",
+            userId: "user_seed_2",
+            userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+            screenSize: "1920x1080",
+            language: "en-US",
+            isReturning: true,
+            country: "United States",
+            timestamp: baseTimestamp + 20000,
+        },
+        {
+            chatbot_id: chatbotId,
+            sessionId: "session_seed_4",
+            userId: "user_seed_4",
+            userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+            screenSize: "1920x1080",
+            language: "en-US",
+            isReturning: false,
+            country: "United States",
+            timestamp: baseTimestamp,
+        },
+        {
+            chatbot_id: chatbotId,
+            sessionId: "session_seed_5",
+            userId: "user_seed_5",
             userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
             screenSize: "1920x1080",
             language: "en-US",
@@ -1702,6 +1746,14 @@ async function createSeedSEO(organizationId, transaction) {
         },
         {
             chatbot_id: chatbotId,
+            type: "timeOnPage",
+            url: "/page-0",
+            metadata: { elementId: "cta_button", timeSpent: 900000, text: "Sign Up" },
+            sessionId: "session_seed_0",
+            timestamp: baseTimestamp,
+        },
+        {
+            chatbot_id: chatbotId,
             type: "scroll",
             url: "/page-1",
             metadata: { elementId: "main_content", depth: 80 },
@@ -1710,9 +1762,25 @@ async function createSeedSEO(organizationId, transaction) {
         },
         {
             chatbot_id: chatbotId,
-            type: "form_submit",
-            url: "/contact",
-            metadata: { elementId: "contact_form", formId: "contact-1" },
+            type: "timeOnPage",
+            url: "/page-1",
+            metadata: { elementId: "main_content", timeSpent: 400000, text: "Sign Up" },
+            sessionId: "session_seed_1",
+            timestamp: baseTimestamp - 3600000,
+        },
+        {
+            chatbot_id: chatbotId,
+            type: "timeOnPage",
+            url: "/page-2",
+            metadata: { elementId: "main_content", timeSpent: 600000, text: "Sign Up" },
+            sessionId: "session_seed_1",
+            timestamp: baseTimestamp - 3600000,
+        },
+        {
+            chatbot_id: chatbotId,
+            type: "timeOnPage",
+            url: "/page-3",
+            metadata: { elementId: "contact_form", timeSpent: 5000000, formId: "contact-1" },
             sessionId: "session_seed_2",
             timestamp: baseTimestamp - 7200000,
         },
@@ -1729,45 +1797,115 @@ async function createSeedSEO(organizationId, transaction) {
     const compliances = [
         {
             chatbot_id: chatbotId,
-            baseUrl: "https://example.com/page-0",
-            seoScore: "85",
-            passedChecks: 17,
-            totalChecks: 20,
+            baseUrl: "https://example.com/products/ai-chatbot-platform",
+            seoScore: "78",
+            passedChecks: 26,
+            totalChecks: 34,
             categories: [
                 {
                     category: "Performance",
                     checks: [
                         { title: "First Contentful Paint", status: "Good", fix: null },
-                        { title: "Speed Index", status: "Needs Fix", fix: "Optimize images" }
+                        { title: "Largest Contentful Paint", status: "Needs Improvement", fix: "Optimize hero image and enable compression" },
+                        { title: "Speed Index", status: "Needs Improvement", fix: "Reduce unused JavaScript" },
+                        { title: "Total Blocking Time", status: "Good", fix: null },
+                        { title: "Cumulative Layout Shift", status: "Good", fix: null },
+                        { title: "Unused CSS", status: "Needs Improvement", fix: "Remove unused Tailwind classes and purge CSS" }
                     ]
                 },
                 {
                     category: "Accessibility",
                     checks: [
                         { title: "ARIA Attributes", status: "Good", fix: null },
-                        { title: "Color Contrast", status: "Good", fix: null }
+                        { title: "Color Contrast", status: "Critical", fix: "Increase contrast ratio for buttons and links" },
+                        { title: "Image Alt Attributes", status: "Needs Improvement", fix: "Add descriptive alt text to product images" },
+                        { title: "Form Label Association", status: "Good", fix: null },
+                        { title: "Keyboard Navigation", status: "Good", fix: null }
                     ]
                 },
                 {
                     category: "Best Practices",
                     checks: [
-                        { title: "HTTPS Usage", status: "Good", fix: null }
+                        { title: "HTTPS Usage", status: "Good", fix: null },
+                        { title: "Console Errors", status: "Needs Improvement", fix: "Fix JavaScript errors in main bundle" },
+                        { title: "Uses Modern Image Formats", status: "Needs Improvement", fix: "Serve images in WebP format" },
+                        { title: "Avoid Deprecated APIs", status: "Good", fix: null },
+                        { title: "Security Headers", status: "Critical", fix: "Add Content-Security-Policy and X-Frame-Options headers" }
                     ]
                 },
                 {
                     category: "SEO",
                     checks: [
-                        { title: "Meta Description", status: "Good", fix: null },
-                        { title: "Alt Text", status: "Good", fix: null }
+                        { title: "Meta Title", status: "Good", fix: null },
+                        { title: "Meta Description", status: "Needs Improvement", fix: "Add compelling meta description with target keywords" },
+                        { title: "Canonical Tag", status: "Good", fix: null },
+                        { title: "Structured Data", status: "Needs Improvement", fix: "Implement JSON-LD schema for Product" },
+                        { title: "Robots.txt", status: "Good", fix: null },
+                        { title: "XML Sitemap", status: "Good", fix: null },
+                        { title: "Mobile Friendly", status: "Good", fix: null }
+                    ]
+                },
+                {
+                    category: "Content Quality",
+                    checks: [
+                        { title: "Keyword Optimization", status: "Needs Improvement", fix: "Include primary keyword in H1 and first paragraph" },
+                        { title: "Content Length", status: "Good", fix: null },
+                        { title: "Duplicate Content", status: "Good", fix: null },
+                        { title: "Internal Linking", status: "Needs Improvement", fix: "Add 3-5 internal links to related articles" },
+                        { title: "Outbound Links", status: "Good", fix: null }
+                    ]
+                },
+                {
+                    category: "Technical SEO",
+                    checks: [
+                        { title: "URL Structure", status: "Good", fix: null },
+                        { title: "Broken Links", status: "Needs Improvement", fix: "Fix 2 broken internal links" },
+                        { title: "Redirect Chains", status: "Good", fix: null },
+                        { title: "Indexability", status: "Good", fix: null },
+                        { title: "Hreflang Tags", status: "Needs Improvement", fix: "Add hreflang tags for international pages" }
                     ]
                 }
             ],
             actionItems: [
-                { id: "alt-text", label: "Images are missing alt text", fix: "Add alt tags", priority: "High" },
-                { id: "meta-desc", label: "Missing meta description", fix: "Add meta description", priority: "Medium" }
+                {
+                    id: "color-contrast",
+                    label: "Low color contrast detected on primary buttons",
+                    fix: "Increase contrast ratio to at least 4.5:1",
+                    priority: "High"
+                },
+                {
+                    id: "security-headers",
+                    label: "Missing important security headers",
+                    fix: "Add CSP, X-Content-Type-Options, and X-Frame-Options",
+                    priority: "High"
+                },
+                {
+                    id: "meta-description",
+                    label: "Meta description not optimized for target keyword",
+                    fix: "Rewrite meta description including primary keyword",
+                    priority: "Medium"
+                },
+                {
+                    id: "structured-data",
+                    label: "Structured data schema missing",
+                    fix: "Implement JSON-LD schema markup",
+                    priority: "Medium"
+                },
+                {
+                    id: "alt-text",
+                    label: "Images missing descriptive alt text",
+                    fix: "Add relevant alt attributes to all product images",
+                    priority: "Medium"
+                },
+                {
+                    id: "unused-css",
+                    label: "Unused CSS detected",
+                    fix: "Enable CSS purging in production build",
+                    priority: "Low"
+                }
             ],
             timestamp: baseTimestamp,
-        },
+        }
         // Second entry omitted/simplified for brevity if needed, but I'll keep one good entry
     ];
 
@@ -1781,16 +1919,101 @@ async function createSeedSEO(organizationId, transaction) {
     // Create performance data
     const performance = await seo_performances.create({
         chatbot_id: chatbotId,
-        baseUrl: "https://example.com",
-        overallScore: { performance: 90, accessibility: 95, bestPractices: 85, seo: 92 },
-        metrics: { fcp: "0.8s", lcp: "1.2s", cls: "0.05", tbt: "120ms" },
-        accessibility: { score: 95, issues: [] },
-        bestPractices: { score: 85, issues: [] },
-        seo: { score: 92, issues: [] },
-        opportunities: [{ title: "Eliminate render-blocking resources", savings: "1.2s" }],
-        diagnostics: [{ title: "Minimize main-thread work", value: "0.5s" }],
-        recommendations: [{ title: "Use HTTP/2", priority: "High" }],
-    }, { transaction });
+        baseUrl: "https://example.com/products/ai-chatbot-platform",
+
+        overallScore: {
+            performance: 76,
+            accessibility: 88,
+            bestPractices: 81,
+            seo: 90
+        },
+
+        metrics: {
+            fcp: "1.4s",
+            lcp: "2.6s",
+            cls: "0.12",
+            tbt: "280ms",
+            speedIndex: "2.1s",
+            ttfb: "180ms"
+        },
+
+        accessibility: {
+            score: 88,
+            issues: 5
+        },
+
+        bestPractices: {
+            score: 81,
+            issues: 4
+        },
+
+        seo: {
+            score: 90,
+            issues: 2
+
+        },
+
+        opportunities: [
+            {
+                title: "Eliminate render-blocking resources",
+                description: "Remove unused CSS and defer non-critical JavaScript",
+                savings: "1.3s"
+            },
+            {
+                title: "Serve images in next-gen formats",
+                description: "Convert PNG/JPEG images to WebP",
+                savings: "800KB"
+            },
+            {
+                title: "Enable text compression",
+                description: "Use gzip or Brotli compression on server",
+                savings: "120KB"
+            }
+        ],
+
+        diagnostics: [
+            {
+                title: "Minimize main-thread work",
+                value: "1.9s",
+                description: "Large JavaScript execution blocking UI thread"
+            },
+            {
+                title: "Reduce unused JavaScript",
+                value: "320KB",
+                description: "Remove dead code from bundle"
+            },
+            {
+                title: "Avoid enormous network payloads",
+                value: "2.4MB",
+                description: "Optimize image and video assets"
+            }
+        ],
+
+        recommendations: [
+            {
+                title: "Implement lazy loading for images",
+                priority: "High",
+                impact: "High",
+                effort: "Low",
+                description: "Lazy load offscreen images to reduce LCP."
+            },
+            {
+                title: "Add Content Security Policy headers",
+                priority: "High",
+                impact: "High",
+                effort: "Medium",
+                description: "Protect against XSS attacks."
+            },
+            {
+                title: "Optimize meta tags for better CTR",
+                priority: "Medium",
+                impact: "Medium",
+                effort: "Low",
+                description: "Improve SERP click-through rate."
+            }
+        ]
+    }
+        , { transaction });
     await registerSeedData("seo_performances", performance.id, organizationId, transaction);
 
     return {

@@ -30,14 +30,14 @@ export function CreateTopicDialog({
   initialDescription = "",
   topicId,
 }: CreateTopicDialogProps) {
-  const [name, setName] = useState(initialName);
-  const [description, setDescription] = useState(initialDescription);
+  const [name, setName] = useState(initialName || "");
+  const [description, setDescription] = useState(initialDescription || "");
 
   // Reset form when dialog opens/closes
   useEffect(() => {
     if (open) {
-      setName(initialName);
-      setDescription(initialDescription);
+      setName(initialName || "");
+      setDescription(initialDescription || "");
     }
   }, [open, initialName, initialDescription]);
 
