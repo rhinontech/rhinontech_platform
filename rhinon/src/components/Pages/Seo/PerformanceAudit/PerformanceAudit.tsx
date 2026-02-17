@@ -321,7 +321,7 @@ export function PerformanceAudit({ chatbotId }: SeoPerformanceProps) {
       overall.accessibility +
       overall.bestPractices +
       overall.seo) /
-      4
+    4
   );
 
   return (

@@ -1,12 +1,29 @@
 "use client";
 
-import { Article, Theme } from "@/types/kb";
+import { Theme } from "@/types/kb";
 import { ChevronLeft, Copy, Calendar, Eye, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { resolveImagesInHTML } from "@/helpers/html-image-resolver";
 import "./tiptap.css";
 
 import { useRouter } from "next/navigation";
+import { postArticalStats } from "@/services/kbServices";
+
+
+interface Article {
+    id: string;
+    title: string;
+    content: string;
+    status: string;
+    views: number;
+    likes: number;
+    dislikes: number;
+    updated_at: string;
+    createdAt: string;
+    keywords?: string[];
+    seoTitle?: string;
+    seoDescription?: string;
+}
 
 interface ArticleViewProps {
     article: Article;
@@ -40,6 +57,63 @@ export function ArticleView({ article, theme, onBack }: ArticleViewProps) {
 
         processContent();
     }, [article.content]);
+
+    useEffect(() => {
+        const setStats = async () => {
+            try {
+                const storedArticles = localStorage.getItem("articles");
+                if (storedArticles) {
+                    const articles = JSON.parse(storedArticles);
+                    const existingArticle = articles.find((item: any) => item.id === article.id);
+
+                    if (existingArticle) {
+                        if (existingArticle.previous === "like") {
+                            setLiked(true);
+                            setDisliked(false);
+                        } else if (existingArticle.previous === "dislike") {
+                            setLiked(false);
+                            setDisliked(true);
+                        }
+                    } else {
+                        await postArticalStats({ articleId: article.id, action: "view", previous: "" });
+                        article.views = article.views + 1;
+                        articles.push({ id: article.id, previous: null });
+                        localStorage.setItem("articles", JSON.stringify(articles));
+                    }
+                } else {
+                    await postArticalStats({ articleId: article.id, action: "view", previous: "" });
+                    article.views = article.views + 1;
+                    localStorage.setItem(
+                        "articles",
+                        JSON.stringify([{ id: article.id, previous: null }])
+                    );
+                }
+            } catch (error) {
+                console.log("server error", error)
+            }
+        }
+        setStats();
+    }, [article.id]);
+
+
+
+
+    const updateArticleState = async (newState: "like" | "dislike") => {
+        try {
+            const storedArticles = localStorage.getItem("articles");
+            if (storedArticles) {
+                const articles = JSON.parse(storedArticles);
+                const index = articles.findIndex((item: any) => item.id === article.id);
+                if (index !== -1) {
+                    await postArticalStats({ articleId: article.id, action: newState, previous: articles[index].previous });
+                    articles[index].previous = newState;
+                    localStorage.setItem("articles", JSON.stringify(articles));
+                }
+            }
+        } catch (error) {
+            console.log("server error", error)
+        }
+    };
 
     const handleBack = () => {
         if (onBack) {
@@ -104,8 +178,8 @@ export function ArticleView({ article, theme, onBack }: ArticleViewProps) {
                     <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
                         <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
-                            <time dateTime={article.updatedAt}>
-                                Updated {formatDate(article.updatedAt)}
+                            <time dateTime={article.updated_at}>
+                                Updated {formatDate(article.updated_at)}
                             </time>
                         </div>
                         <div className="flex items-center gap-2">
@@ -166,8 +240,14 @@ export function ArticleView({ article, theme, onBack }: ArticleViewProps) {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => {
-                                setLiked(!liked);
-                                if (disliked) setDisliked(false);
+                                if (liked) return;
+                                if (disliked) {
+                                    article.dislikes = article.dislikes - 1;
+                                }
+                                setLiked(true);
+                                setDisliked(false);
+                                article.likes = article.likes + 1;
+                                updateArticleState("like");
                             }}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-medium ${liked
                                 ? "bg-primary text-primary-foreground"
@@ -179,8 +259,14 @@ export function ArticleView({ article, theme, onBack }: ArticleViewProps) {
                         </button>
                         <button
                             onClick={() => {
-                                setDisliked(!disliked);
-                                if (liked) setLiked(false);
+                                if (disliked) return;
+                                if (liked) {
+                                    article.likes = article.likes - 1;
+                                }
+                                setDisliked(true);
+                                setLiked(false);
+                                article.dislikes = article.dislikes + 1;
+                                updateArticleState("dislike");
                             }}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-medium ${disliked
                                 ? "bg-destructive text-destructive-foreground"

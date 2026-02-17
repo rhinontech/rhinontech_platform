@@ -144,7 +144,7 @@ export function ArticleRow({
         </div>
 
         {/* Performance */}
-        {/* <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
             <Eye className="h-3 w-3" />
             <span>{article.views}</span>
@@ -157,7 +157,7 @@ export function ArticleRow({
             <ThumbsDown className="h-3 w-3" />
             <span>{article.dislikes}</span>
           </div>
-        </div> */}
+        </div>
       </div>
 
       <DropdownMenu>
