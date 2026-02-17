@@ -27,16 +27,16 @@ export function ArticleCard({ article, onClick }: ArticleCardProps) {
     return (
         <div
             onClick={onClick}
-            className="p-4 hover:bg-muted rounded-lg cursor-pointer border border-transparent hover:border-border transition-all duration-200 transform hover:translate-x-1"
+            className="p-4 hover:bg-muted rounded-lg cursor-pointer border border-transparent hover:border-border transition-all duration-200 transform hover:translate-x-1 max-h-40 overflow-hidden flex flex-col"
         >
-            <h4 className="font-semibold text-foreground hover:text-primary transition-colors">
+            <h4 className="font-semibold text-foreground hover:text-primary transition-colors line-clamp-1 mb-1">
                 {article.title}
             </h4>
             <div
-                className="text-sm text-muted-foreground mt-2 line-clamp-3"
+                className="text-sm text-muted-foreground line-clamp-4 [&_img]:hidden"
                 dangerouslySetInnerHTML={{ __html: processedContent }}
             />
-            <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-4 mt-auto pt-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                     <Eye className="w-3 h-3" /> {article.views || 0}
                 </span>

@@ -75,3 +75,28 @@ export const getPresignedUrl = async (key: string): Promise<string> => {
     return "";
   }
 };
+
+
+interface PostArticalStatesProps {
+  articleId: string;
+  action: string;
+  previous?: string;
+}
+
+export const postArticalStats = async ({articleId, action, previous }: PostArticalStatesProps) =>{
+  if (!API_URL) throw new Error("API_URL is not defined");
+
+  const res = await fetch(`${API_URL}/articles/stats`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({articleId, action, previous }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to post article states: ${res.statusText}`);
+  }
+
+  return res.json();
+}
