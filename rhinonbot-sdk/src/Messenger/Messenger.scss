@@ -412,7 +412,11 @@
     bottom: 0;
     top: 0;
     width: 100%;
-    height: 100%;
+    // Use dvh (dynamic viewport height) with vh fallback for older browsers
+    // dvh accounts for mobile browser chrome (address bar, etc.)
+    height: 100vh;
+    height: 100dvh;
+    height: calc(100vh - env(safe-area-inset-bottom, 0px)); // Safe area fallback
     max-width: none;
     max-height: none;
     border-radius: 0;

@@ -463,11 +463,10 @@ export default function Traffic() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab.id
+                    className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
                         ? "border-primary text-primary"
                         : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}>
+                      }`}>
                     {tab.label}
                     <Badge variant="secondary" className="text-xs">
                       {tab.count}
@@ -565,11 +564,11 @@ export default function Traffic() {
                                     readyRooms.includes(visitor.room)
                                       ? router.push(`/${role}/chats`)
                                       : handleTrigger(
-                                          visitor.visitor_email,
-                                          visitor.chatbot_id,
-                                          visitor.visitor_id,
-                                          visitor.room
-                                        )
+                                        visitor.visitor_email,
+                                        visitor.chatbot_id,
+                                        visitor.visitor_id,
+                                        visitor.room
+                                      )
                                   }
                                   disabled={!visitor.is_online}>
                                   {readyRooms.includes(visitor.room)
@@ -584,11 +583,10 @@ export default function Traffic() {
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <div
-                                  className={`w-2 h-2 rounded-full ${
-                                    visitor.is_online
+                                  className={`w-2 h-2 rounded-full ${visitor.is_online
                                       ? "bg-green-500"
                                       : "bg-gray-400"
-                                  }`}
+                                    }`}
                                 />
                                 <span className="text-sm">
                                   {visitor.is_online ? "Browsing" : "Offline"}
