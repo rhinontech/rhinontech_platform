@@ -247,6 +247,13 @@ const Messenger: React.FC<MessengerProps> = ({ config }) => {
       socket.on('connect', () => {
         console.log('Connected to real-person chat');
 
+        if (activeConvoId && activeConvoId !== 'NEW_CHAT') {
+          socket.emit('join_conversation', {
+            chatbot_history: activeConvoId,
+            chatbot_id: config?.app_id,
+          });
+        }
+
         if (convoId === 'NEW_CHAT' && isSpeakingWithRealPerson) {
           const firstMessage: Message = {
             user_email: userEmail,
