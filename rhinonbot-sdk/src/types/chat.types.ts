@@ -19,6 +19,7 @@ export interface ConversationSummary {
   isOnline?: boolean;
   unreadCount?: number;
   lastMessage?: string;
+  type?: 'bot' | 'support';
 }
 
 // Alias for ConversationSummary - used in ChatHistoryScreen

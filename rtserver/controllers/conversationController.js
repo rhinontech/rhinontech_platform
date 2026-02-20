@@ -2,6 +2,7 @@ const {
   bot_conversations,
   support_conversations,
   customers,
+  users_profiles,
 } = require("../models");
 
 // Get all support conversations for a chatbot
@@ -124,9 +125,30 @@ const getSocketConversationByUserId = async (req, res) => {
       console.error("Error fetching customer phone for conversation", e);
     }
 
+    // --- ENRICH WITH ASSIGNED AGENT DETAILS ---
+    let assigned_agent = null;
+    if (socketConversation.assigned_user_id) {
+      try {
+        const agentProfile = await users_profiles.findOne({
+          where: { user_id: socketConversation.assigned_user_id },
+          attributes: ["first_name", "last_name", "image_url"],
+        });
+
+        if (agentProfile) {
+          assigned_agent = {
+            name: `${agentProfile.first_name} ${agentProfile.last_name}`.trim(),
+            image: agentProfile.image_url,
+          };
+        }
+      } catch (e) {
+        console.error("Error fetching assigned agent profile", e);
+      }
+    }
+
     // Convert to plain object to attach new field
     const responseData = socketConversation.toJSON();
     responseData.phone_number = phone_number;
+    responseData.assigned_agent = assigned_agent;
 
     res.json(responseData);
   } catch (err) {
@@ -201,8 +223,31 @@ const getSocketConversationForChatbot = async (req, res) => {
       return res.status(404).json({ message: "Conversation not found" });
     }
 
+    // --- ENRICH WITH ASSIGNED AGENT DETAILS ---
+    let assigned_agent = null;
+    if (socketConversation.assigned_user_id) {
+      try {
+        const agentProfile = await users_profiles.findOne({
+          where: { user_id: socketConversation.assigned_user_id },
+          attributes: ["first_name", "last_name", "image_url"],
+        });
+
+        if (agentProfile) {
+          assigned_agent = {
+            name: `${agentProfile.first_name} ${agentProfile.last_name}`.trim(),
+            image: agentProfile.image_url,
+          };
+        }
+      } catch (e) {
+        console.error("Error fetching assigned agent profile for chatbot", e);
+      }
+    }
+
+    const responseData = socketConversation.toJSON();
+    responseData.assigned_agent = assigned_agent;
+
     // Optional: Ensure messages is parsed if stored as JSONB
-    res.status(200).json(socketConversation);
+    res.status(200).json(responseData);
   } catch (err) {
     console.error("Error fetching socket conversation:", err);
     res.status(500).json({

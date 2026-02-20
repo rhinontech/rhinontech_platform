@@ -5,6 +5,7 @@ import { Loader } from '@/components/common';
 // New imports from restructured modules
 import type { ChatbotConfig, ConversationItem, ChatHistoryScreenProps } from '@/types';
 import { getConversationByUserId } from '@/services/chat';
+import { resolveS3Key } from '@/utils/s3KeyResolver';
 
 const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
   isFreePlan,
@@ -37,7 +38,15 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
         ]);
         return;
       }
-      setConversationIds(sortedConversations);
+      const resolvedConversations = await Promise.all(sortedConversations.map(async (chat: ConversationItem) => {
+        if (chat.avatar) {
+          const resolvedAvatar = await resolveS3Key(chat.avatar, null);
+          return { ...chat, avatar: resolvedAvatar };
+        }
+        return chat;
+      }));
+
+      setConversationIds(resolvedConversations);
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -186,10 +195,17 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
                   onClick={() => onChatSelect(chat.conversation_id)}
                 >
                   <div className='chat-avatar'>
-                    {chat.title === 'Support Chat' ? (
-
-                      <img src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png' alt='support profile' />
-
+                    {chat.avatar ? (
+                      <img
+                        src={chat.avatar}
+                        alt='agent profile'
+                        style={{ borderRadius: '8px', objectFit: 'cover' }}
+                      />
+                    ) : chat.title === 'Support Chat' || chat.type === 'support' ? (
+                      <img
+                        src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'
+                        alt='support profile'
+                      />
                     ) : (
                       <img
                         src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png'
@@ -209,7 +225,11 @@ const ChatHistoryScreen: React.FC<ChatHistoryScreenProps> = ({
                     </div>
                     {chat.lastMessage && (
                       <div className='chat-preview'>
-                        <div className='last-message'>{chat.lastMessage}</div>
+                        <div className='last-message'>
+                          {chat.lastMessage?.includes('<a href') || chat.lastMessage?.includes('platform-uploads')
+                            ? '📷 Photo'
+                            : chat.lastMessage}
+                        </div>
                         {chat.unreadCount && (
                           <div className='unread-badge'>{chat.unreadCount}</div>
                         )}
