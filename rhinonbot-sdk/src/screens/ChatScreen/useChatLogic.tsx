@@ -777,6 +777,7 @@ export const useChatLogic = ({
         if (socketRef.current) {
           socketRef.current.emit('conversation:closed', {
             chatbot_history: conversation.id,
+            chatbot_id: appId,
           });
         }
 

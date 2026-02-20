@@ -388,7 +388,7 @@ export default function ModernDashboard() {
   }
 
   return (
-    <div className="flex h-full w-full overflow-hidden rounded-lg border bg-background dark:bg-background-dark">
+    <div className="flex w-full h-[calc(100vh-var(--header-height)-1rem)] overflow-hidden rounded-lg border bg-background dark:bg-background-dark">
       <div className="flex flex-1 flex-col w-full">
         <ScrollArea className="flex-1 h-0 p-4">
           <div className="max-w-7xl mx-auto py-10">
@@ -565,11 +565,10 @@ export default function ModernDashboard() {
                               <motion.div
                                 animate={{ rotate: isOpen ? 180 : 0 }}
                                 transition={{ duration: 0.3 }}
-                                className={`p-2.5 rounded-lg ${
-                                  isOpen
+                                className={`p-2.5 rounded-lg ${isOpen
                                     ? "bg-primary/10 text-primary"
                                     : "bg-muted text-muted-foreground"
-                                }`}>
+                                  }`}>
                                 <ChevronDown className="w-4 h-4" />
                               </motion.div>
                             </motion.div>

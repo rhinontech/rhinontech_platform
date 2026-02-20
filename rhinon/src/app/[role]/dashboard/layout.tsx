@@ -19,7 +19,7 @@ export default function BillingLayout({
     )}>
       <SidebarProvider>
         {/* <BillingSidebar> */}
-        {children}
+          {children}
 
         {/* </BillingSidebar> */}
       </SidebarProvider>
