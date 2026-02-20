@@ -302,23 +302,118 @@ def get_chat_history(user_id, chatbot_id, conversation_id):
 
 def get_conversation_by_user_id(user_id, chatbot_id):
     with get_db_connection() as conn:
-        query = """
+        # 1. Fetch AI Bot Conversations
+        bot_query = """
             SELECT conversation_id, title, history, updated_at
             FROM bot_conversations
             WHERE user_id = %s AND chatbot_id = %s
-            ORDER BY updated_at DESC;
         """
-        results = run_query(conn, query, (user_id, chatbot_id))
+        bot_results = run_query(conn, bot_query, (user_id, chatbot_id))
+
+        # 2. Fetch Support Conversations (with Agent Details)
+        # We assume users_profiles table exists and is linked via assigned_user_id
+        support_query = """
+            SELECT 
+                sc.id, 
+                sc.messages, 
+                sc.updated_at,
+                up.first_name, 
+                up.last_name, 
+                up.image_url,
+                sc.chatbot_history
+            FROM support_conversations sc
+            LEFT JOIN users_profiles up ON sc.assigned_user_id = up.user_id
+            WHERE sc.user_id = %s AND sc.chatbot_id = %s
+        """
+        support_results = run_query(conn, support_query, (user_id, chatbot_id))
+
+    # Create a set of conversation IDs that are already in support (chatbot_history)
+    support_conversation_ids = set()
+    for row in support_results:
+        # chatbot_history contains the original bot conversation_id
+        chatbot_history = row[6]
+        if chatbot_history:
+            support_conversation_ids.add(chatbot_history)
 
     conversation_list = []
-    for row in results:
+
+    # Process AI Bot Conversations
+    for row in bot_results:
         conversation_id, title, history, updated_at = row
+        
+        # Skip if this conversation exists in support
+        if conversation_id in support_conversation_ids:
+            continue
+
         last_chat_time = updated_at
+        last_message = ""
+        
         if history and isinstance(history, list) and len(history) > 0:
-            last_chat_time = history[-1].get('timestamp', updated_at)
+            last_msg_obj = history[-1]
+            last_chat_time = last_msg_obj.get('timestamp', updated_at)
+            last_message = last_msg_obj.get('text', '')
+
         conversation_list.append({
             'conversation_id': conversation_id,
             'title': title,
-            'last_chat_time': last_chat_time
+            'last_chat_time': last_chat_time,
+            'lastMessage': last_message,
+            'type': 'bot'
         })
+
+    # Process Support Conversations
+    for row in support_results:
+        # sc.id is integer, but frontend expects string ID mostly. 
+        # Actually conversation_id in bot_conversations is UUID string. 
+        # Support ID is int. We'll convert to string to be safe.
+        conv_id_int, messages, updated_at, first_name, last_name, image_url, chatbot_history = row
+        
+        # Determine Title / Name
+        # If agent is assigned, use their name. Else "Support Chat"
+        if first_name and last_name:
+            displayed_title = f"{first_name} {last_name}".strip()
+        else:
+            displayed_title = "Support Chat"
+            
+        # Determine Image
+        # If agent is assigned, use their image. Else None (frontend handles default)
+        displayed_image = image_url if image_url else None
+
+        last_chat_time = updated_at
+        last_message = ""
+
+        # Messages in support_conversations is also JSONB list
+        if messages and isinstance(messages, list) and len(messages) > 0:
+            last_msg_obj = messages[-1]
+            last_chat_time = last_msg_obj.get('timestamp', updated_at)
+            last_message = last_msg_obj.get('text', '')
+
+        conversation_list.append({
+            'conversation_id': chatbot_history if chatbot_history else str(conv_id_int), # use bot conversation_id if available
+            'title': displayed_title,
+            'last_chat_time': last_chat_time,
+            'lastMessage': last_message,
+            'avatar': displayed_image, # Frontend uses this or 'image'
+            'name': displayed_title,   # Explicit name field
+            'type': 'support'
+        })
+
+    # Sort by last_chat_time descending
+    # Handle both string (ISO) and datetime objects if necessary, 
+    # but run_query usually returns datetime objects for TIMESTAMP columns.
+    # JSON timestamps are strings. Let's normalize to string for sorting or ensure types.
+    # Python sort works if types are consistent. 
+    # Let's trust they are comparable (ISO strings or datetimes).
+    # Ideally convert all to ISO string for API response consistency.
+    
+    def get_sort_key(item):
+        t = item['last_chat_time']
+        if isinstance(t, str):
+            return t
+        if isinstance(t, datetime):
+            return t.isoformat()
+        return ""
+
+    conversation_list.sort(key=get_sort_key, reverse=True)
+
     return conversation_list

@@ -142,9 +142,11 @@
 
 .chat-header-info {
   display: flex;
-  flex-direction: column;
-  height: 100%;
+  flex-direction: row;
+  height: auto;
   justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
 }
 
 .chat-name {

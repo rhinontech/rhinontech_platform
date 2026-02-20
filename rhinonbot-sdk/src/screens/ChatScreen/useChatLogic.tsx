@@ -263,6 +263,12 @@ export const useChatLogic = ({
             setConversation(resultSocket);
           }
 
+          // Update Support Name & Image if assigned
+          if (resultSocket.assigned_agent) {
+            setSupportName(resultSocket.assigned_agent.name);
+            setSupportImage(resultSocket.assigned_agent.image);
+          }
+
 
           if (typeof resultSocket.is_closed !== 'undefined') {
             setIsConversationClosed(resultSocket.is_closed);

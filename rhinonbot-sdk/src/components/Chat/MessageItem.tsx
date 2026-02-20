@@ -472,7 +472,7 @@ const RegularMessage: React.FC<{
               textDecoration: 'none',
             }}
           >
-            <img src={fileUrl} alt={fileName} style={{ width: '100%', height: 'auto', display: 'block' }} />
+            <SecureImage src={fileUrl} alt={fileName} style={{ width: '100%', height: 'auto', display: 'block' }} />
             <p
               style={{
                 fontSize: '12px',

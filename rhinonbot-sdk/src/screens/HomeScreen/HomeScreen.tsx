@@ -28,6 +28,7 @@ interface IConversationIds {
   isOnline?: boolean;
   unreadCount?: number;
   lastMessage?: string;
+  type?: 'bot' | 'support';
 }
 
 interface ticket {
@@ -130,9 +131,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
         const resolved = await resolveS3Key(chatbot_config.primaryLogo, null);
         setResolvedLogo(resolved);
       }
+      if (conversationIds?.avatar) {
+        const resolved = await resolveS3Key(conversationIds.avatar, null);
+        // We need a state for resolved avatar, adding it now
+        setConversationIds(prev => prev ? { ...prev, avatar: resolved } : prev);
+      }
     };
     resolveImages();
-  }, [chatbot_config.backgroundImage, chatbot_config.primaryLogo]);
+  }, [chatbot_config.backgroundImage, chatbot_config.primaryLogo, conversationIds?.avatar]);
 
   const handleSendMessage = (conversationId?: string) => {
     onNavigate('chats');
@@ -534,11 +540,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
               <div
                 style={{ display: 'flex', gap: '10px', alignItems: 'center' }}
               >
-                {conversationIds?.title === 'Support Chat' ? (
-
-                  <img src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png' width={50}
-                    style={{ borderRadius: '8px' }} alt='support profile' />
-
+                {conversationIds?.avatar ? (
+                  <img
+                    src={conversationIds.avatar}
+                    width={50}
+                    height={50}
+                    style={{ borderRadius: '8px', objectFit: 'cover' }}
+                    alt='agent profile'
+                  />
+                ) : conversationIds?.title === 'Support Chat' || conversationIds?.type === 'support' ? (
+                  <img
+                    src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/support_avatar.png'
+                    width={50}
+                    style={{ borderRadius: '8px' }}
+                    alt='support profile'
+                  />
                 ) : (
                   <img
                     src='https://rhinontech.s3.ap-south-1.amazonaws.com/rhinon-live/rhinonbot.png'
@@ -559,9 +575,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
                       fontSize: 12,
                       fontWeight: 400,
                       color: '#8A8A8A',
+                      overflow: 'hidden',
+                      whiteSpace: 'nowrap',
+                      textOverflow: 'ellipsis',
+                      maxWidth: '200px'
                     }}
                   >
-                    Send us a message we usually reply in minutes!
+                    {conversationIds?.lastMessage?.includes('<a href') || conversationIds?.lastMessage?.includes('platform-uploads')
+                      ? '📷 Photo'
+                      : conversationIds?.lastMessage || "Send us a message we usually reply in minutes!"}
                   </p>
                 </div>
               </div>
