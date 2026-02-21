@@ -311,9 +311,10 @@
     width: 100vw;
     height: 100vh; // Fallback for older browsers
     height: 100dvh; // Dynamic viewport - excludes browser chrome
-    height: calc(100vh - env(safe-area-inset-bottom, 0px)); // Safe area fallback
     max-width: none;
     max-height: none;
+    top: 0;
+    left: 0;
     bottom: 0;
     right: 0;
     border-radius: 0;
@@ -416,7 +417,6 @@
     // dvh accounts for mobile browser chrome (address bar, etc.)
     height: 100vh;
     height: 100dvh;
-    height: calc(100vh - env(safe-area-inset-bottom, 0px)); // Safe area fallback
     max-width: none;
     max-height: none;
     border-radius: 0;
